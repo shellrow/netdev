@@ -10,4 +10,4 @@ categories = ["network-programming"]
 license = "MIT"
 
 [dependencies]
-pnet = "0.27"
+pnet = "0.26"
