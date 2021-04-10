@@ -34,7 +34,7 @@ pub fn receive_icmp_packets(rx: &mut pnet::transport::TransportReceiver, icmp_ty
     let mut iter = icmp_packet_iter(rx);
     let start_time = Instant::now();
     loop {
-        match iter.next_with_timeout(timeout) {
+        match iter.next_with_timeout(*timeout) {
             Ok(r) => {
                 if let Some((packet, addr)) = r {
                     if packet.get_icmp_type() == icmp_type {
