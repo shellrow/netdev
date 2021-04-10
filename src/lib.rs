@@ -1,36 +1,17 @@
 use std::net::UdpSocket;
 use pnet::transport::TransportChannelType::Layer4;
 use pnet::transport::TransportProtocol::Ipv4;
-//use std::time;
 use std::time::{Duration, Instant};
 use std::net::IpAddr;
-//use pnet::packet::Packet;
 use pnet::transport::icmp_packet_iter;
-use pnet::packet::Packet;
 use pnet::datalink;
 
+#[cfg(target_os = "windows")]
+use pnet::packet::Packet;
+
 pub fn get_default_gateway() -> Result<String,String> {
-    /*
-    let buf = [0u8; 0];
-    let socket = match UdpSocket::bind("0.0.0.0:0") {
-        Ok(s) => s,
-        Err(_) => panic!("error!"),
-    };
-    let dest: &str = "192.168.11.1:80";
-    socket.set_ttl(1).unwrap();
-    socket.send_to(&buf, dest).unwrap();
-    */
     send_udp_packet();
-    /*
-    let protocol = Layer4(Ipv4(pnet::packet::ip::IpNextHeaderProtocols::Icmp));
-    let (mut _tx, mut rx) = match pnet::transport::transport_channel(4096, protocol) {
-        Ok((tx, rx)) => (tx, rx),
-        Err(e) => panic!("Error happened {}", e),
-    };
     let timeout = Duration::from_millis(3000);
-    */
-    let timeout = Duration::from_millis(3000);
-    //let r = receive_icmp_packets(&mut rx, pnet::packet::icmp::IcmpTypes::TimeExceeded, &timeout);
     let r = receive_icmp_packets(pnet::packet::icmp::IcmpTypes::TimeExceeded, &timeout);
     return r;
 }
@@ -41,7 +22,7 @@ pub fn send_udp_packet(){
         Ok(s) => s,
         Err(_) => panic!("error!"),
     };
-    let dest: &str = "192.168.11.1:80";
+    let dest: &str = "8.8.8.8:80";
     socket.set_ttl(1).unwrap();
     socket.send_to(&buf, dest).unwrap();
 }
@@ -115,12 +96,12 @@ fn receive_icmp_packets(icmp_type: pnet::packet::icmp::IcmpType, timeout: &Durat
     let default_idx = get_default_interface_index().unwrap();
     let interfaces = pnet::datalink::interfaces();
     let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == default_idx).next().expect("Failed to get Interface");
-    let (mut _sender, mut receiver) = match datalink::channel(&interface, Default::default()) {
+    let (mut _tx, mut rx) = match datalink::channel(&interface, Default::default()) {
         Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unknown channel type"),
         Err(e) => panic!("Error happened {}", e),
     };
-    receive_packets(&mut receiver, timeout)
+    receive_packets(&mut rx, timeout)
 }
 
 #[cfg(target_os = "windows")]
@@ -158,6 +139,7 @@ fn receive_packets(rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, timeout: 
     }
 }
 
+#[cfg(target_os = "windows")]
 fn ipv4_handler(ethernet: &pnet::packet::ethernet::EthernetPacket) -> Option<String> {
     if let Some(packet) = pnet::packet::ipv4::Ipv4Packet::new(ethernet.payload()){
         match packet.get_next_level_protocol() {
@@ -173,6 +155,7 @@ fn ipv4_handler(ethernet: &pnet::packet::ethernet::EthernetPacket) -> Option<Str
     }
 }
 
+#[cfg(target_os = "windows")]
 fn ipv6_handler(ethernet: &pnet::packet::ethernet::EthernetPacket) -> Option<String> {
     if let Some(packet) = pnet::packet::ipv6::Ipv6Packet::new(ethernet.payload()){
         match packet.get_next_header() {
@@ -188,6 +171,7 @@ fn ipv6_handler(ethernet: &pnet::packet::ethernet::EthernetPacket) -> Option<Str
     }
 }
 
+#[cfg(target_os = "windows")]
 fn icmp_handler(ip_packet: &pnet::packet::ipv4::Ipv4Packet) -> Option<String> {
     if let Some(packet) = pnet::packet::icmp::IcmpPacket::new(ip_packet.payload()){
         if packet.get_icmp_type() == pnet::packet::icmp::IcmpTypes::TimeExceeded {
@@ -201,6 +185,7 @@ fn icmp_handler(ip_packet: &pnet::packet::ipv4::Ipv4Packet) -> Option<String> {
     }
 }
 
+#[cfg(target_os = "windows")]
 fn icmpv6_handler(ip_packet: &pnet::packet::ipv6::Ipv6Packet) -> Option<String> {
     if let Some(packet) = pnet::packet::icmp::IcmpPacket::new(ip_packet.payload()){
         if packet.get_icmp_type() == pnet::packet::icmp::IcmpTypes::TimeExceeded {
