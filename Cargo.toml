@@ -1,0 +1,13 @@
+[package]
+name = "default-net"
+version = "0.1.0"
+authors = ["shellrow <81893184+shellrow@users.noreply.github.com>"]
+edition = "2018"
+repository = "https://github.com/shellrow/default-net"
+readme = "README.md"
+keywords = ["network"]
+categories = ["network-programming"]
+license = "MIT"
+
+[dependencies]
+pnet = "0.27"
