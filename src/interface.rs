@@ -3,6 +3,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use pnet::datalink;
 use crate::gateway;
 
+/// Struct of default Network Interface information
 pub struct Interface {
     pub index: u32,
     pub name: String,
@@ -12,23 +13,7 @@ pub struct Interface {
     pub gateway: gateway::Gateway,
 }
 
-fn get_local_ipaddr() -> Option<String> {
-    let socket = match UdpSocket::bind("0.0.0.0:0") {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-
-    match socket.connect("8.8.8.8:80") {
-        Ok(()) => (),
-        Err(_) => return None,
-    };
-
-    match socket.local_addr() {
-        Ok(addr) => return Some(addr.ip().to_string()),
-        Err(_) => return None,
-    };
-}
-
+/// Get default Interface
 pub fn get_default_interface()-> Option<Interface> {
     let local_ip = get_local_ipaddr();
     let all_interfaces = datalink::interfaces();
@@ -71,6 +56,7 @@ pub fn get_default_interface()-> Option<Interface> {
     }
 }
 
+/// Get default Interface index
 pub fn get_default_interface_index() -> Option<u32> {
     let local_ip = get_local_ipaddr();
     let all_interfaces = datalink::interfaces();
@@ -88,6 +74,7 @@ pub fn get_default_interface_index() -> Option<u32> {
     }
 }
 
+/// Get default Interface name
 pub fn get_default_interface_name() -> Option<String> {
     let local_ip = get_local_ipaddr();
     let all_interfaces = datalink::interfaces();
@@ -103,4 +90,21 @@ pub fn get_default_interface_name() -> Option<String> {
     }else{
         return None;
     }
+}
+
+fn get_local_ipaddr() -> Option<String> {
+    let socket = match UdpSocket::bind("0.0.0.0:0") {
+        Ok(s) => s,
+        Err(_) => return None,
+    };
+
+    match socket.connect("8.8.8.8:80") {
+        Ok(()) => (),
+        Err(_) => return None,
+    };
+
+    match socket.local_addr() {
+        Ok(addr) => return Some(addr.ip().to_string()),
+        Err(_) => return None,
+    };
 }

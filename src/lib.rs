@@ -11,10 +11,3 @@ pub use gateway::get_default_gateway;
 pub use gateway::get_default_gateway_ip;
 pub use gateway::get_default_gateway_mac;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}

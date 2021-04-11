@@ -16,11 +16,13 @@ use pnet::datalink;
 
 use crate::interface;
 
+/// Struct of default Gateway information
 pub struct Gateway {
     pub ip: Option<String>,
     pub mac: Option<String>,
 }
 
+/// Get default Gateway
 pub fn get_default_gateway() -> Gateway {
     let mut gateway: Gateway = Gateway {
         ip: None,
@@ -41,6 +43,7 @@ pub fn get_default_gateway() -> Gateway {
     return gateway;
 }
 
+/// Get default Gateway IP address
 pub fn get_default_gateway_ip() -> Result<String,String>{
     send_udp_packet();
     let timeout = Duration::from_millis(3000);
@@ -48,6 +51,7 @@ pub fn get_default_gateway_ip() -> Result<String,String>{
     return r;
 }
 
+/// Get default Gateway MAC address
 pub fn get_default_gateway_mac(gateway_ip: String) -> Result<String,String>{
     match gateway_ip.parse::<Ipv4Addr>(){
         Ok(ipv4_addr) => {
