@@ -1,4 +1,8 @@
-# default-net
+[crates-badge]: https://img.shields.io/crates/v/default-net.svg
+[crates-url]: https://crates.io/crates/default-net
+[license-badge]: https://img.shields.io/crates/l/default-net.svg
+[examples-url]: https://github.com/shellrow/default-net/tree/main/examples
+# default-net [![Crates.io][crates-badge]][crates-url] ![License][license-badge]
 Get default network information  
 `default-net` provides a cross-platform API for network interface and gateway.
 
@@ -33,5 +37,5 @@ fn main(){
 }
 ```
 
-For more details, see examples or doc.  
+For more details, see [examples][examples-url] or doc.  
 
