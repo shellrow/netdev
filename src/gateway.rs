@@ -69,7 +69,7 @@ fn send_udp_packet(){
     let buf = [0u8; 0];
     let socket = match UdpSocket::bind("0.0.0.0:0") {
         Ok(s) => s,
-        Err(_) => panic!("error!"),
+        Err(e) => panic!("Error happened {}", e),
     };
     let dest: &str = "8.8.8.8:80";
     socket.set_ttl(1).unwrap();
