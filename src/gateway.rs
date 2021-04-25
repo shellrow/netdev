@@ -295,6 +295,7 @@ fn get_mac_through_arp(dst_ip: Ipv4Addr) -> Option<String> {
         let arp = pnet::packet::arp::ArpPacket::new(&buf[pnet::packet::ethernet::MutableEthernetPacket::minimum_packet_size()..]).unwrap();
         if arp.get_sender_hw_addr() != interface.mac.unwrap() {
             target_mac_addr = arp.get_sender_hw_addr();
+            break;
         }
     }
     if target_mac_addr == pnet::datalink::MacAddr::zero() {
