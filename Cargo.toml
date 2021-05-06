@@ -10,6 +10,8 @@ keywords = ["network"]
 categories = ["network-programming"]
 license = "MIT"
 
-[dependencies]
+[target.'cfg(not(windows))'.dependencies]
+pnet = "0.27"
+
+[target.'cfg(target_os = "windows")'.dependencies]
 pnet = "0.26"
-pnet_datalink = "0.27"
