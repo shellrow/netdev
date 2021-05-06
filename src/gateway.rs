@@ -3,17 +3,6 @@ use std::time::{Duration, Instant};
 use std::net::{IpAddr, Ipv4Addr};
 use pnet::packet::Packet;
 use pnet::packet::MutablePacket;
-
-#[cfg(any(unix, macos))]
-use pnet::transport::TransportChannelType::Layer4;
-#[cfg(any(unix, macos))]
-use pnet::transport::TransportProtocol::Ipv4;
-#[cfg(any(unix, macos))]
-use pnet::transport::icmp_packet_iter;
-
-#[cfg(target_os = "windows")]
-use pnet::datalink;
-
 use crate::interface;
 
 /// Struct of default Gateway information
@@ -76,76 +65,21 @@ fn send_udp_packet(){
     socket.send_to(&buf, dest).unwrap();
 }
 
-#[cfg(any(unix, macos))]
 fn receive_icmp_packets(icmp_type: pnet::packet::icmp::IcmpType, timeout: &Duration) -> Result<String, String>{
-    let protocol = Layer4(Ipv4(pnet::packet::ip::IpNextHeaderProtocols::Icmp));
-    let (mut _tx, mut rx) = match pnet::transport::transport_channel(4096, protocol) {
-        Ok((tx, rx)) => (tx, rx),
-        Err(e) => panic!("Error happened {}", e),
-    };
-    let mut iter = icmp_packet_iter(&mut rx);
-    let start_time = Instant::now();
-    loop {
-        match iter.next_with_timeout(*timeout) {
-            Ok(r) => {
-                if let Some((packet, addr)) = r {
-                    if packet.get_icmp_type() == icmp_type {
-                        match addr {
-                            IpAddr::V4(ipv4_addr) =>{return Ok(ipv4_addr.to_string())},
-                            IpAddr::V6(ipv6_addr) =>{return Ok(ipv6_addr.to_string())},
-                        }
-                    }
-                }else{
-                    return Err(String::from("Failed to read packet"));
-                }
-            },
-            Err(e) => {
-                return Err(format!("An error occurred while reading: {}", e));
-            }
-        }
-        if Instant::now().duration_since(start_time) > *timeout {
-            return Err(String::from("timeout"));
-        }else{
-            send_udp_packet();
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn receive_icmp_packets(icmp_type: pnet::packet::icmp::IcmpType, timeout: &Duration) -> Result<String, String>{
-    /*
-    let protocol = Layer4(Ipv4(pnet::packet::ip::IpNextHeaderProtocols::Icmp));
-    let (mut _tx, mut rx) = match pnet::transport::transport_channel(4096, protocol) {
-        Ok((tx, rx)) => (tx, rx),
-        Err(e) => panic!("Error happened {}", e),
-    };
-    let mut iter = icmp_packet_iter(&mut rx);
-    let start_time = Instant::now();
-    loop {
-        match iter.next() {
-            Ok((packet, addr)) => {
-                if packet.get_icmp_type() == icmp_type {
-                    match addr {
-                        IpAddr::V4(ipv4_addr) =>{return Ok(ipv4_addr.to_string())},
-                        IpAddr::V6(ipv6_addr) =>{return Ok(ipv6_addr.to_string())},
-                    }
-                }
-            },
-            Err(e) => {
-                return Err(format!("An error occurred while reading: {}", e));
-            }
-        }
-        if Instant::now().duration_since(start_time) > *timeout {
-            return Err(String::from("timeout"));
-        }else{
-            send_udp_packet();
-        }
-    }
-    */
     let default_idx = interface::get_default_interface_index().unwrap();
     let interfaces = pnet::datalink::interfaces();
     let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == default_idx).next().expect("Failed to get Interface");
-    let (mut _tx, mut rx) = match datalink::channel(&interface, Default::default()) {
+    let config = pnet::datalink::Config {
+        write_buffer_size: 4096,
+        read_buffer_size: 4096,
+        read_timeout: None,
+        write_timeout: None,
+        channel_type: pnet::datalink::ChannelType::Layer2,
+        bpf_fd_attempts: 1000,
+        linux_fanout: None,
+        promiscuous: false,
+    };
+    let (mut _tx, mut rx) = match pnet::datalink::channel(&interface, config) {
         Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unknown channel type"),
         Err(e) => panic!("Error happened {}", e),
@@ -153,7 +87,6 @@ fn receive_icmp_packets(icmp_type: pnet::packet::icmp::IcmpType, timeout: &Durat
     receive_packets(&mut rx, icmp_type, timeout)
 }
 
-#[cfg(target_os = "windows")]
 fn receive_packets(rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, icmp_type: pnet::packet::icmp::IcmpType, timeout: &Duration) -> Result<String, String>{
     let start_time = Instant::now();
     loop {
@@ -171,9 +104,7 @@ fn receive_packets(rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, icmp_type
                             return Ok(ip_addr);
                         }
                     },
-                    _ => {
-                        //println!("Not a ipv4 or ipv6");
-                    }
+                    _ => {}
                 }
             },
             Err(e) => {
@@ -188,7 +119,6 @@ fn receive_packets(rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, icmp_type
     }
 }
 
-#[cfg(target_os = "windows")]
 fn ipv4_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, icmp_type: pnet::packet::icmp::IcmpType) -> Option<String> {
     if let Some(packet) = pnet::packet::ipv4::Ipv4Packet::new(ethernet.payload()){
         match packet.get_next_level_protocol() {
@@ -204,7 +134,6 @@ fn ipv4_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, icmp_type: pn
     }
 }
 
-#[cfg(target_os = "windows")]
 fn ipv6_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, icmp_type: pnet::packet::icmp::IcmpType) -> Option<String> {
     if let Some(packet) = pnet::packet::ipv6::Ipv6Packet::new(ethernet.payload()){
         match packet.get_next_header() {
@@ -220,7 +149,6 @@ fn ipv6_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, icmp_type: pn
     }
 }
 
-#[cfg(target_os = "windows")]
 fn icmp_handler(ip_packet: &pnet::packet::ipv4::Ipv4Packet, icmp_type: pnet::packet::icmp::IcmpType) -> Option<String> {
     if let Some(packet) = pnet::packet::icmp::IcmpPacket::new(ip_packet.payload()){
         if packet.get_icmp_type() == icmp_type {
@@ -234,7 +162,6 @@ fn icmp_handler(ip_packet: &pnet::packet::ipv4::Ipv4Packet, icmp_type: pnet::pac
     }
 }
 
-#[cfg(target_os = "windows")]
 fn icmpv6_handler(ip_packet: &pnet::packet::ipv6::Ipv6Packet, icmp_type: pnet::packet::icmp::IcmpType) -> Option<String> {
     if let Some(packet) = pnet::packet::icmp::IcmpPacket::new(ip_packet.payload()){
         if packet.get_icmp_type() == icmp_type {

@@ -1,6 +1,6 @@
 [package]
 name = "default-net"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["shellrow <81893184+shellrow@users.noreply.github.com>"]
 edition = "2018"
 description = "Get default network information"
@@ -11,4 +11,4 @@ categories = ["network-programming"]
 license = "MIT"
 
 [dependencies]
-pnet = "0.26"
+pnet = "0.27"
