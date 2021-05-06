@@ -67,27 +67,27 @@ fn send_udp_packet(){
 
 fn receive_icmp_packets(icmp_type: pnet::packet::icmp::IcmpType, timeout: &Duration) -> Result<String, String>{
     let default_idx = interface::get_default_interface_index().unwrap();
-    let interfaces = pnet::datalink::interfaces();
-    let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == default_idx).next().expect("Failed to get Interface");
-    let config = pnet::datalink::Config {
+    let interfaces = pnet_datalink::interfaces();
+    let interface = interfaces.into_iter().filter(|interface: &pnet_datalink::NetworkInterface| interface.index == default_idx).next().expect("Failed to get Interface");
+    let config = pnet_datalink::Config {
         write_buffer_size: 4096,
         read_buffer_size: 4096,
         read_timeout: None,
         write_timeout: None,
-        channel_type: pnet::datalink::ChannelType::Layer2,
+        channel_type: pnet_datalink::ChannelType::Layer2,
         bpf_fd_attempts: 1000,
         linux_fanout: None,
         promiscuous: false,
     };
-    let (mut _tx, mut rx) = match pnet::datalink::channel(&interface, config) {
-        Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+    let (mut _tx, mut rx) = match pnet_datalink::channel(&interface, config) {
+        Ok(pnet_datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unknown channel type"),
         Err(e) => panic!("Error happened {}", e),
     };
     receive_packets(&mut rx, icmp_type, timeout)
 }
 
-fn receive_packets(rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, icmp_type: pnet::packet::icmp::IcmpType, timeout: &Duration) -> Result<String, String>{
+fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>, icmp_type: pnet::packet::icmp::IcmpType, timeout: &Duration) -> Result<String, String>{
     let start_time = Instant::now();
     loop {
         match rx.next() {
