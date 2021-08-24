@@ -60,7 +60,7 @@ fn send_udp_packet(){
         Ok(s) => s,
         Err(e) => panic!("Error happened {}", e),
     };
-    let dest: &str = "8.8.8.8:80";
+    let dest: &str = "1.1.1.1:80";
     socket.set_ttl(1).unwrap();
     socket.send_to(&buf, dest).unwrap();
 }

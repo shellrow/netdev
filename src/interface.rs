@@ -98,7 +98,7 @@ fn get_local_ipaddr() -> Option<String> {
         Err(_) => return None,
     };
 
-    match socket.connect("8.8.8.8:80") {
+    match socket.connect("1.1.1.1:80") {
         Ok(()) => (),
         Err(_) => return None,
     };
