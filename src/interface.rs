@@ -14,7 +14,7 @@ pub struct Interface {
 }
 
 /// Get default Interface
-pub fn get_default_interface()-> Option<Interface> {
+pub fn get_default_interface() -> Option<Interface> {
     let local_ip = get_local_ipaddr();
     let all_interfaces = datalink::interfaces();
     if let Some(local_ip) = local_ip {
@@ -61,8 +61,8 @@ pub fn get_default_interface_index() -> Option<u32> {
     let local_ip = get_local_ipaddr();
     let all_interfaces = datalink::interfaces();
     if let Some(local_ip) = local_ip {
-        for iface in all_interfaces{
-            for ip in iface.ips{
+        for iface in all_interfaces {
+            for ip in iface.ips {
                 if local_ip == ip.ip().to_string() {
                     return Some(iface.index)
                 }
@@ -79,8 +79,8 @@ pub fn get_default_interface_name() -> Option<String> {
     let local_ip = get_local_ipaddr();
     let all_interfaces = datalink::interfaces();
     if let Some(local_ip) = local_ip {
-        for iface in all_interfaces{
-            for ip in iface.ips{
+        for iface in all_interfaces {
+            for ip in iface.ips {
                 if local_ip == ip.ip().to_string() {
                     return Some(iface.name)
                 }
