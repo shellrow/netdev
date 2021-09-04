@@ -11,4 +11,7 @@ categories = ["network-programming"]
 license = "MIT"
 
 [dependencies]
-pnet = "0.26"
+pnet = "0.28"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3.8", features = [ "std" ] }
