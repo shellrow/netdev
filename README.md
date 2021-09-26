@@ -15,7 +15,7 @@ Get default network information
 Add `default-net` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-default-net = "0.3.0"
+default-net = "0.4.0"
 ```
 
 ## Example 
