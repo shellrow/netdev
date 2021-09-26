@@ -85,7 +85,17 @@ fn receive_icmp_packets(icmp_type: pnet::packet::icmp::IcmpType, timeout: &Durat
     };
     let interfaces = pnet::datalink::interfaces();
     let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == default_idx).next().expect("Failed to get Interface");
-    let (mut _tx, mut rx) = match pnet::datalink::channel(&interface, Default::default()) {
+    let config = pnet::datalink::Config {
+        write_buffer_size: 4096,
+        read_buffer_size: 4096,
+        read_timeout: None,
+        write_timeout: None,
+        channel_type: pnet::datalink::ChannelType::Layer2,
+        bpf_fd_attempts: 1000,
+        linux_fanout: None,
+        promiscuous: false,
+    };
+    let (mut _tx, mut rx) = match pnet::datalink::channel(&interface, config) {
         Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unknown channel type"),
         Err(e) => panic!("Error happened {}", e),
