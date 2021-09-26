@@ -8,7 +8,7 @@ Get default network information
 
 ## Supported platform
 - Linux
-- macOS(OS X)
+- macOS
 - Windows
 
 ## Usage
