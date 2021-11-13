@@ -2,16 +2,20 @@ use std::net::UdpSocket;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use crate::gateway::{self, Gateway};
 
+/// Struct of MAC address
 #[derive(Clone, Debug)]
 pub struct MacAddr(u8, u8, u8, u8, u8, u8);
 
 impl MacAddr {
+    /// Construct a new MacAddr struct from the given octets
     pub fn new(octets: [u8; 6]) -> MacAddr {
         MacAddr(octets[0], octets[1], octets[2], octets[3], octets[4], octets[5])
     }
+    /// Returns an array of MAC address octets
     pub fn octets(&self) -> [u8; 6] {
         [self.0,self.1,self.2,self.3,self.4,self.5]
     }
+    /// Return a formatted string of MAC address
     pub fn address(&self) -> String {
         format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", self.0,self.1,self.2,self.3,self.4,self.5)
     }
