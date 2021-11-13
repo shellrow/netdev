@@ -50,5 +50,11 @@ fn main(){
 }
 ```
 
-For more details, see [examples][examples-url] or doc.  
+## Tested on
+- Linux
+    - Kali 2021.1 (VMware)
+    - Ubuntu 20.04
+- macOS 11.6
+- Windows 10 20H2
 
+For more details, see [examples][examples-url] or doc.  
