@@ -1,3 +1,4 @@
+mod os;
 pub mod interface;
 pub mod gateway;
 
