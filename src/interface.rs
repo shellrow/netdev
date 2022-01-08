@@ -19,6 +19,9 @@ impl MacAddr {
     pub fn address(&self) -> String {
         format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", self.0,self.1,self.2,self.3,self.4,self.5)
     }
+    pub fn zero() -> MacAddr {
+        MacAddr(0,0,0,0,0,0)
+    }
 }
 
 impl std::fmt::Display for MacAddr {
@@ -33,6 +36,7 @@ impl std::fmt::Display for MacAddr {
 pub struct Interface {
     pub index: u32,
     pub name: String,
+    pub description: Option<String>,
     pub mac_addr: Option<MacAddr>,
     pub ipv4: Vec<Ipv4Addr>,
     pub ipv6: Vec<Ipv6Addr>,
@@ -70,6 +74,7 @@ pub fn get_default_interface() -> Result<Interface, String> {
                     let interface: Interface = Interface{
                         index: iface.index,
                         name: iface.name,
+                        description: None,
                         mac_addr: mac_addr,
                         ipv4: ipv4_vec,
                         ipv6: ipv6_vec,
