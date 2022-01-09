@@ -53,8 +53,8 @@ fn main(){
 
 ## Tested on
 - Linux
-    - Kali 2021.1 (VMware)
-    - Ubuntu 20.04
+    - Ubuntu 20.04, 18.04
+    - Kali 2021.1 (VM)
 - macOS 11.6
 - Windows 10 20H2
 

@@ -31,7 +31,7 @@ impl std::fmt::Display for MacAddr {
     }
 }
 
-/// Structure of default Network Interface information
+/// Structure of Network Interface information
 #[derive(Clone, Debug)]
 pub struct Interface {
     pub index: u32,
