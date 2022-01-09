@@ -60,6 +60,8 @@ fn main(){
 
 For more details, see [examples][examples-url] or doc.  
 
+## v0.6.0
+Remove libpnet from Windows build dependencies and changed to windows-rs only.
 
 ## For Windows users using v0.5.0 or lower
 To build [libpnet](https://github.com/libpnet/libpnet) on Windows, follow the instructions below.
