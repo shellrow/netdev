@@ -1,6 +1,7 @@
 use std::net::UdpSocket;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use crate::gateway::{self, Gateway};
+use crate::os;
 
 /// Struct of MAC address
 #[derive(Clone, Debug)]
@@ -43,6 +44,31 @@ pub struct Interface {
     pub gateway: Option<Gateway>,
 }
 
+#[cfg(target_os = "windows")]
+pub fn get_default_interface() -> Result<Interface, String> {
+    let local_ip: IpAddr = match os::get_local_ipaddr(){
+        Some(local_ip) => local_ip,
+        None => return Err(String::from("Local IP address not found")),
+    };
+    let interfaces: Vec<Interface> = os::get_interfaces();
+    for iface in interfaces {
+        match local_ip {
+            IpAddr::V4(local_ipv4) => {
+                if iface.ipv4.contains(&local_ipv4) {
+                    return Ok(iface);
+                }
+            },
+            IpAddr::V6(local_ipv6) => {
+                if iface.ipv6.contains(&local_ipv6) {
+                    return Ok(iface);
+                }
+            },
+        }
+    }
+    Err(String::from("Default Interface not found"))
+}
+
+#[cfg(not(target_os="windows"))]
 /// Get default Interface
 pub fn get_default_interface() -> Result<Interface, String> {
     let local_ip = get_local_ipaddr();

@@ -11,3 +11,6 @@ Cargo.lock
 
 # mac
 .DS_Store
+
+# debug
+/.vscode/
