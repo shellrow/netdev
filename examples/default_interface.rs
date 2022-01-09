@@ -6,6 +6,7 @@ fn main(){
             println!("Default Interface");
             println!("\tIndex: {}", default_interface.index);
             println!("\tName: {}", default_interface.name);
+            println!("\tDescription: {:?}", default_interface.description);
             if let Some(mac_addr) = default_interface.mac_addr {
                 println!("\tMAC: {}", mac_addr);
             }else{
