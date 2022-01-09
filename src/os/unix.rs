@@ -153,6 +153,7 @@ fn icmpv6_handler(ip_packet: &pnet_packet::ipv6::Ipv6Packet) -> Option<IpAddr> {
     }
 }
 
+// Get network interfaces
 pub fn interfaces() -> Vec<Interface> {
     let mut result: Vec<Interface> = vec![];
     let local_ip: IpAddr = match super::get_local_ipaddr(){
@@ -206,7 +207,7 @@ pub fn interfaces() -> Vec<Interface> {
     return result;
 }
 
-/// Get default Interface index
+// Get default Interface index
 pub fn default_interface_index() -> Option<u32> {
     let local_ip: IpAddr = match super::get_local_ipaddr(){
         Some(local_ip) => local_ip,
@@ -223,7 +224,7 @@ pub fn default_interface_index() -> Option<u32> {
     return None;
 }
 
-/// Get default Interface name
+// Get default Interface name
 pub fn default_interface_name() -> Option<String> {
     let local_ip: IpAddr = match super::get_local_ipaddr(){
         Some(local_ip) => local_ip,

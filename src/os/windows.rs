@@ -166,22 +166,50 @@ pub fn interfaces() -> Vec<Interface> {
     return interfaces;
 }
 
-#[cfg(test)]
-mod tests {
-    use std::net::Ipv4Addr;
-    use super::*;
-    #[test]
-    fn test_nw_interfaces() {
-        let interfaces = get_interfaces();
-        for interface in interfaces {
-            println!("{:?}", interface);
+// Get default Interface index
+pub fn default_interface_index() -> Option<u32> {
+    let local_ip: IpAddr = match super::get_local_ipaddr(){
+        Some(local_ip) => local_ip,
+        None => return None,
+    };
+    let interfaces = interfaces();
+    for iface in interfaces {
+        match local_ip {
+            IpAddr::V4(local_ipv4) => {
+                if iface.ipv4.contains(&local_ipv4) {
+                    return Some(iface.index);
+                }
+            },
+            IpAddr::V6(local_ipv6) => {
+                if iface.ipv6.contains(&local_ipv6) {
+                    return Some(iface.index);
+                }
+            },
         }
     }
-    #[test]
-    fn test_arp() {
-        let src_ip: Ipv4Addr = Ipv4Addr::new(192, 168, 1, 2);
-        let dst_ip: Ipv4Addr = Ipv4Addr::new(192, 168, 1, 1);
-        let mac_addr = get_mac_through_arp(src_ip, dst_ip);
-        println!("{}", mac_addr);
+    None
+}
+
+// Get default Interface name
+pub fn default_interface_name() -> Option<String> {
+    let local_ip: IpAddr = match super::get_local_ipaddr(){
+        Some(local_ip) => local_ip,
+        None => return None,
+    };
+    let interfaces = interfaces();
+    for iface in interfaces {
+        match local_ip {
+            IpAddr::V4(local_ipv4) => {
+                if iface.ipv4.contains(&local_ipv4) {
+                    return Some(iface.name);
+                }
+            },
+            IpAddr::V6(local_ipv6) => {
+                if iface.ipv6.contains(&local_ipv6) {
+                    return Some(iface.name);
+                }
+            },
+        }
     }
+    None
 }
