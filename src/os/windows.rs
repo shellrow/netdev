@@ -58,7 +58,7 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
 // Get network interfaces using the IP Helper API
 // TODO: Make more rusty ...
 // Reference: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersinfo
-pub fn get_interfaces() -> Vec<Interface> {
+pub fn interfaces() -> Vec<Interface> {
     let mut interfaces: Vec<Interface> = vec![];
     let mut out_buf_len : u32 = mem::size_of::<IP_ADAPTER_INFO>().try_into().unwrap();
     let mut raw_adaptor_mem: Vec<u8> = Vec::with_capacity(out_buf_len  as usize);

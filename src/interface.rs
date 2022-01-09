@@ -1,9 +1,8 @@
-use std::net::UdpSocket;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use crate::gateway::{self, Gateway};
+use crate::gateway::{Gateway};
 use crate::os;
 
-/// Struct of MAC address
+/// Structure of MAC address
 #[derive(Clone, Debug)]
 pub struct MacAddr(u8, u8, u8, u8, u8, u8);
 
@@ -32,7 +31,7 @@ impl std::fmt::Display for MacAddr {
     }
 }
 
-/// Struct of default Network Interface information
+/// Structure of default Network Interface information
 #[derive(Clone, Debug)]
 pub struct Interface {
     pub index: u32,
@@ -44,13 +43,13 @@ pub struct Interface {
     pub gateway: Option<Gateway>,
 }
 
-#[cfg(target_os = "windows")]
+/// Get default Network Interface
 pub fn get_default_interface() -> Result<Interface, String> {
     let local_ip: IpAddr = match os::get_local_ipaddr(){
         Some(local_ip) => local_ip,
         None => return Err(String::from("Local IP address not found")),
     };
-    let interfaces: Vec<Interface> = os::get_interfaces();
+    let interfaces: Vec<Interface> = os::interfaces();
     for iface in interfaces {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
@@ -68,103 +67,41 @@ pub fn get_default_interface() -> Result<Interface, String> {
     Err(String::from("Default Interface not found"))
 }
 
-#[cfg(not(target_os="windows"))]
-/// Get default Interface
-pub fn get_default_interface() -> Result<Interface, String> {
-    let local_ip = get_local_ipaddr();
-    let interfaces = pnet_datalink::interfaces();
-    if let Some(local_ip) = local_ip {
-        for iface in interfaces{
-            for ip in &iface.ips{
-                if local_ip == ip.ip().to_string() {
-                    let mac_addr: Option<MacAddr> = match iface.mac {
-                        Some(mac_addr) => Some(MacAddr::new(mac_addr.octets())),
-                        None => None,
-                    };
-                    let mut ipv4_vec: Vec<Ipv4Addr> = vec![];
-                    let mut ipv6_vec: Vec<Ipv6Addr> = vec![];
-                    for ip in &iface.ips {
-                        match ip.ip() {
-                            IpAddr::V4(ipv4_addr) => {
-                                ipv4_vec.push(ipv4_addr);
-                            },
-                            IpAddr::V6(ipv6_addr) => {
-                                ipv6_vec.push(ipv6_addr);
-                            },
-                        }
-                    }
-                    let default_gateway: Option<Gateway> = match gateway::get_default_gateway() {
-                        Ok(gateway) => Some(gateway),
-                        Err(_) => None,
-                    };
-                    let interface: Interface = Interface{
-                        index: iface.index,
-                        name: iface.name,
-                        description: None,
-                        mac_addr: mac_addr,
-                        ipv4: ipv4_vec,
-                        ipv6: ipv6_vec,
-                        gateway: default_gateway,
-                    };
-                    return Ok(interface);
-                }
-            }
-        }
-        return Err(String::from(""));
-    }else{
-        return Err(String::from(""));
-    }
-}
-
-/// Get default Interface index
+/// Get default Network Interface index
 pub fn get_default_interface_index() -> Option<u32> {
-    let local_ip = get_local_ipaddr();
-    let interfaces = pnet_datalink::interfaces();
-    if let Some(local_ip) = local_ip {
-        for iface in interfaces {
-            for ip in iface.ips {
-                if local_ip == ip.ip().to_string() {
-                    return Some(iface.index)
-                }
-            }
-        }
-        return None;
-    }else{
-        return None;
-    }
+    os::default_interface_index()
 }
 
-/// Get default Interface name
+/// Get default Network Interface name
 pub fn get_default_interface_name() -> Option<String> {
-    let local_ip = get_local_ipaddr();
-    let interfaces = pnet_datalink::interfaces();
-    if let Some(local_ip) = local_ip {
-        for iface in interfaces {
-            for ip in iface.ips {
-                if local_ip == ip.ip().to_string() {
-                    return Some(iface.name)
-                }
-            }
-        }
-        return None;
-    }else{
-        return None;
-    }
+    os::default_interface_name()
 }
 
-fn get_local_ipaddr() -> Option<String> {
-    let socket = match UdpSocket::bind("0.0.0.0:0") {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
+/// Get a list of available Network Interfaces
+pub fn get_interfaces() -> Vec<Interface> {
+    os::interfaces()
+}
 
-    match socket.connect("1.1.1.1:80") {
-        Ok(()) => (),
-        Err(_) => return None,
-    };
-
-    match socket.local_addr() {
-        Ok(addr) => return Some(addr.ip().to_string()),
-        Err(_) => return None,
-    };
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_interfaces() {
+        let interfaces = get_interfaces();
+        for interface in interfaces {
+            println!("{:#?}", interface);
+        }
+    }
+    #[test]
+    fn test_default_interface() {
+        println!("{:#?}", get_default_interface());
+    }
+    #[test]
+    fn test_default_interface_index() {
+        println!("{:?}", get_default_interface_index());
+    }
+    #[test]
+    fn test_default_interface_name() {
+        println!("{:?}", get_default_interface_name());
+    }
 }

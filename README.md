@@ -15,7 +15,7 @@ Get default network information
 Add `default-net` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-default-net = "0.5.0"
+default-net = "0.6.0"
 ```
 
 ## Example 
@@ -28,6 +28,7 @@ fn main(){
             println!("Default Interface");
             println!("\tIndex: {}", default_interface.index);
             println!("\tName: {}", default_interface.name);
+            println!("\tDescription: {:?}", default_interface.description);
             if let Some(mac_addr) = default_interface.mac_addr {
                 println!("\tMAC: {}", mac_addr);
             }else{
@@ -50,7 +51,17 @@ fn main(){
 }
 ```
 
-## Note for Windows users
+## Tested on
+- Linux
+    - Kali 2021.1 (VMware)
+    - Ubuntu 20.04
+- macOS 11.6
+- Windows 10 20H2
+
+For more details, see [examples][examples-url] or doc.  
+
+
+## For Windows users using v0.5.0 or lower
 To build [libpnet](https://github.com/libpnet/libpnet) on Windows, follow the instructions below.
 > ### Windows
 > * You must use a version of Rust which uses the MSVC toolchain
@@ -62,12 +73,3 @@ To build [libpnet](https://github.com/libpnet/libpnet) on Windows, follow the in
 >   in `WpdPack/Lib/x64/Packet.lib`, for the 32 bit toolchain, it is in `WpdPack/Lib/Packet.lib`.
 
 [Source](https://github.com/libpnet/libpnet/blob/master/README.md#windows "libpnet#windows")
-
-## Tested on
-- Linux
-    - Kali 2021.1 (VMware)
-    - Ubuntu 20.04
-- macOS 11.6
-- Windows 10 20H2
-
-For more details, see [examples][examples-url] or doc.  

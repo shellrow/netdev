@@ -9,4 +9,4 @@ pub use self::windows::*;
 #[cfg(not(target_os="windows"))]
 mod unix;
 #[cfg(not(target_os="windows"))]
-use self::unix::*;
+pub use self::unix::*;
