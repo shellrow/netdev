@@ -1,6 +1,8 @@
 mod os;
 mod sys;
 mod bpf;
+mod socket;
+
 pub mod interface;
 pub mod gateway;
 

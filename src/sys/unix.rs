@@ -51,7 +51,7 @@ pub fn sockaddr_to_addr(storage: &SockAddrStorage, len: usize) -> io::Result<Soc
                 storage.sin6_scope_id,
             )))
         }
-        _ => Err(io::Error::new(io::ErrorKind::InvalidData, "expected IPv4 or IPv6 socket",)),
+        _ => Err(io::Error::new(io::ErrorKind::InvalidData, "Not supported",)),
     }
 }
 

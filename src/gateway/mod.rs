@@ -1,4 +1,4 @@
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr};
 use crate::interface::{MacAddr, Interface};
 use crate::os;
 
@@ -7,6 +7,15 @@ use crate::os;
 pub struct Gateway {
     pub mac_addr: MacAddr,
     pub ip_addr: IpAddr,
+}
+
+impl Gateway {
+    pub fn new() -> Gateway {
+        Gateway {
+            mac_addr: MacAddr::zero(),
+            ip_addr: IpAddr::V4(Ipv4Addr::LOCALHOST),
+        }
+    }
 }
 
 /// Get default Gateway
