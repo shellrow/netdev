@@ -4,7 +4,6 @@ pub mod unix;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod linux;
 
-use std::net::UdpSocket;
 use std::net::{IpAddr, Ipv4Addr};
 use crate::interface::{self, MacAddr, Interface};
 
@@ -52,7 +51,9 @@ pub fn get_default_gateway() -> Result<Gateway, String> {
     Err(String::from("Default Gateway not found"))
 }
 
+#[cfg(not(target_os="windows"))]
 fn send_udp_packet() -> Result<(), String> {
+    use std::net::UdpSocket;
     let buf = [0u8; 0];
     let socket = match UdpSocket::bind("0.0.0.0:0") {
         Ok(s) => s,
