@@ -1,8 +1,8 @@
 #[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
-pub mod unix;
+pub(crate) mod unix;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-pub mod linux;
+pub(crate) mod linux;
 
 use std::net::{IpAddr, Ipv4Addr};
 use crate::interface::{self, MacAddr, Interface};
