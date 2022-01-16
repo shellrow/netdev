@@ -1,4 +1,4 @@
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::fs::read_to_string;
 use crate::interface::MacAddr;
 use super::Gateway;
