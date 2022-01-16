@@ -1,5 +1,6 @@
 use std::net::{IpAddr, UdpSocket};
 
+/// Get IP address of the default Network Interface
 pub fn get_local_ipaddr() -> Option<IpAddr> {
     let socket = match UdpSocket::bind("0.0.0.0:0") {
         Ok(s) => s,

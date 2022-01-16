@@ -1,9 +1,9 @@
 [package]
 name = "default-net"
-version = "0.6.0"
-authors = ["shellrow <81893184+shellrow@users.noreply.github.com>"]
+version = "0.7.0"
+authors = ["shellrow <shellrow@protonmail.com>"]
 edition = "2018"
-description = "Get default network information"
+description = "Cross-platform library for network interface and gateway"
 repository = "https://github.com/shellrow/default-net"
 readme = "README.md"
 keywords = ["network"]

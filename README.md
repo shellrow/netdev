@@ -15,7 +15,7 @@ Get default network information
 Add `default-net` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-default-net = "0.6.0"
+default-net = "0.7.0"
 ```
 
 ## Example 
@@ -53,25 +53,9 @@ fn main(){
 
 ## Tested on
 - Linux
-    - Ubuntu 20.04, 18.04
+    - Ubuntu 21.10, 20.04, 18.04
     - Kali 2021.1 (VM)
 - macOS 11.6
 - Windows 10 20H2
 
 For more details, see [examples][examples-url] or doc.  
-
-## v0.6.0
-Remove libpnet from Windows build dependencies and changed to windows-rs only.
-
-## For Windows users using v0.5.0 or lower
-To build [libpnet](https://github.com/libpnet/libpnet) on Windows, follow the instructions below.
-> ### Windows
-> * You must use a version of Rust which uses the MSVC toolchain
-> * You must have [WinPcap](https://www.winpcap.org/) or [npcap](https://nmap.org/npcap/) installed
->   (tested with version WinPcap 4.1.3) (If using npcap, make sure to install with the "Install Npcap in WinPcap API-compatible Mode")
-> * You must place `Packet.lib` from the [WinPcap Developers pack](https://www.winpcap.org/devel.htm)
->   in a directory named `lib`, in the root of this repository. Alternatively, you can use any of the
->   locations listed in the `%LIB%`/`$Env:LIB` environment variables. For the 64 bit toolchain it is
->   in `WpdPack/Lib/x64/Packet.lib`, for the 32 bit toolchain, it is in `WpdPack/Lib/Packet.lib`.
-
-[Source](https://github.com/libpnet/libpnet/blob/master/README.md#windows "libpnet#windows")

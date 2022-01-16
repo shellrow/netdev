@@ -19,7 +19,7 @@ use crate::gateway::{Gateway};
 pub struct MacAddr(u8, u8, u8, u8, u8, u8);
 
 impl MacAddr {
-    /// Construct a new MacAddr struct from the given octets
+    /// Construct a new MacAddr instance from the given octets
     pub fn new(octets: [u8; 6]) -> MacAddr {
         MacAddr(octets[0], octets[1], octets[2], octets[3], octets[4], octets[5])
     }
@@ -31,9 +31,11 @@ impl MacAddr {
     pub fn address(&self) -> String {
         format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", self.0,self.1,self.2,self.3,self.4,self.5)
     }
+    /// Construct an all-zero MacAddr instance
     pub fn zero() -> MacAddr {
         MacAddr(0,0,0,0,0,0)
     }
+    /// Construct a new MacAddr instance from a colon-separated string of hex format
     pub fn from_hex_format(hex_mac_addr: &str) -> MacAddr {
         if hex_mac_addr.len() != 17 {
             return MacAddr(0,0,0,0,0,0)
@@ -59,12 +61,21 @@ impl std::fmt::Display for MacAddr {
 /// Structure of Network Interface information
 #[derive(Clone, Debug)]
 pub struct Interface {
+    /// Index of network interface
     pub index: u32,
+    /// Name of network interface
     pub name: String,
+    /// Description of the network interface
+    /// 
+    /// On Windows, this field is the adapter name 
     pub description: Option<String>,
+    /// MAC address of network interface
     pub mac_addr: Option<MacAddr>,
+    /// List of IPv4 addresses for the network interface
     pub ipv4: Vec<Ipv4Addr>,
+    /// List of IPv6 addresses for the network interface
     pub ipv6: Vec<Ipv6Addr>,
+    /// Default gateway for the network interface
     pub gateway: Option<Gateway>,
 }
 
