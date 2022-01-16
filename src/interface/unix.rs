@@ -1,6 +1,7 @@
 use super::Interface;
 use super::MacAddr;
 use crate::sys;
+use crate::gateway;
 
 use libc;
 use std::ffi::{CStr, CString};
@@ -9,8 +10,72 @@ use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+#[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
 pub fn interfaces() -> Vec<Interface> {
-    unix_interfaces()
+    let mut interfaces: Vec<Interface> = unix_interfaces();
+    let local_ip: IpAddr = match super::get_local_ipaddr(){
+        Some(local_ip) => local_ip,
+        None => return interfaces,
+    };
+    for iface in &mut interfaces {
+        match local_ip {
+            IpAddr::V4(local_ipv4) => {
+                if iface.ipv4.contains(&local_ipv4) {
+                    match gateway::unix::get_default_gateway(iface.name.clone()) {
+                        Ok(gateway) => {
+                            iface.gateway = Some(gateway);
+                        },
+                        Err(_) => {},
+                    }
+                }
+            },
+            IpAddr::V6(local_ipv6) => {
+                if iface.ipv6.contains(&local_ipv6) {
+                    match gateway::unix::get_default_gateway(iface.name.clone()) {
+                        Ok(gateway) => {
+                            iface.gateway = Some(gateway);
+                        },
+                        Err(_) => {},
+                    }
+                }
+            },
+        }
+    }
+    interfaces
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub fn interfaces() -> Vec<Interface> {
+    let mut interfaces: Vec<Interface> = unix_interfaces();
+    let local_ip: IpAddr = match super::get_local_ipaddr(){
+        Some(local_ip) => local_ip,
+        None => return interfaces,
+    };
+    for iface in &mut interfaces {
+        match local_ip {
+            IpAddr::V4(local_ipv4) => {
+                if iface.ipv4.contains(&local_ipv4) {
+                    match gateway::unix::get_default_gateway(iface.name.clone()) {
+                        Ok(gateway) => {
+                            iface.gateway = Some(gateway);
+                        },
+                        Err(_) => {},
+                    }
+                }
+            },
+            IpAddr::V6(local_ipv6) => {
+                if iface.ipv6.contains(&local_ipv6) {
+                    match gateway::unix::get_default_gateway(iface.name.clone()) {
+                        Ok(gateway) => {
+                            iface.gateway = Some(gateway);
+                        },
+                        Err(_) => {},
+                    }
+                }
+            },
+        }
+    }
+    interfaces
 }
 
 pub fn unix_interfaces() -> Vec<Interface> {

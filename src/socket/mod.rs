@@ -9,25 +9,7 @@ pub use self::unix::*;
 mod tests {
     use super::*;
     use std::net::UdpSocket;
-    #[test]
-    fn test_packet_capture() {
-        let interface_name: String = String::from("en0");
-        let config = Config {
-            write_buffer_size: 4096,
-            read_buffer_size: 4096,
-            read_timeout: None,
-            write_timeout: None,
-            channel_type: ChannelType::Layer2,
-            bpf_fd_attempts: 1000,
-            linux_fanout: None,
-            promiscuous: false,
-        };
-        let (mut _tx, mut rx) = match channel(interface_name, config) {
-            Ok(Channel::Ethernet(tx, rx)) => (tx, rx),
-            //Ok(_) => panic!("Unknown channel type"),
-            Err(e) => panic!("Error happened {}", e),
-        };
-
+    fn send_udp_packet() {
         let buf = [0u8; 0];
         let socket = match UdpSocket::bind("0.0.0.0:0") {
             Ok(s) => s,
@@ -51,6 +33,25 @@ mod tests {
                 return;
             },
         }
+    }
+    #[test]
+    fn test_packet_capture() {
+        let interface_name: String = String::from("en7");
+        let config = Config {
+            write_buffer_size: 4096,
+            read_buffer_size: 4096,
+            read_timeout: None,
+            write_timeout: None,
+            channel_type: ChannelType::Layer2,
+            bpf_fd_attempts: 1000,
+            promiscuous: false,
+        };
+        let (mut _tx, mut rx) = match channel(interface_name, config) {
+            Ok(Channel::Ethernet(tx, rx)) => (tx, rx),
+            Err(e) => panic!("Error happened {}", e),
+        };
+
+        send_udp_packet();
 
         loop {
             match rx.next() {
@@ -71,6 +72,7 @@ mod tests {
                     println!("{}", e);
                 }
             }
+            send_udp_packet();
         }
     }
 }

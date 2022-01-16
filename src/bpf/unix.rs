@@ -84,6 +84,7 @@ pub fn channel(interface_name: String, config: Config) -> io::Result<crate::sock
         }
     }
 
+    #[allow(temporary_cstring_as_ptr)]
     #[cfg(any(target_os = "openbsd", target_os = "macos", target_os = "ios"))]
     fn get_fd(attempts: usize) -> libc::c_int {
         for i in 0..attempts {

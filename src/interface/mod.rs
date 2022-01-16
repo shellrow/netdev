@@ -1,9 +1,18 @@
-#[cfg(not(target_os="windows"))]
+mod shared;
+pub use self::shared::*;
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios", target_os = "android"))]
 mod unix;
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios", target_os = "android"))]
+use self::unix::*;
+
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
+use self::windows::*;
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use crate::gateway::{Gateway};
-use crate::os;
 
 /// Structure of MAC address
 #[derive(Clone, Debug)]
@@ -48,11 +57,11 @@ pub struct Interface {
 
 /// Get default Network Interface
 pub fn get_default_interface() -> Result<Interface, String> {
-    let local_ip: IpAddr = match os::get_local_ipaddr(){
+    let local_ip: IpAddr = match get_local_ipaddr(){
         Some(local_ip) => local_ip,
         None => return Err(String::from("Local IP address not found")),
     };
-    let interfaces: Vec<Interface> = os::interfaces();
+    let interfaces: Vec<Interface> = interfaces();
     for iface in interfaces {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
@@ -72,17 +81,55 @@ pub fn get_default_interface() -> Result<Interface, String> {
 
 /// Get default Network Interface index
 pub fn get_default_interface_index() -> Option<u32> {
-    os::default_interface_index()
+    let local_ip: IpAddr = match get_local_ipaddr(){
+        Some(local_ip) => local_ip,
+        None => return None,
+    };
+    let interfaces = interfaces();
+    for iface in interfaces {
+        match local_ip {
+            IpAddr::V4(local_ipv4) => {
+                if iface.ipv4.contains(&local_ipv4) {
+                    return Some(iface.index);
+                }
+            },
+            IpAddr::V6(local_ipv6) => {
+                if iface.ipv6.contains(&local_ipv6) {
+                    return Some(iface.index);
+                }
+            },
+        }
+    }
+    None
 }
 
 /// Get default Network Interface name
 pub fn get_default_interface_name() -> Option<String> {
-    os::default_interface_name()
+    let local_ip: IpAddr = match get_local_ipaddr(){
+        Some(local_ip) => local_ip,
+        None => return None,
+    };
+    let interfaces = interfaces();
+    for iface in interfaces {
+        match local_ip {
+            IpAddr::V4(local_ipv4) => {
+                if iface.ipv4.contains(&local_ipv4) {
+                    return Some(iface.name);
+                }
+            },
+            IpAddr::V6(local_ipv6) => {
+                if iface.ipv6.contains(&local_ipv6) {
+                    return Some(iface.name);
+                }
+            },
+        }
+    }
+    None
 }
 
 /// Get a list of available Network Interfaces
 pub fn get_interfaces() -> Vec<Interface> {
-    os::interfaces()
+    interfaces()
 }
 
 #[cfg(test)]

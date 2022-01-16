@@ -1,4 +1,3 @@
-mod os;
 mod sys;
 mod bpf;
 mod socket;

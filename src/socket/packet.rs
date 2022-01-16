@@ -11,6 +11,7 @@ pub const NEXT_HEADER_ICMPV6: u8 = 58;
 pub const ICMP_TYPE_TIME_EXCEEDED: u8 = 11;
 pub const ICMPV6_TYPE_TIME_EXCEEDED: u8 = 3;
 
+#[allow(dead_code)]
 pub enum Frame {
     SrcMacAddr,
     DstMacAddr,

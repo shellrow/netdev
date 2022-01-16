@@ -6,6 +6,7 @@ use crate::interface::Interface;
 
 pub type EtherType = u16;
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ChannelType {
     Layer2,
@@ -18,21 +19,8 @@ pub enum Channel {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum FanoutType {
-    HASH,
-    LB,
-    CPU,
-    ROLLOVER,
-    RND,
-    QM,
-    CBPF,
-    EBPF,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct FanoutOption {
     pub group_id: u16,
-    pub fanout_type: FanoutType,
     pub defrag: bool,
     pub rollover: bool,
 }
@@ -45,7 +33,6 @@ pub struct Config {
     pub write_timeout: Option<Duration>,
     pub channel_type: ChannelType,
     pub bpf_fd_attempts: usize,
-    pub linux_fanout: Option<FanoutOption>,
     pub promiscuous: bool,
 }
 
@@ -58,7 +45,6 @@ impl Default for Config {
             write_timeout: None,
             channel_type: ChannelType::Layer2,
             bpf_fd_attempts: 1000,
-            linux_fanout: None,
             promiscuous: true,
         }
     }

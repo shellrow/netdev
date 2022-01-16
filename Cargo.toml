@@ -11,8 +11,6 @@ categories = ["network-programming"]
 license = "MIT"
 
 [target.'cfg(not(windows))'.dependencies]
-pnet_packet = "0.28"
-pnet_datalink = "0.28"
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies.windows]

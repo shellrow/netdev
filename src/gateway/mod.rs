@@ -1,6 +1,11 @@
+#[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
+pub mod unix;
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub mod linux;
+
 use std::net::{IpAddr, Ipv4Addr};
-use crate::interface::{MacAddr, Interface};
-use crate::os;
+use crate::interface::{self, MacAddr, Interface};
 
 /// Structure of default Gateway information
 #[derive(Clone, Debug)]
@@ -20,11 +25,11 @@ impl Gateway {
 
 /// Get default Gateway
 pub fn get_default_gateway() -> Result<Gateway, String> {
-    let local_ip: IpAddr = match os::get_local_ipaddr(){
+    let local_ip: IpAddr = match interface::get_local_ipaddr(){
         Some(local_ip) => local_ip,
         None => return Err(String::from("Local IP address not found")),
     };
-    let interfaces: Vec<Interface> = os::interfaces();
+    let interfaces: Vec<Interface> = interface::get_interfaces();
     for iface in interfaces {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
