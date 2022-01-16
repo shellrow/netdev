@@ -4,6 +4,7 @@ pub mod unix;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod linux;
 
+use std::net::UdpSocket;
 use std::net::{IpAddr, Ipv4Addr};
 use crate::interface::{self, MacAddr, Interface};
 
@@ -18,7 +19,7 @@ impl Gateway {
     pub fn new() -> Gateway {
         Gateway {
             mac_addr: MacAddr::zero(),
-            ip_addr: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            ip_addr: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
         }
     }
 }
@@ -49,6 +50,24 @@ pub fn get_default_gateway() -> Result<Gateway, String> {
         }
     }
     Err(String::from("Default Gateway not found"))
+}
+
+fn send_udp_packet() -> Result<(), String> {
+    let buf = [0u8; 0];
+    let socket = match UdpSocket::bind("0.0.0.0:0") {
+        Ok(s) => s,
+        Err(e) => return Err(format!("Failed to create UDP socket {}", e)),
+    };
+    let dst: &str = "1.1.1.1:80";
+    match socket.set_ttl(1) {
+        Ok(_) => (),
+        Err(e) => return Err(format!("Failed to set TTL {}", e)),
+    }
+    match socket.send_to(&buf, dst) {
+        Ok(_) => (),
+        Err(e) => return Err(format!("Failed to send data {}", e)),
+    }
+    Ok(())
 }
 
 #[cfg(test)]

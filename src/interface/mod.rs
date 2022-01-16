@@ -34,6 +34,19 @@ impl MacAddr {
     pub fn zero() -> MacAddr {
         MacAddr(0,0,0,0,0,0)
     }
+    pub fn from_hex_format(hex_mac_addr: &str) -> MacAddr {
+        if hex_mac_addr.len() != 17 {
+            return MacAddr(0,0,0,0,0,0)
+        }
+        let fields: Vec<&str> = hex_mac_addr.split(":").collect();
+        let o1: u8 = u8::from_str_radix(&fields[0], 0x10).unwrap_or(0);
+        let o2: u8 = u8::from_str_radix(&fields[1], 0x10).unwrap_or(0);
+        let o3: u8 = u8::from_str_radix(&fields[2], 0x10).unwrap_or(0);
+        let o4: u8 = u8::from_str_radix(&fields[3], 0x10).unwrap_or(0);
+        let o5: u8 = u8::from_str_radix(&fields[4], 0x10).unwrap_or(0);
+        let o6: u8 = u8::from_str_radix(&fields[5], 0x10).unwrap_or(0);
+        MacAddr(o1, o2, o3, o4, o5, o6)
+    }
 }
 
 impl std::fmt::Display for MacAddr {

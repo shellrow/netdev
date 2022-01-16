@@ -1,8 +1,8 @@
 #[cfg(not(target_os="windows"))]
 mod sys;
-#[cfg(not(target_os="windows"))]
+#[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
 mod bpf;
-#[cfg(not(target_os="windows"))]
+#[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
 mod socket;
 
 pub mod interface;
