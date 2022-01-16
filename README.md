@@ -3,8 +3,11 @@
 [license-badge]: https://img.shields.io/crates/l/default-net.svg
 [examples-url]: https://github.com/shellrow/default-net/tree/main/examples
 # default-net [![Crates.io][crates-badge]][crates-url] ![License][license-badge]
-Get default network information  
+  
 `default-net` provides a cross-platform API for network interface and gateway.
+
+- Get default Network Interface and Gateway information
+- Get list of available Network Interfaces
 
 ## Supported platform
 - Linux
@@ -19,6 +22,7 @@ default-net = "0.7.0"
 ```
 
 ## Example 
+The following example retrieves and displays information about the default network interface.
 ```rust
 use default_net;
 
