@@ -6,6 +6,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ffi::CStr;
 use core::ffi::c_void;
 
+use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::interface::{Interface, MacAddr};
 use crate::gateway::Gateway;
 
@@ -86,21 +87,42 @@ pub fn interfaces() -> Vec<Interface> {
         let adapter_desc: String = bytes_to_string(&adapter.Description);
         let mac_addr:[u8; 6] = adapter.Address[..6].try_into().unwrap_or([0, 0, 0, 0, 0, 0]);
         //Enumerate all IPs
-        let mut ipv4_vec: Vec<Ipv4Addr> = vec![];
-        let mut ipv6_vec: Vec<Ipv6Addr> = vec![];
+        let mut ipv4_vec: Vec<Ipv4Net> = vec![];
+        let mut ipv6_vec: Vec<Ipv6Net> = vec![];
         let mut p_ip_addr: *mut IP_ADDR_STRING;
         p_ip_addr = unsafe { mem::transmute(&(*p_adaptor).IpAddressList) };
         while p_ip_addr as u64 != 0 {
             let ip_addr_string: IP_ADDR_STRING = unsafe{ *p_ip_addr };
             let ip_addr: String = bytes_to_string(&ip_addr_string.IpAddress.String);
+            let netmask: String = bytes_to_string(&ip_addr_string.IpMask.String);
             match ip_addr.parse::<IpAddr>() {
                 Ok(ip_addr) => {
                     match ip_addr {
                         IpAddr::V4(ipv4_addr) => {
-                            ipv4_vec.push(ipv4_addr);
+                            let netmask: Ipv4Addr = match netmask.parse::<IpAddr>() {
+                                Ok(netmask) => {
+                                    match netmask {
+                                        IpAddr::V4(netmask) => netmask,
+                                        IpAddr::V6(_) => Ipv4Addr::UNSPECIFIED,
+                                    }
+                                },
+                                Err(_) => Ipv4Addr::UNSPECIFIED,
+                            };
+                            let ipv4_net: Ipv4Net = Ipv4Net::new_with_netmask(ipv4_addr, netmask);
+                            ipv4_vec.push(ipv4_net);
                         },
                         IpAddr::V6(ipv6_addr) => {
-                            ipv6_vec.push(ipv6_addr);
+                            let netmask: Ipv6Addr = match netmask.parse::<IpAddr>() {
+                                Ok(netmask) => {
+                                    match netmask {
+                                        IpAddr::V4(_) => Ipv6Addr::UNSPECIFIED,
+                                        IpAddr::V6(netmask) => netmask,
+                                    }
+                                },
+                                Err(_) => Ipv6Addr::UNSPECIFIED,
+                            };
+                            let ipv6_net: Ipv6Net = Ipv6Net::new_with_netmask(ipv6_addr, netmask);
+                            ipv6_vec.push(ipv6_net);
                         }
                     }
                 },
@@ -129,8 +151,8 @@ pub fn interfaces() -> Vec<Interface> {
                 let default_gateway: Option<Gateway> = if gateway_ip != IpAddr::V4(Ipv4Addr::UNSPECIFIED) {
                     match gateway_ip {
                         IpAddr::V4(dst_ip) => {
-                            if let Some(src_ip) = ipv4_vec.get(0) {
-                                let mac_addr = get_mac_through_arp(*src_ip, dst_ip);
+                            if let Some(ip_net) = ipv4_vec.get(0) {
+                                let mac_addr = get_mac_through_arp(ip_net.addr, dst_ip);
                                 let gateway = Gateway {
                                     mac_addr: mac_addr,
                                     ip_addr: IpAddr::V4(dst_ip),
