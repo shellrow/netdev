@@ -1,13 +1,18 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+/// Structure of IPv4 Network
 #[derive(Clone, Debug)]
 pub struct Ipv4Net {
+    /// IPv4 Address
     pub addr: Ipv4Addr,
+    /// Prefix Length
     pub prefix_len: u8,
+    /// Network Mask
     pub netmask: Ipv4Addr,
 }
 
 impl Ipv4Net {
+    /// Construct a new Ipv4Net instance from IPv4 Address and Prefix Length
     pub fn new(ipv4_addr: Ipv4Addr, prefix_len: u8) -> Ipv4Net {
         Ipv4Net {
             addr: ipv4_addr,
@@ -15,6 +20,7 @@ impl Ipv4Net {
             netmask: prefix_to_ipv4_netmask(prefix_len),
         }
     }
+    /// Construct a new Ipv4Net instance from IPv4 Address and Network Mask
     pub fn new_with_netmask(ipv4_addr: Ipv4Addr, netmask: Ipv4Addr) -> Ipv4Net {
         Ipv4Net {
             addr: ipv4_addr,
@@ -24,14 +30,19 @@ impl Ipv4Net {
     }
 }
 
+/// Structure of IPv6 Network
 #[derive(Clone, Debug)]
 pub struct Ipv6Net {
+    /// IPv6 Address
     pub addr: Ipv6Addr,
+    /// Prefix Length
     pub prefix_len: u8,
+    /// Network Mask
     pub netmask: Ipv6Addr,
 }
 
 impl Ipv6Net {
+    /// Construct a new Ipv6Net instance from IPv6 Address and Prefix Length
     pub fn new(ipv6_addr: Ipv6Addr, prefix_len: u8) -> Ipv6Net {
         Ipv6Net {
             addr: ipv6_addr,
@@ -39,6 +50,7 @@ impl Ipv6Net {
             netmask: prefix_to_ipv6_netmask(prefix_len),
         }
     }
+    /// Construct a new Ipv6Net instance from IPv6 Address and Network Mask
     pub fn new_with_netmask(ipv6_addr: Ipv6Addr, netmask: Ipv6Addr) -> Ipv6Net {
         Ipv6Net {
             addr: ipv6_addr,
