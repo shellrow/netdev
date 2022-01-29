@@ -18,7 +18,7 @@
 Add `default-net` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-default-net = "0.7.0"
+default-net = "0.8.0"
 ```
 
 ## Example 
