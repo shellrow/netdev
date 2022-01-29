@@ -11,7 +11,8 @@ mod windows;
 #[cfg(target_os = "windows")]
 use self::windows::*;
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::IpAddr;
+use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::gateway::{Gateway};
 
 /// Structure of MAC address
@@ -71,10 +72,10 @@ pub struct Interface {
     pub description: Option<String>,
     /// MAC address of network interface
     pub mac_addr: Option<MacAddr>,
-    /// List of IPv4 addresses for the network interface
-    pub ipv4: Vec<Ipv4Addr>,
-    /// List of IPv6 addresses for the network interface
-    pub ipv6: Vec<Ipv6Addr>,
+    /// List of Ipv4Net for the network interface
+    pub ipv4: Vec<Ipv4Net>,
+    /// List of Ipv6Net for the network interface
+    pub ipv6: Vec<Ipv6Net>,
     /// Default gateway for the network interface
     pub gateway: Option<Gateway>,
 }
@@ -89,12 +90,12 @@ pub fn get_default_interface() -> Result<Interface, String> {
     for iface in interfaces {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.contains(&local_ipv4) {
+                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
                     return Ok(iface);
                 }
             },
             IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.contains(&local_ipv6) {
+                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
                     return Ok(iface);
                 }
             },
@@ -113,12 +114,12 @@ pub fn get_default_interface_index() -> Option<u32> {
     for iface in interfaces {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.contains(&local_ipv4) {
+                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
                     return Some(iface.index);
                 }
             },
             IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.contains(&local_ipv6) {
+                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
                     return Some(iface.index);
                 }
             },
@@ -137,12 +138,12 @@ pub fn get_default_interface_name() -> Option<String> {
     for iface in interfaces {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.contains(&local_ipv4) {
+                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
                     return Some(iface.name);
                 }
             },
             IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.contains(&local_ipv6) {
+                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
                     return Some(iface.name);
                 }
             },

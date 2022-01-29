@@ -2,6 +2,7 @@ use super::Interface;
 use super::MacAddr;
 use crate::sys;
 use crate::gateway;
+use crate::ip::{Ipv4Net, Ipv6Net};
 
 use libc;
 use std::ffi::{CStr, CString};
@@ -20,7 +21,7 @@ pub fn interfaces() -> Vec<Interface> {
     for iface in &mut interfaces {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.contains(&local_ipv4) {
+                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
                     match gateway::unix::get_default_gateway(iface.name.clone()) {
                         Ok(gateway) => {
                             iface.gateway = Some(gateway);
@@ -30,7 +31,7 @@ pub fn interfaces() -> Vec<Interface> {
                 }
             },
             IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.contains(&local_ipv6) {
+                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
                     match gateway::unix::get_default_gateway(iface.name.clone()) {
                         Ok(gateway) => {
                             iface.gateway = Some(gateway);
@@ -92,15 +93,36 @@ pub fn unix_interfaces() -> Vec<Interface> {
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name = unsafe {from_utf8_unchecked(bytes).to_owned() };
         let (mac, ip) = sockaddr_to_network_addr(addr_ref.ifa_addr as *const libc::sockaddr);
-        let mut ini_ipv4: Vec<Ipv4Addr> = vec![];
-        let mut ini_ipv6: Vec<Ipv6Addr> = vec![];
+        let (_, netmask) = sockaddr_to_network_addr(addr_ref.ifa_netmask as *const libc::sockaddr);
+        let mut ini_ipv4: Vec<Ipv4Net> = vec![];
+        let mut ini_ipv6: Vec<Ipv6Net> = vec![];
         if let Some(ip) = ip {
             match ip {
                 IpAddr::V4(ipv4) => {
-                    ini_ipv4.push(ipv4);
+                    let netmask: Ipv4Addr = match netmask {
+                        Some(netmask) => {
+                            match netmask {
+                                IpAddr::V4(netmask) => netmask,
+                                IpAddr::V6(_) => Ipv4Addr::UNSPECIFIED,
+                            }
+                        },
+                        None => Ipv4Addr::UNSPECIFIED,
+                    };
+                    let ipv4_net: Ipv4Net = Ipv4Net::new_with_netmask(ipv4, netmask);
+                    ini_ipv4.push(ipv4_net);
                 },
                 IpAddr::V6(ipv6) => {
-                    ini_ipv6.push(ipv6);
+                    let netmask: Ipv6Addr = match netmask {
+                        Some(netmask) => {
+                            match netmask {
+                                IpAddr::V4(_) => Ipv6Addr::UNSPECIFIED,
+                                IpAddr::V6(netmask) => netmask,
+                            }
+                        },
+                        None => Ipv6Addr::UNSPECIFIED,
+                    };
+                    let ipv6_net: Ipv6Net = Ipv6Net::new_with_netmask(ipv6, netmask);
+                    ini_ipv6.push(ipv6_net);
                 },
             }
         }
@@ -122,10 +144,30 @@ pub fn unix_interfaces() -> Vec<Interface> {
                 if let Some(ip) = ip {
                     match ip {
                         IpAddr::V4(ipv4) => {
-                            iface.ipv4.push(ipv4);
+                            let netmask: Ipv4Addr = match netmask {
+                                Some(netmask) => {
+                                    match netmask {
+                                        IpAddr::V4(netmask) => netmask,
+                                        IpAddr::V6(_) => Ipv4Addr::UNSPECIFIED,
+                                    }
+                                },
+                                None => Ipv4Addr::UNSPECIFIED,
+                            };
+                            let ipv4_net: Ipv4Net = Ipv4Net::new_with_netmask(ipv4, netmask);
+                            iface.ipv4.push(ipv4_net);
                         },
                         IpAddr::V6(ipv6) => {
-                            iface.ipv6.push(ipv6);
+                            let netmask: Ipv6Addr = match netmask {
+                                Some(netmask) => {
+                                    match netmask {
+                                        IpAddr::V4(_) => Ipv6Addr::UNSPECIFIED,
+                                        IpAddr::V6(netmask) => netmask,
+                                    }
+                                },
+                                None => Ipv6Addr::UNSPECIFIED,
+                            };
+                            let ipv6_net: Ipv6Net = Ipv6Net::new_with_netmask(ipv6, netmask);
+                            iface.ipv6.push(ipv6_net);
                         },
                     }
                 }
