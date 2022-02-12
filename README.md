@@ -18,7 +18,7 @@
 Add `default-net` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-default-net = "0.8.0"
+default-net = "0.8.1"
 ```
 
 ## Example 
@@ -57,9 +57,14 @@ fn main(){
 
 ## Tested on
 - Linux
-    - Ubuntu 21.10, 20.04, 18.04
+    - Ubuntu 
+      - 21.10 
+      - 20.04 
+      - 18.04
     - Kali 2021.1 (VM)
 - macOS 11.6
-- Windows 10 20H2
+- Windows 
+  - Windows 10 21H2 19044.1526
+  - Windows 11 21H2 22000.493 (VM)
 
 For more details, see [examples][examples-url] or doc.  

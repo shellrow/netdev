@@ -1,6 +1,6 @@
 [package]
 name = "default-net"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["shellrow <shellrow@protonmail.com>"]
 edition = "2018"
 description = "Cross-platform library for network interface and gateway"
