@@ -1,14 +1,14 @@
 use windows::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
 use windows::Win32::NetworkManagement::IpHelper::{GetAdaptersInfo, IP_ADAPTER_INFO, IP_ADDR_STRING, SendARP};
-use windows::Win32::NetworkManagement::IpHelper::{MIB_IF_TYPE_ETHERNET, MIB_IF_TYPE_FDDI, MIB_IF_TYPE_LOOPBACK, MIB_IF_TYPE_OTHER, MIB_IF_TYPE_PPP, MIB_IF_TYPE_SLIP, MIB_IF_TYPE_TOKENRING};
 use std::convert::TryInto;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ffi::CStr;
+use std::convert::TryFrom;
 use core::ffi::c_void;
 
 use crate::ip::{Ipv4Net, Ipv6Net};
-use crate::interface::{Interface, MacAddr};
+use crate::interface::{Interface, MacAddr,InterfaceType};
 use crate::gateway::Gateway;
 
 // Convert C string to Rust string without trailing null bytes
@@ -77,15 +77,9 @@ pub fn interfaces() -> Vec<Interface> {
 	p_adaptor = unsafe { mem::transmute(&raw_adaptor_mem) };
     while p_adaptor as u64 != 0 {
         let adapter: IP_ADAPTER_INFO = unsafe { *p_adaptor };
-        match adapter.Type {
-            MIB_IF_TYPE_ETHERNET => {}, 
-            MIB_IF_TYPE_FDDI => {}, 
-            MIB_IF_TYPE_LOOPBACK => {}, 
-            MIB_IF_TYPE_OTHER => {}, 
-            MIB_IF_TYPE_PPP => {}, 
-            MIB_IF_TYPE_SLIP => {}, 
-            MIB_IF_TYPE_TOKENRING => {},
-            _ => {
+        match InterfaceType::try_from(adapter.Type) {
+            Ok(_) => {},
+            Err(_) => {
                 unsafe { p_adaptor = (*p_adaptor).Next; }
                 continue;
             },

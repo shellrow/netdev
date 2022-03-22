@@ -1,6 +1,9 @@
 mod shared;
 pub use self::shared::*;
 
+mod types;
+pub use self::types::*;
+
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios", target_os = "android"))]
 mod unix;
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios", target_os = "android"))]
