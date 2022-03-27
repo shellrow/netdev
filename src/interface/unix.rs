@@ -10,9 +10,12 @@ use std::mem::{self, MaybeUninit};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::convert::TryFrom;
-use std::fs::read_to_string;
 use crate::interface::InterfaceType;
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::convert::TryFrom;
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::fs::read_to_string;
 
 #[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
 pub fn interfaces() -> Vec<Interface> {
@@ -83,7 +86,7 @@ pub fn interfaces() -> Vec<Interface> {
 }
 
 #[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
-pub fn get_interface_type(if_name: String) -> InterfaceType {
+pub fn get_interface_type(_if_name: String) -> InterfaceType {
     // TODO
     InterfaceType::Unknown
 }
