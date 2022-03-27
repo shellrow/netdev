@@ -1,10 +1,8 @@
 use std::convert::TryFrom;
 use std::fs::read_to_string;
+use crate::interface::InterfaceType;
 
 pub fn get_interface_type(if_name: String) -> InterfaceType {
-    use std::convert::TryFrom;
-    use std::fs::read_to_string;
-
     let if_type_path: String = format!("/sys/class/net/{}/type", if_name);
     let r = read_to_string(if_type_path);
     let if_type_string = match r {
