@@ -14,6 +14,12 @@ mod windows;
 #[cfg(target_os = "windows")]
 use self::windows::*;
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+mod linux;
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+mod macos;
+
 use std::net::IpAddr;
 use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::gateway::{Gateway};
