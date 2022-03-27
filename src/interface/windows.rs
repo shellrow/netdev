@@ -178,9 +178,11 @@ pub fn interfaces() -> Vec<Interface> {
             index: adapter.Index,
             name: adapter_name,
             description: Some(adapter_desc),
+            if_type: InterfaceType::try_from(adapter.Type).unwrap_or(InterfaceType::Unknown),
             mac_addr: Some(MacAddr::new(mac_addr)),
             ipv4: ipv4_vec,
             ipv6: ipv6_vec,
+            flags: adapter.Type,
             gateway: default_gateway,
         };
         interfaces.push(interface);

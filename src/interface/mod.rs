@@ -73,12 +73,16 @@ pub struct Interface {
     /// 
     /// On Windows, this field is the adapter name 
     pub description: Option<String>,
+    /// Interface Type
+    pub if_type: InterfaceType,
     /// MAC address of network interface
     pub mac_addr: Option<MacAddr>,
     /// List of Ipv4Net for the network interface
     pub ipv4: Vec<Ipv4Net>,
     /// List of Ipv6Net for the network interface
     pub ipv6: Vec<Ipv6Net>,
+    /// Flags for the network interface (OS Specific)
+    pub flags: u32,
     /// Default gateway for the network interface
     pub gateway: Option<Gateway>,
 }
