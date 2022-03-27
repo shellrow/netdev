@@ -10,6 +10,9 @@ use std::mem::{self, MaybeUninit};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::convert::TryFrom;
+use std::fs::read_to_string;
+use crate::interface::InterfaceType;
 
 #[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
 pub fn interfaces() -> Vec<Interface> {
@@ -79,6 +82,30 @@ pub fn interfaces() -> Vec<Interface> {
     interfaces
 }
 
+#[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
+pub fn get_interface_type(if_name: String) -> InterfaceType {
+    // TODO
+    InterfaceType::Unknown
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub fn get_interface_type(if_name: String) -> InterfaceType {
+    let if_type_path: String = format!("/sys/class/net/{}/type", if_name);
+    let r = read_to_string(if_type_path);
+    let if_type_string = match r {
+        Ok(content) => content.trim().to_string(),
+        Err(_) => String::from("999"),
+    };
+    match if_type_string.parse::<u32>() {
+        Ok(if_type) => {
+            InterfaceType::try_from(if_type).unwrap_or(InterfaceType::Unknown)
+        },
+        Err(_) => {
+            InterfaceType::Unknown
+        }
+    }
+}
+
 pub fn unix_interfaces() -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = vec![];
     let mut addrs: MaybeUninit<*mut libc::ifaddrs> = MaybeUninit::uninit();
@@ -130,9 +157,11 @@ pub fn unix_interfaces() -> Vec<Interface> {
             index: 0,
             name: name.clone(),
             description: None,
+            if_type: get_interface_type(name.clone()),
             mac_addr: mac.clone(),
             ipv4: ini_ipv4,
             ipv6: ini_ipv6,
+            flags: addr_ref.ifa_flags,
             gateway: None,
         };
         let mut found: bool = false;

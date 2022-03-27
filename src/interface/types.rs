@@ -69,9 +69,18 @@ impl InterfaceType {
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn value(&self) -> u32 {
-        // TODO
         match *self {
-            _ => 0,
+            InterfaceType::Ethernet => 1,
+            InterfaceType::TokenRing => 4,
+            InterfaceType::Fddi => 774,
+            InterfaceType::Ppp => 512,
+            InterfaceType::Loopback => 772,
+            InterfaceType::Ethernet3Megabit => 2,
+            InterfaceType::Slip => 256,
+            InterfaceType::Atm => 19,
+            InterfaceType::Wireless80211 => 801,
+            InterfaceType::Tunnel => 768,
+            _ => 999,
         }
     }
 
