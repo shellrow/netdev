@@ -80,7 +80,7 @@ impl InterfaceType {
             InterfaceType::Atm => 19,
             InterfaceType::Wireless80211 => 801,
             InterfaceType::Tunnel => 768,
-            _ => 999,
+            _ => u32::MAX,
         }
     }
 
