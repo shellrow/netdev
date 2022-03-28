@@ -7,6 +7,7 @@ fn main(){
         println!("\tIndex: {}", interface.index);
         println!("\tName: {}", interface.name);
         println!("\tDescription: {:?}", interface.description);
+        println!("\tType: {}", interface.if_type.name());
         if let Some(mac_addr) = interface.mac_addr {
             println!("\tMAC: {}", mac_addr);
         }else{
@@ -14,6 +15,7 @@ fn main(){
         }
         println!("\tIPv4: {:?}", interface.ipv4);
         println!("\tIPv6: {:?}", interface.ipv6);
+        println!("\tFlags: {:?}", interface.flags);
         if let Some(gateway) = interface.gateway {
             println!("Gateway");
             println!("\tMAC: {}", gateway.mac_addr);
