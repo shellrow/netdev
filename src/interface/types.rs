@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+/// Type of Network Interface
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum InterfaceType {
     Unknown,
