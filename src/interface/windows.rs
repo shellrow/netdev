@@ -1,31 +1,16 @@
 use windows::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
-use windows::Win32::NetworkManagement::IpHelper::{GetAdaptersInfo, IP_ADAPTER_INFO, IP_ADDR_STRING, SendARP};
+use windows::Win32::Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6};
+use windows::Win32::NetworkManagement::IpHelper::{GetAdaptersAddresses, AF_UNSPEC, AF_INET, AF_INET6, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH, SendARP};
 use std::convert::TryInto;
-use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::ffi::CStr;
 use std::convert::TryFrom;
 use core::ffi::c_void;
+use libc::{c_char, strlen, wchar_t, wcslen};
+use memalloc::{allocate, deallocate};
 
 use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::interface::{Interface, MacAddr,InterfaceType};
 use crate::gateway::Gateway;
-
-// Convert C string to Rust string without trailing null bytes
-fn bytes_to_string(bytes: &[u8]) -> String {
-    let result: String = match CStr::from_bytes_with_nul(bytes) {
-        Ok(cstr) => {
-            match cstr.to_str() {
-                Ok(rstr) => rstr.to_string(),
-                Err(_) => cstr.to_string_lossy().replace("\u{0}", "").to_string(),
-            }  
-        },
-        Err(_) => {
-            String::from_utf8_lossy(bytes).replace("\u{0}", "").to_string()
-        }
-    };
-    result
-}
 
 #[cfg(target_endian = "little")]
 fn htonl(val : u32) -> u32 {
@@ -55,138 +40,146 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
 }
 
 // Get network interfaces using the IP Helper API
-// TODO: Make more rusty ...
-// Reference: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersinfo
+// Reference: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
 pub fn interfaces() -> Vec<Interface> {
     let mut interfaces: Vec<Interface> = vec![];
-    let mut out_buf_len : u32 = mem::size_of::<IP_ADAPTER_INFO>().try_into().unwrap();
-    let mut raw_adaptor_mem: Vec<u8> = Vec::with_capacity(out_buf_len  as usize);
-    let mut p_adaptor: *mut IP_ADAPTER_INFO;
-    let mut res = unsafe { GetAdaptersInfo(raw_adaptor_mem.as_mut_ptr() as *mut IP_ADAPTER_INFO, &mut out_buf_len ) };
-    // Make an initial call to GetAdaptersInfo to get the necessary size into the out_buf_len variable
-    if res == ERROR_BUFFER_OVERFLOW {
-		raw_adaptor_mem = Vec::with_capacity(out_buf_len as usize);
-		unsafe {
-			res = GetAdaptersInfo(raw_adaptor_mem.as_mut_ptr() as *mut IP_ADAPTER_INFO, &mut out_buf_len);
-		}
-	}
-    if res != NO_ERROR {
-        return interfaces;
-	}
-    //Enumerate all adapters
-	p_adaptor = unsafe { mem::transmute(&raw_adaptor_mem) };
-    while p_adaptor as u64 != 0 {
-        let adapter: IP_ADAPTER_INFO = unsafe { *p_adaptor };
-        match InterfaceType::try_from(adapter.Type) {
-            Ok(_) => {},
-            Err(_) => {
-                unsafe { p_adaptor = (*p_adaptor).Next; }
-                continue;
-            },
+    let mut dwsize: u32 = 2000;
+    let mut mem = unsafe { allocate(dwsize as usize) } as *mut IP_ADAPTER_ADDRESSES_LH;
+    let mut retries = 3;
+    let mut ret_val;
+    let family: u32 = AF_UNSPEC;
+    let flags: u32 = GAA_FLAG_INCLUDE_GATEWAYS;
+    loop {
+        let old_size = dwsize as usize;
+        ret_val = unsafe { GetAdaptersAddresses(family, flags, std::ptr::null_mut::<std::ffi::c_void>(), mem, &mut dwsize) };
+        if ret_val != ERROR_BUFFER_OVERFLOW || retries <= 0 {
+            break;
         }
-        let adapter_name: String = bytes_to_string(&adapter.AdapterName);
-        let adapter_desc: String = bytes_to_string(&adapter.Description);
-        let mac_addr:[u8; 6] = adapter.Address[..6].try_into().unwrap_or([0, 0, 0, 0, 0, 0]);
-        //Enumerate all IPs
-        let mut ipv4_vec: Vec<Ipv4Net> = vec![];
-        let mut ipv6_vec: Vec<Ipv6Net> = vec![];
-        let mut p_ip_addr: *mut IP_ADDR_STRING;
-        p_ip_addr = unsafe { mem::transmute(&(*p_adaptor).IpAddressList) };
-        while p_ip_addr as u64 != 0 {
-            let ip_addr_string: IP_ADDR_STRING = unsafe{ *p_ip_addr };
-            let ip_addr: String = bytes_to_string(&ip_addr_string.IpAddress.String);
-            let netmask: String = bytes_to_string(&ip_addr_string.IpMask.String);
-            match ip_addr.parse::<IpAddr>() {
-                Ok(ip_addr) => {
-                    match ip_addr {
-                        IpAddr::V4(ipv4_addr) => {
-                            let netmask: Ipv4Addr = match netmask.parse::<IpAddr>() {
-                                Ok(netmask) => {
-                                    match netmask {
-                                        IpAddr::V4(netmask) => netmask,
-                                        IpAddr::V6(_) => Ipv4Addr::UNSPECIFIED,
-                                    }
-                                },
-                                Err(_) => Ipv4Addr::UNSPECIFIED,
-                            };
-                            let ipv4_net: Ipv4Net = Ipv4Net::new_with_netmask(ipv4_addr, netmask);
-                            ipv4_vec.push(ipv4_net);
-                        },
-                        IpAddr::V6(ipv6_addr) => {
-                            let netmask: Ipv6Addr = match netmask.parse::<IpAddr>() {
-                                Ok(netmask) => {
-                                    match netmask {
-                                        IpAddr::V4(_) => Ipv6Addr::UNSPECIFIED,
-                                        IpAddr::V6(netmask) => netmask,
-                                    }
-                                },
-                                Err(_) => Ipv6Addr::UNSPECIFIED,
-                            };
-                            let ipv6_net: Ipv6Net = Ipv6Net::new_with_netmask(ipv6_addr, netmask);
-                            ipv6_vec.push(ipv6_net);
-                        }
+        unsafe { deallocate(mem as *mut u8, old_size as usize) };
+        mem = unsafe { allocate(dwsize as usize) as *mut IP_ADAPTER_ADDRESSES_LH };
+        retries -= 1;
+    }
+    if ret_val == NO_ERROR {
+        // Enumerate all adapters
+        let mut cur = mem;
+        while !cur.is_null() {
+            let if_type: u32 = unsafe{ (*cur).IfType };
+            match InterfaceType::try_from(if_type) {
+                Ok(_) => {},
+                Err(_) => {
+                    cur = unsafe { (*cur).Next };
+                    continue;
+                },
+            }
+            // Index
+            let anon1 = unsafe { (*cur).Anonymous1 };
+            let anon = unsafe { anon1.Anonymous};
+            let index = anon.IfIndex;
+            // Flags
+            let anon2 = unsafe { (*cur).Anonymous2 };
+            let flags = unsafe { anon2.Flags };
+            // Name
+            let p_aname = unsafe { (*cur).AdapterName.0 };
+            let aname_len = unsafe { strlen(p_aname as *const c_char) };
+            let aname_slice = unsafe { std::slice::from_raw_parts(p_aname, aname_len) };
+            let adapter_name = String::from_utf8(aname_slice.to_vec()).unwrap();
+            // Friendly Name
+            let p_fname = unsafe { (*cur).FriendlyName.0 };
+            let fname_len = unsafe { wcslen(p_fname as *const wchar_t) };
+            let fname_slice = unsafe { std::slice::from_raw_parts(p_fname, fname_len) };
+            let friendly_name = String::from_utf16(fname_slice).unwrap();
+            // Description
+            let p_desc = unsafe { (*cur).Description.0};
+            let desc_len = unsafe { wcslen(p_desc as *const wchar_t) };
+            let aname_slice = unsafe { std::slice::from_raw_parts(p_desc, desc_len) };
+            let description = String::from_utf16(aname_slice).unwrap();
+            // MAC address
+            let mac_addr_arr: [u8; 6] = unsafe { (*cur).PhysicalAddress }[..6].try_into().unwrap_or([0, 0, 0, 0, 0, 0]);
+            let mac_addr: MacAddr = MacAddr::new(mac_addr_arr);
+
+            let mut ipv4_vec: Vec<Ipv4Net> = vec![];
+            let mut ipv6_vec: Vec<Ipv6Net> = vec![];
+            // Enumerate all IPs
+            let mut cur_a = unsafe { (*cur).FirstUnicastAddress };
+            while !cur_a.is_null() {
+                let addr = unsafe { (*cur_a).Address };
+                let prefix_len = unsafe{ (*cur_a).OnLinkPrefixLength }; 
+                let sockaddr = unsafe { *addr.lpSockaddr };
+                if sockaddr.sa_family == AF_INET as u16 {
+                    let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
+                    let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
+                    let ipv4 = if cfg!(target_endian = "little") {
+                        Ipv4Addr::from(a.swap_bytes())
+                    } else {
+                        Ipv4Addr::from(a)
+                    };
+                    let ipv4_net: Ipv4Net = Ipv4Net::new(ipv4, prefix_len);
+                    ipv4_vec.push(ipv4_net);
+                } else if sockaddr.sa_family == AF_INET6 as u16 {
+                    let sockaddr: *mut SOCKADDR_IN6 = addr.lpSockaddr as *mut SOCKADDR_IN6;
+                    let a = unsafe { (*sockaddr).sin6_addr.u.Byte };
+                    let ipv6 = Ipv6Addr::from(a);
+                    let ipv6_net: Ipv6Net = Ipv6Net::new(ipv6, prefix_len);
+                    ipv6_vec.push(ipv6_net);
+                }
+                cur_a = unsafe { (*cur_a).Next };
+            }
+            // Gateway
+            // TODO: IPv6 support
+            let mut gateway_ips: Vec<Ipv4Addr> = vec![];
+            let mut cur_g = unsafe { (*cur).FirstGatewayAddress };
+            while !cur_g.is_null() {
+                let addr = unsafe { (*cur_g).Address };
+                let sockaddr = unsafe { *addr.lpSockaddr };
+                if sockaddr.sa_family == AF_INET as u16 {
+                    let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
+                    let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
+                    let ipv4 = if cfg!(target_endian = "little") {
+                        Ipv4Addr::from(a.swap_bytes())
+                    } else {
+                        Ipv4Addr::from(a)
+                    };
+                    gateway_ips.push(ipv4);
+                }
+                cur_g = unsafe { (*cur_g).Next };
+            }
+            let default_gateway: Option<Gateway> = match gateway_ips.get(0) {
+                Some(gateway_ip) => {
+                    if let Some(ip_net) = ipv4_vec.get(0) {
+                        let mac_addr = get_mac_through_arp(ip_net.addr, *gateway_ip);
+                        let gateway = Gateway {
+                            mac_addr: mac_addr,
+                            ip_addr: IpAddr::V4(*gateway_ip),
+                        };
+                        Some(gateway)
+                    }else{
+                        None
                     }
                 },
-                Err(_) => {},
-            }
-            unsafe { p_ip_addr = (*p_ip_addr).Next; }
+                None => None,
+            };
+            let interface: Interface = Interface{
+                index: index,
+                name: adapter_name,
+                friendly_name: Some(friendly_name),
+                description: Some(description),
+                if_type: InterfaceType::try_from(if_type).unwrap_or(InterfaceType::Unknown),
+                mac_addr: Some(mac_addr),
+                ipv4: ipv4_vec,
+                ipv6: ipv6_vec,
+                flags: flags,
+                gateway: default_gateway,
+            };
+            interfaces.push(interface);
+            cur = unsafe { (*cur).Next };
         }
-        //Enumerate all gateways
-        let mut gateway_ips: Vec<IpAddr> = vec![];
-        let mut p_gateway_addr: *mut IP_ADDR_STRING;
-        p_gateway_addr = unsafe { mem::transmute(&(*p_adaptor).GatewayList) };
-        while p_gateway_addr as u64 != 0 {
-            let gateway_addr_string: IP_ADDR_STRING = unsafe { *p_gateway_addr };
-            let gateway_addr: String = bytes_to_string(&gateway_addr_string.IpAddress.String);
-            match gateway_addr.parse::<IpAddr>() {
-                Ok(ip_addr) => {
-                    gateway_ips.push(ip_addr);
-                },
-                Err(_) => {},
-            }
-            unsafe { p_gateway_addr = (*p_gateway_addr).Next; }
+    } else {
+        unsafe {
+            deallocate(mem as *mut u8, dwsize as usize);
         }
-        let default_gateway: Option<Gateway> = match gateway_ips.get(0) {
-            Some(gateway_ip) => {
-                let gateway_ip: IpAddr = *gateway_ip;
-                let default_gateway: Option<Gateway> = if gateway_ip != IpAddr::V4(Ipv4Addr::UNSPECIFIED) {
-                    match gateway_ip {
-                        IpAddr::V4(dst_ip) => {
-                            if let Some(ip_net) = ipv4_vec.get(0) {
-                                let mac_addr = get_mac_through_arp(ip_net.addr, dst_ip);
-                                let gateway = Gateway {
-                                    mac_addr: mac_addr,
-                                    ip_addr: IpAddr::V4(dst_ip),
-                                };
-                                Some(gateway)
-                            }else{
-                                None
-                            }
-                        },
-                        IpAddr::V6(_dst_ip) => {
-                            None
-                        },
-                    }
-                }else{
-                    None
-                };
-                default_gateway
-            },
-            None => None,
-        };
-        let interface: Interface = Interface{
-            index: adapter.Index,
-            name: adapter_name,
-            description: Some(adapter_desc),
-            if_type: InterfaceType::try_from(adapter.Type).unwrap_or(InterfaceType::Unknown),
-            mac_addr: Some(MacAddr::new(mac_addr)),
-            ipv4: ipv4_vec,
-            ipv6: ipv6_vec,
-            flags: adapter.Type,
-            gateway: default_gateway,
-        };
-        interfaces.push(interface);
-        unsafe { p_adaptor = (*p_adaptor).Next; }
+    }
+    unsafe {
+        deallocate(mem as *mut u8, dwsize as usize);
     }
     return interfaces;
 }

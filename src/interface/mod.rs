@@ -75,9 +75,9 @@ pub struct Interface {
     pub index: u32,
     /// Name of network interface
     pub name: String,
+    /// Friendly Name of network interface
+    pub friendly_name : Option<String>,
     /// Description of the network interface
-    /// 
-    /// On Windows, this field is the adapter name 
     pub description: Option<String>,
     /// Interface Type
     pub if_type: InterfaceType,
