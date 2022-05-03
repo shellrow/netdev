@@ -10,11 +10,14 @@ use crate::interface::{self, MacAddr, Interface};
 /// Structure of default Gateway information
 #[derive(Clone, Debug)]
 pub struct Gateway {
+    /// MAC address of Gateway
     pub mac_addr: MacAddr,
+    /// IP address of Gateway
     pub ip_addr: IpAddr,
 }
 
 impl Gateway {
+    /// Construct a new Gateway instance
     pub fn new() -> Gateway {
         Gateway {
             mac_addr: MacAddr::zero(),

@@ -3,37 +3,66 @@ use std::convert::TryFrom;
 /// Type of Network Interface
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum InterfaceType {
+    /// Unknown interface type
     Unknown,
+    /// The network interface using an Ethernet connection
     Ethernet,
+    /// The network interface using a Token-Ring connection
     TokenRing,
+    /// The network interface using a Fiber Distributed Data Interface (FDDI) connection
     Fddi,
+    /// The network interface using a basic rate interface Integrated Services Digital Network (ISDN) connection
     BasicIsdn,
+    /// The network interface using a primary rate interface Integrated Services Digital Network (ISDN) connection
     PrimaryIsdn,
+    /// The network interface using a Point-To-Point protocol (PPP) connection
     Ppp,
+    /// The loopback interface (often used for testing)
     Loopback,
+    /// The network interface using an Ethernet 3 megabit/second connection
     Ethernet3Megabit,
+    /// The network interface using a Serial Line Internet Protocol (SLIP) connection
     Slip,
+    /// The network interface using asynchronous transfer mode (ATM) for data transmission
     Atm,
+    /// The network interface using a modem
     GenericModem,
+    /// The network interface using a Fast Ethernet connection over twisted pair and provides a data rate of 100 megabits per second (100BASE-T)
     FastEthernetT,
+    /// The network interface using a connection configured for ISDN and the X.25 protocol.
     Isdn,
+    /// The network interface using a Fast Ethernet connection over optical fiber and provides a data rate of 100 megabits per second (100Base-FX)
     FastEthernetFx,
+    /// The network interface using a wireless LAN connection (IEEE 802.11)
     Wireless80211,
+    /// The network interface using an Asymmetric Digital Subscriber Line (ADSL)
     AsymmetricDsl,
+    /// The network interface using a Rate Adaptive Digital Subscriber Line (RADSL)
     RateAdaptDsl,
+    /// The network interface using a Symmetric Digital Subscriber Line (SDSL)
     SymmetricDsl,
+    /// The network interface using a Very High Data Rate Digital Subscriber Line (VDSL)
     VeryHighSpeedDsl,
+    /// The network interface using the Internet Protocol (IP) in combination with asynchronous transfer mode (ATM) for data transmission
     IPOverAtm,
+    /// The network interface using a gigabit Ethernet connection and provides a data rate of 1,000 megabits per second (1 gigabit per second)
     GigabitEthernet,
+    /// The network interface using a tunnel connection
     Tunnel,
+    /// The network interface using a Multirate Digital Subscriber Line
     MultiRateSymmetricDsl,
+    /// The network interface using a High Performance Serial Bus
     HighPerformanceSerialBus,
+    /// The network interface using a mobile broadband interface for WiMax devices
     Wman,
+    /// The network interface using a mobile broadband interface for GSM-based devices
     Wwanpp,
+    /// The network interface using a mobile broadband interface for CDMA-based devices
     Wwanpp2,
 }
 
 impl InterfaceType {
+    /// Returns OS-specific value of InterfaceType
     #[cfg(target_os = "windows")]
     pub fn value(&self) -> u32 {
         match *self {
@@ -67,7 +96,7 @@ impl InterfaceType {
             InterfaceType::Wwanpp2 => 244,
         }
     }
-
+    /// Returns OS-specific value of InterfaceType
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn value(&self) -> u32 {
         match *self {
@@ -84,7 +113,7 @@ impl InterfaceType {
             _ => u32::MAX,
         }
     }
-
+    /// Returns OS-specific value of InterfaceType
     #[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
     pub fn value(&self) -> u32 {
         // TODO
@@ -92,7 +121,7 @@ impl InterfaceType {
             _ => 0,
         }
     }
-
+    /// Returns name of InterfaceType
     pub fn name(&self) -> String {
         match *self {
             InterfaceType::Unknown => String::from("Unknown"),
