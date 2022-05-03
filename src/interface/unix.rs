@@ -241,6 +241,7 @@ pub fn unix_interfaces() -> Vec<Interface> {
         let interface: Interface = Interface{
             index: 0,
             name: name.clone(),
+            friendly_name: None,
             description: None,
             if_type: InterfaceType::Unknown,
             mac_addr: mac.clone(),
