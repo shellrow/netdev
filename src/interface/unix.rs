@@ -95,6 +95,9 @@ pub fn interfaces() -> Vec<Interface> {
     };
     for iface in &mut interfaces {
         iface.if_type = linux::get_interface_type(iface.name.clone());
+        let if_speed: Option<u64> = linux::get_interface_speed(iface.name.clone());
+        iface.transmit_speed = if_speed;
+        iface.receive_speed = if_speed;
         match local_ip {
             IpAddr::V4(local_ipv4) => {
                 if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
@@ -248,6 +251,8 @@ pub fn unix_interfaces() -> Vec<Interface> {
             ipv4: ini_ipv4,
             ipv6: ini_ipv6,
             flags: addr_ref.ifa_flags,
+            transmit_speed: None,
+            receive_speed: None,
             gateway: None,
         };
         let mut found: bool = false;
