@@ -18,7 +18,7 @@
 Add `default-net` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-default-net = "0.10.0"
+default-net = "0.11.0"
 ```
 
 ## Example 
@@ -32,7 +32,7 @@ fn main(){
             println!("Default Interface");
             println!("\tIndex: {}", default_interface.index);
             println!("\tName: {}", default_interface.name);
-            println!("\tFriendlyName: {:?}", default_interface.friendly_name);
+            println!("\tFriendly Name: {:?}", default_interface.friendly_name);
             println!("\tDescription: {:?}", default_interface.description);
             println!("\tType: {}", default_interface.if_type.name());
             if let Some(mac_addr) = default_interface.mac_addr {
@@ -43,6 +43,8 @@ fn main(){
             println!("\tIPv4: {:?}", default_interface.ipv4);
             println!("\tIPv6: {:?}", default_interface.ipv6);
             println!("\tFlags: {:?}", default_interface.flags);
+            println!("\tTransmit Speed: {:?}", default_interface.transmit_speed);
+            println!("\tReceive Speed: {:?}", default_interface.receive_speed);
             if let Some(gateway) = default_interface.gateway {
                 println!("Default Gateway");
                 println!("\tMAC: {}", gateway.mac_addr);

@@ -91,12 +91,15 @@ pub fn interfaces() -> Vec<Interface> {
             // Description
             let p_desc = unsafe { (*cur).Description.0};
             let desc_len = unsafe { wcslen(p_desc as *const wchar_t) };
-            let aname_slice = unsafe { std::slice::from_raw_parts(p_desc, desc_len) };
-            let description = String::from_utf16(aname_slice).unwrap();
+            let desc_slice = unsafe { std::slice::from_raw_parts(p_desc, desc_len) };
+            let description = String::from_utf16(desc_slice).unwrap();
             // MAC address
             let mac_addr_arr: [u8; 6] = unsafe { (*cur).PhysicalAddress }[..6].try_into().unwrap_or([0, 0, 0, 0, 0, 0]);
             let mac_addr: MacAddr = MacAddr::new(mac_addr_arr);
-
+            // TransmitLinkSpeed (bits per second)
+            let transmit_speed = unsafe { (*cur).TransmitLinkSpeed};
+            // ReceiveLinkSpeed (bits per second)
+            let receive_speed = unsafe { (*cur).ReceiveLinkSpeed};
             let mut ipv4_vec: Vec<Ipv4Net> = vec![];
             let mut ipv6_vec: Vec<Ipv6Net> = vec![];
             // Enumerate all IPs
@@ -168,6 +171,8 @@ pub fn interfaces() -> Vec<Interface> {
                 ipv4: ipv4_vec,
                 ipv6: ipv6_vec,
                 flags: flags,
+                transmit_speed: Some(transmit_speed),
+                receive_speed: Some(receive_speed),
                 gateway: default_gateway,
             };
             interfaces.push(interface);

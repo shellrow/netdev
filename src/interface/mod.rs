@@ -89,6 +89,10 @@ pub struct Interface {
     pub ipv6: Vec<Ipv6Net>,
     /// Flags for the network interface (OS Specific)
     pub flags: u32,
+    /// Speed in bits per second of the transmit for the network interface
+    pub transmit_speed: Option<u64>,
+    /// Speed in bits per second of the receive for the network interface
+    pub receive_speed: Option<u64>,
     /// Default gateway for the network interface
     pub gateway: Option<Gateway>,
 }
