@@ -16,10 +16,14 @@ pub fn get_default_gateway(interface_name: String) -> Result<Gateway, String> {
         bpf_fd_attempts: 1000,
         promiscuous: false,
     };
-    let (mut _tx, mut rx) = match socket::channel(interface_name, config) {
-        Ok(socket::Channel::Ethernet(tx, rx)) => (tx, rx),
-        Err(e) => panic!("Failed to create channel {}", e),
-    };
+    let (mut _tx, mut rx);
+    match socket::channel(interface_name, config) {
+        Ok(socket::Channel::Ethernet(etx, erx)) => {
+            _tx = etx;
+            rx = erx;
+        },
+        Err(e) => return Err(format!("Failed to create channel {}", e)),
+    }
     match super::send_udp_packet() {
         Ok(_) => (),
         Err(e) => return Err(format!("Failed to send UDP packet {}", e)),
