@@ -32,7 +32,7 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
     let mut out_buf_len : u32 = 6;
     let mut target_mac_addr: [u8; 6] =  [0; 6];
     let res = unsafe { SendARP(dst_ip_int, src_ip_int, target_mac_addr.as_mut_ptr() as *mut c_void, &mut out_buf_len) };
-    if res == NO_ERROR {
+    if res == NO_ERROR.0 {
         MacAddr::new(target_mac_addr)
     }else{
         MacAddr::zero()
@@ -47,19 +47,17 @@ pub fn interfaces() -> Vec<Interface> {
     let mut mem = unsafe { allocate(dwsize as usize) } as *mut IP_ADAPTER_ADDRESSES_LH;
     let mut retries = 3;
     let mut ret_val;
-    let family: u32 = AF_UNSPEC;
-    let flags: u32 = GAA_FLAG_INCLUDE_GATEWAYS;
     loop {
         let old_size = dwsize as usize;
-        ret_val = unsafe { GetAdaptersAddresses(family, flags, std::ptr::null_mut::<std::ffi::c_void>(), mem, &mut dwsize) };
-        if ret_val != ERROR_BUFFER_OVERFLOW || retries <= 0 {
+        ret_val = unsafe { GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_GATEWAYS, std::ptr::null_mut::<std::ffi::c_void>(), mem, &mut dwsize) };
+        if ret_val != ERROR_BUFFER_OVERFLOW.0 || retries <= 0 {
             break;
         }
         unsafe { deallocate(mem as *mut u8, old_size as usize) };
         mem = unsafe { allocate(dwsize as usize) as *mut IP_ADAPTER_ADDRESSES_LH };
         retries -= 1;
     }
-    if ret_val == NO_ERROR {
+    if ret_val == NO_ERROR.0 {
         // Enumerate all adapters
         let mut cur = mem;
         while !cur.is_null() {
@@ -108,7 +106,7 @@ pub fn interfaces() -> Vec<Interface> {
                 let addr = unsafe { (*cur_a).Address };
                 let prefix_len = unsafe{ (*cur_a).OnLinkPrefixLength }; 
                 let sockaddr = unsafe { *addr.lpSockaddr };
-                if sockaddr.sa_family == AF_INET as u16 {
+                if sockaddr.sa_family == AF_INET.0 as u16{
                     let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
                     let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
                     let ipv4 = if cfg!(target_endian = "little") {
@@ -118,7 +116,7 @@ pub fn interfaces() -> Vec<Interface> {
                     };
                     let ipv4_net: Ipv4Net = Ipv4Net::new(ipv4, prefix_len);
                     ipv4_vec.push(ipv4_net);
-                } else if sockaddr.sa_family == AF_INET6 as u16 {
+                } else if sockaddr.sa_family == AF_INET6.0 as u16 {
                     let sockaddr: *mut SOCKADDR_IN6 = addr.lpSockaddr as *mut SOCKADDR_IN6;
                     let a = unsafe { (*sockaddr).sin6_addr.u.Byte };
                     let ipv6 = Ipv6Addr::from(a);
@@ -134,7 +132,7 @@ pub fn interfaces() -> Vec<Interface> {
             while !cur_g.is_null() {
                 let addr = unsafe { (*cur_g).Address };
                 let sockaddr = unsafe { *addr.lpSockaddr };
-                if sockaddr.sa_family == AF_INET as u16 {
+                if sockaddr.sa_family == AF_INET.0 as u16 {
                     let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
                     let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
                     let ipv4 = if cfg!(target_endian = "little") {
