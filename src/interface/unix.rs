@@ -149,7 +149,7 @@ pub(super) fn sockaddr_to_network_addr(
             let addr =
                 sys::sockaddr_to_addr(mem::transmute(sa), mem::size_of::<libc::sockaddr_storage>());
 
-            match dbg!(addr) {
+            match addr {
                 Ok(SocketAddr::V4(sa)) => (None, Some(IpAddr::V4(*sa.ip()))),
                 Ok(SocketAddr::V6(sa)) => (None, Some(IpAddr::V6(*sa.ip()))),
                 Err(_) => (None, None),

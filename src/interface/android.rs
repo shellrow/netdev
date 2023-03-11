@@ -164,7 +164,6 @@ mod netlink {
                                 ifaces.push(interface);
                             }
                             RtnlMessage::NewAddress(addr_msg) => {
-                                println!("NewAddress: {:?}", addr_msg);
                                 if let Some(interface) =
                                     ifaces.iter_mut().find(|i| i.index == addr_msg.header.index)
                                 {
