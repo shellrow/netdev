@@ -1,19 +1,16 @@
 use super::Interface;
 use super::MacAddr;
 use crate::gateway;
+use crate::interface::InterfaceType;
 use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::sys;
 
-use crate::interface::InterfaceType;
 use libc;
 use std::ffi::{CStr, CString};
 use std::mem::{self, MaybeUninit};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
-
-#[cfg(target_os = "android")]
-use super::android::{freeifaddrs, getifaddrs};
 
 #[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 pub fn interfaces() -> Vec<Interface> {
@@ -128,7 +125,9 @@ pub fn interfaces() -> Vec<Interface> {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-fn sockaddr_to_network_addr(sa: *const libc::sockaddr) -> (Option<MacAddr>, Option<IpAddr>) {
+pub(super) fn sockaddr_to_network_addr(
+    sa: *const libc::sockaddr,
+) -> (Option<MacAddr>, Option<IpAddr>) {
     use std::net::SocketAddr;
 
     unsafe {
@@ -150,7 +149,7 @@ fn sockaddr_to_network_addr(sa: *const libc::sockaddr) -> (Option<MacAddr>, Opti
             let addr =
                 sys::sockaddr_to_addr(mem::transmute(sa), mem::size_of::<libc::sockaddr_storage>());
 
-            match addr {
+            match dbg!(addr) {
                 Ok(SocketAddr::V4(sa)) => (None, Some(IpAddr::V4(*sa.ip()))),
                 Ok(SocketAddr::V6(sa)) => (None, Some(IpAddr::V6(*sa.ip()))),
                 Err(_) => (None, None),
@@ -199,7 +198,30 @@ fn sockaddr_to_network_addr(sa: *const libc::sockaddr) -> (Option<MacAddr>, Opti
     }
 }
 
+#[cfg(not(target_os = "android"))]
 pub fn unix_interfaces() -> Vec<Interface> {
+    unix_interfaces_inner(libc::getifaddrs, libc::freeifaddrs)
+}
+
+#[cfg(target_os = "android")]
+pub fn unix_interfaces() -> Vec<Interface> {
+    // Android is complicated
+
+    // API 24+ contains the getifaddrs and freeifaddrs functions but the NDK doesn't
+    // expose those functions in ifaddrs.h when the minimum supported SDK is lower than 24
+    // and therefore we need to load them manually.
+    if let Some((getifaddrs, freeeifaddrs)) = android::get_libc_ifaddrs() {
+        return unix_interfaces_inner(getifaddrs, freeifaddrs);
+    }
+
+    // If API < 24 (or we can't load libc for some other reason), we fallback to using netlink
+    android::netlink::unix_interfaces()
+}
+
+pub fn unix_interfaces_inner(
+    getifaddrs: unsafe extern "C" fn(ifap: *mut *mut libc::ifaddrs) -> libc::c_int,
+    freeifaddrs: unsafe extern "C" fn(ifa: *mut libc::ifaddrs),
+) -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = vec![];
     let mut addrs: MaybeUninit<*mut libc::ifaddrs> = MaybeUninit::uninit();
     if unsafe { getifaddrs(addrs.as_mut_ptr()) } != 0 {
@@ -212,6 +234,7 @@ pub fn unix_interfaces() -> Vec<Interface> {
         let c_str = addr_ref.ifa_name as *const c_char;
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name = unsafe { from_utf8_unchecked(bytes).to_owned() };
+
         let (mac, ip) = sockaddr_to_network_addr(addr_ref.ifa_addr as *const libc::sockaddr);
         let (_, netmask) = sockaddr_to_network_addr(addr_ref.ifa_netmask as *const libc::sockaddr);
         let mut ini_ipv4: Vec<Ipv4Net> = vec![];
@@ -306,17 +329,6 @@ pub fn unix_interfaces() -> Vec<Interface> {
         }
     }
     ifaces
-}
-
-#[cfg(not(target_os = "android"))]
-unsafe fn getifaddrs(ifap: *mut *mut libc::ifaddrs) -> libc::c_int {
-    // Not android, everything is easy
-    libc::getifaddrs(ifap)
-}
-
-#[cfg(not(target_os = "android"))]
-unsafe fn freeifaddrs(ifa: *mut libc::ifaddrs) {
-    libc::freeifaddrs(ifa);
 }
 
 #[cfg(test)]
