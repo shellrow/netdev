@@ -198,33 +198,17 @@ fn sockaddr_to_network_addr(sa: *const libc::sockaddr) -> (Option<MacAddr>, Opti
     }
 }
 
-#[cfg(not(target_os = "android"))]
-pub fn unix_interfaces() -> Vec<Interface> {
-    unix_interfaces_inner(libc::getifaddrs, libc::freeifaddrs)
-}
 
 #[cfg(target_os = "android")]
 pub fn unix_interfaces() -> Vec<Interface> {
-    // Android is complicated
-
-    // API 24+ contains the getifaddrs and freeifaddrs functions but the NDK doesn't
-    // expose those functions in ifaddrs.h when the minimum supported SDK is lower than 24
-    // and therefore we need to load them manually.
-    if let Some((getifaddrs, freeeifaddrs)) = android::get_libc_ifaddrs() {
-        return unix_interfaces_inner(getifaddrs, freeifaddrs);
-    }
-
-    // If API < 24 (or we can't load libc for some other reason), we fallback to using netlink
-    android::netlink::unix_interfaces()
+    super::android::unix_interfaces()
 }
 
-pub fn unix_interfaces_inner(
-    getifaddrs: unsafe extern "C" fn(ifap: *mut *mut libc::ifaddrs) -> libc::c_int,
-    freeifaddrs: unsafe extern "C" fn(ifa: *mut libc::ifaddrs),
-) -> Vec<Interface> {
+#[cfg(not(target_os = "android"))]
+pub fn unix_interfaces() -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = vec![];
     let mut addrs: MaybeUninit<*mut libc::ifaddrs> = MaybeUninit::uninit();
-    if unsafe { getifaddrs(addrs.as_mut_ptr()) } != 0 {
+    if unsafe { libc::getifaddrs(addrs.as_mut_ptr()) } != 0 {
         return ifaces;
     }
     let addrs = unsafe { addrs.assume_init() };
@@ -320,7 +304,7 @@ pub fn unix_interfaces_inner(
         addr = addr_ref.ifa_next;
     }
     unsafe {
-        freeifaddrs(addrs);
+        libc::freeifaddrs(addrs);
     }
     for iface in &mut ifaces {
         let name = CString::new(iface.name.as_bytes()).unwrap();
