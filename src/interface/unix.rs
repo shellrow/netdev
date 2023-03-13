@@ -198,17 +198,29 @@ fn sockaddr_to_network_addr(sa: *const libc::sockaddr) -> (Option<MacAddr>, Opti
     }
 }
 
-
 #[cfg(target_os = "android")]
 pub fn unix_interfaces() -> Vec<Interface> {
-    super::android::unix_interfaces()
+    use super::android;
+
+    if let Some((getifaddrs, freeifaddrs)) = android::get_libc_ifaddrs() {
+        return unix_interfaces_inner(getifaddrs, freeifaddrs);
+    }
+
+    android::netlink::unix_interfaces()
 }
 
 #[cfg(not(target_os = "android"))]
 pub fn unix_interfaces() -> Vec<Interface> {
+    unix_interfaces_inner(libc::getifaddrs, libc::freeifaddrs)
+}
+
+fn unix_interfaces_inner(
+    getifaddrs: unsafe extern "C" fn(*mut *mut libc::ifaddrs) -> libc::c_int,
+    freeifaddrs: unsafe extern "C" fn(*mut libc::ifaddrs),
+) -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = vec![];
     let mut addrs: MaybeUninit<*mut libc::ifaddrs> = MaybeUninit::uninit();
-    if unsafe { libc::getifaddrs(addrs.as_mut_ptr()) } != 0 {
+    if unsafe { getifaddrs(addrs.as_mut_ptr()) } != 0 {
         return ifaces;
     }
     let addrs = unsafe { addrs.assume_init() };
@@ -304,7 +316,7 @@ pub fn unix_interfaces() -> Vec<Interface> {
         addr = addr_ref.ifa_next;
     }
     unsafe {
-        libc::freeifaddrs(addrs);
+        freeifaddrs(addrs);
     }
     for iface in &mut ifaces {
         let name = CString::new(iface.name.as_bytes()).unwrap();
