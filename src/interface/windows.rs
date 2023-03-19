@@ -1,40 +1,50 @@
-use windows::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
-use windows::Win32::Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6};
-use windows::Win32::NetworkManagement::IpHelper::{GetAdaptersAddresses, AF_UNSPEC, AF_INET, AF_INET6, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH, SendARP};
-use std::convert::TryInto;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::convert::TryFrom;
 use core::ffi::c_void;
 use libc::{c_char, strlen, wchar_t, wcslen};
 use memalloc::{allocate, deallocate};
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use windows::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
+use windows::Win32::NetworkManagement::IpHelper::{
+    GetAdaptersAddresses, SendARP, AF_INET, AF_INET6, AF_UNSPEC, GAA_FLAG_INCLUDE_GATEWAYS,
+    IP_ADAPTER_ADDRESSES_LH,
+};
+use windows::Win32::Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6};
 
-use crate::ip::{Ipv4Net, Ipv6Net};
-use crate::interface::{Interface, MacAddr,InterfaceType};
 use crate::gateway::Gateway;
+use crate::interface::{Interface, InterfaceType, MacAddr};
+use crate::ip::{Ipv4Net, Ipv6Net};
 
 #[cfg(target_endian = "little")]
-fn htonl(val : u32) -> u32 {
+fn htonl(val: u32) -> u32 {
     let o3 = (val >> 24) as u8;
     let o2 = (val >> 16) as u8;
-    let o1 = (val >> 8)  as u8;
-    let o0 =  val        as u8;
+    let o1 = (val >> 8) as u8;
+    let o0 = val as u8;
     (o0 as u32) << 24 | (o1 as u32) << 16 | (o2 as u32) << 8 | (o3 as u32)
 }
 
 #[cfg(target_endian = "big")]
-fn htonl(val : u32) -> u32 {
+fn htonl(val: u32) -> u32 {
     val
 }
 
 fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
     let src_ip_int: u32 = htonl(u32::from(src_ip));
     let dst_ip_int: u32 = htonl(u32::from(dst_ip));
-    let mut out_buf_len : u32 = 6;
-    let mut target_mac_addr: [u8; 6] =  [0; 6];
-    let res = unsafe { SendARP(dst_ip_int, src_ip_int, target_mac_addr.as_mut_ptr() as *mut c_void, &mut out_buf_len) };
+    let mut out_buf_len: u32 = 6;
+    let mut target_mac_addr: [u8; 6] = [0; 6];
+    let res = unsafe {
+        SendARP(
+            dst_ip_int,
+            src_ip_int,
+            target_mac_addr.as_mut_ptr() as *mut c_void,
+            &mut out_buf_len,
+        )
+    };
     if res == NO_ERROR.0 {
         MacAddr::new(target_mac_addr)
-    }else{
+    } else {
         MacAddr::zero()
     }
 }
@@ -49,7 +59,15 @@ pub fn interfaces() -> Vec<Interface> {
     let mut ret_val;
     loop {
         let old_size = dwsize as usize;
-        ret_val = unsafe { GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_GATEWAYS, std::ptr::null_mut::<std::ffi::c_void>(), mem, &mut dwsize) };
+        ret_val = unsafe {
+            GetAdaptersAddresses(
+                AF_UNSPEC,
+                GAA_FLAG_INCLUDE_GATEWAYS,
+                std::ptr::null_mut::<std::ffi::c_void>(),
+                mem,
+                &mut dwsize,
+            )
+        };
         if ret_val != ERROR_BUFFER_OVERFLOW.0 || retries <= 0 {
             break;
         }
@@ -61,17 +79,17 @@ pub fn interfaces() -> Vec<Interface> {
         // Enumerate all adapters
         let mut cur = mem;
         while !cur.is_null() {
-            let if_type: u32 = unsafe{ (*cur).IfType };
+            let if_type: u32 = unsafe { (*cur).IfType };
             match InterfaceType::try_from(if_type) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(_) => {
                     cur = unsafe { (*cur).Next };
                     continue;
-                },
+                }
             }
             // Index
             let anon1 = unsafe { (*cur).Anonymous1 };
-            let anon = unsafe { anon1.Anonymous};
+            let anon = unsafe { anon1.Anonymous };
             let index = anon.IfIndex;
             // Flags
             let anon2 = unsafe { (*cur).Anonymous2 };
@@ -87,26 +105,28 @@ pub fn interfaces() -> Vec<Interface> {
             let fname_slice = unsafe { std::slice::from_raw_parts(p_fname, fname_len) };
             let friendly_name = String::from_utf16(fname_slice).unwrap();
             // Description
-            let p_desc = unsafe { (*cur).Description.0};
+            let p_desc = unsafe { (*cur).Description.0 };
             let desc_len = unsafe { wcslen(p_desc as *const wchar_t) };
             let desc_slice = unsafe { std::slice::from_raw_parts(p_desc, desc_len) };
             let description = String::from_utf16(desc_slice).unwrap();
             // MAC address
-            let mac_addr_arr: [u8; 6] = unsafe { (*cur).PhysicalAddress }[..6].try_into().unwrap_or([0, 0, 0, 0, 0, 0]);
+            let mac_addr_arr: [u8; 6] = unsafe { (*cur).PhysicalAddress }[..6]
+                .try_into()
+                .unwrap_or([0, 0, 0, 0, 0, 0]);
             let mac_addr: MacAddr = MacAddr::new(mac_addr_arr);
             // TransmitLinkSpeed (bits per second)
-            let transmit_speed = unsafe { (*cur).TransmitLinkSpeed};
+            let transmit_speed = unsafe { (*cur).TransmitLinkSpeed };
             // ReceiveLinkSpeed (bits per second)
-            let receive_speed = unsafe { (*cur).ReceiveLinkSpeed};
+            let receive_speed = unsafe { (*cur).ReceiveLinkSpeed };
             let mut ipv4_vec: Vec<Ipv4Net> = vec![];
             let mut ipv6_vec: Vec<Ipv6Net> = vec![];
             // Enumerate all IPs
             let mut cur_a = unsafe { (*cur).FirstUnicastAddress };
             while !cur_a.is_null() {
                 let addr = unsafe { (*cur_a).Address };
-                let prefix_len = unsafe{ (*cur_a).OnLinkPrefixLength }; 
+                let prefix_len = unsafe { (*cur_a).OnLinkPrefixLength };
                 let sockaddr = unsafe { *addr.lpSockaddr };
-                if sockaddr.sa_family == AF_INET.0 as u16{
+                if sockaddr.sa_family == AF_INET.0 as u16 {
                     let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
                     let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
                     let ipv4 = if cfg!(target_endian = "little") {
@@ -153,13 +173,13 @@ pub fn interfaces() -> Vec<Interface> {
                             ip_addr: IpAddr::V4(*gateway_ip),
                         };
                         Some(gateway)
-                    }else{
+                    } else {
                         None
                     }
-                },
+                }
                 None => None,
             };
-            let interface: Interface = Interface{
+            let interface: Interface = Interface {
                 index: index,
                 name: adapter_name,
                 friendly_name: Some(friendly_name),

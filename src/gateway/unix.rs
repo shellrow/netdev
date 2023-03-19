@@ -1,6 +1,6 @@
-use std::time::{Duration, Instant};
-use crate::socket;
 use super::Gateway;
+use crate::socket;
+use std::time::{Duration, Instant};
 
 const TIMEOUT: u64 = 3000;
 
@@ -21,7 +21,7 @@ pub fn get_default_gateway(interface_name: String) -> Result<Gateway, String> {
         Ok(socket::Channel::Ethernet(etx, erx)) => {
             _tx = etx;
             rx = erx;
-        },
+        }
         Err(e) => return Err(format!("Failed to create channel {}", e)),
     }
     match super::send_udp_packet() {
@@ -30,19 +30,17 @@ pub fn get_default_gateway(interface_name: String) -> Result<Gateway, String> {
     }
     loop {
         match rx.next() {
-            Ok(frame) => {
-                match socket::packet::parse_frame(frame){
-                    Ok(gateway) => {
-                        return Ok(gateway);
-                    },
-                    Err(_) => {},
+            Ok(frame) => match socket::packet::parse_frame(frame) {
+                Ok(gateway) => {
+                    return Ok(gateway);
                 }
+                Err(_) => {}
             },
             Err(_) => {}
         }
         if Instant::now().duration_since(start_time) > timeout {
             return Err(String::from("Recieve timeout"));
-        }else{
+        } else {
             match super::send_udp_packet() {
                 Ok(_) => (),
                 Err(e) => return Err(format!("Failed to send UDP packet {}", e)),

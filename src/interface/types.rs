@@ -114,7 +114,13 @@ impl InterfaceType {
         }
     }
     /// Returns OS-specific value of InterfaceType
-    #[cfg(any(target_os = "macos", target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "ios"))]
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "openbsd",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "ios"
+    ))]
     pub fn value(&self) -> u32 {
         // TODO
         match *self {
@@ -168,7 +174,9 @@ impl TryFrom<u32> for InterfaceType {
             x if x == InterfaceType::PrimaryIsdn.value() => Ok(InterfaceType::PrimaryIsdn),
             x if x == InterfaceType::Ppp.value() => Ok(InterfaceType::Ppp),
             x if x == InterfaceType::Loopback.value() => Ok(InterfaceType::Loopback),
-            x if x == InterfaceType::Ethernet3Megabit.value() => Ok(InterfaceType::Ethernet3Megabit),
+            x if x == InterfaceType::Ethernet3Megabit.value() => {
+                Ok(InterfaceType::Ethernet3Megabit)
+            }
             x if x == InterfaceType::Slip.value() => Ok(InterfaceType::Slip),
             x if x == InterfaceType::Atm.value() => Ok(InterfaceType::Atm),
             x if x == InterfaceType::GenericModem.value() => Ok(InterfaceType::GenericModem),
@@ -179,12 +187,18 @@ impl TryFrom<u32> for InterfaceType {
             x if x == InterfaceType::AsymmetricDsl.value() => Ok(InterfaceType::AsymmetricDsl),
             x if x == InterfaceType::RateAdaptDsl.value() => Ok(InterfaceType::RateAdaptDsl),
             x if x == InterfaceType::SymmetricDsl.value() => Ok(InterfaceType::SymmetricDsl),
-            x if x == InterfaceType::VeryHighSpeedDsl.value() => Ok(InterfaceType::VeryHighSpeedDsl),
+            x if x == InterfaceType::VeryHighSpeedDsl.value() => {
+                Ok(InterfaceType::VeryHighSpeedDsl)
+            }
             x if x == InterfaceType::IPOverAtm.value() => Ok(InterfaceType::IPOverAtm),
             x if x == InterfaceType::GigabitEthernet.value() => Ok(InterfaceType::GigabitEthernet),
             x if x == InterfaceType::Tunnel.value() => Ok(InterfaceType::Tunnel),
-            x if x == InterfaceType::MultiRateSymmetricDsl.value() => Ok(InterfaceType::MultiRateSymmetricDsl),
-            x if x == InterfaceType::HighPerformanceSerialBus.value() => Ok(InterfaceType::HighPerformanceSerialBus),
+            x if x == InterfaceType::MultiRateSymmetricDsl.value() => {
+                Ok(InterfaceType::MultiRateSymmetricDsl)
+            }
+            x if x == InterfaceType::HighPerformanceSerialBus.value() => {
+                Ok(InterfaceType::HighPerformanceSerialBus)
+            }
             x if x == InterfaceType::Wman.value() => Ok(InterfaceType::Wman),
             x if x == InterfaceType::Wwanpp.value() => Ok(InterfaceType::Wwanpp),
             x if x == InterfaceType::Wwanpp2.value() => Ok(InterfaceType::Wwanpp2),
