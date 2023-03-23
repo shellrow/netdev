@@ -1,6 +1,6 @@
-use std::convert::TryInto;
 use crate::gateway::Gateway;
 use crate::interface::MacAddr;
+use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::u16;
 
@@ -76,11 +76,18 @@ fn convert_ipv6_bytes(bytes: [u8; 16]) -> Ipv6Addr {
 }
 
 pub fn parse_frame(frame: &[u8]) -> Result<Gateway, ()> {
-    let src_mac: [u8; 6] = frame[Frame::SrcMacAddr.start_index()..Frame::SrcMacAddr.end_index()].try_into().unwrap();
-    let ether_type: [u8; 2] = frame[Frame::EtherType.start_index()..Frame::EtherType.end_index()].try_into().unwrap();
+    let src_mac: [u8; 6] = frame[Frame::SrcMacAddr.start_index()..Frame::SrcMacAddr.end_index()]
+        .try_into()
+        .unwrap();
+    let ether_type: [u8; 2] = frame[Frame::EtherType.start_index()..Frame::EtherType.end_index()]
+        .try_into()
+        .unwrap();
     match ether_type {
         ETHER_TYPE_IPV4 => {
-            let src_ip: [u8; 4] = frame[Frame::SrcIpv4Addr.start_index()..Frame::SrcIpv4Addr.end_index()].try_into().unwrap();
+            let src_ip: [u8; 4] = frame
+                [Frame::SrcIpv4Addr.start_index()..Frame::SrcIpv4Addr.end_index()]
+                .try_into()
+                .unwrap();
             let next_header_protocol: u8 = frame[Frame::NextHeaderProtocolIpv4.start_index()];
             if next_header_protocol == NEXT_HEADER_ICMP {
                 let icmp_type: u8 = frame[Frame::IcmpType.start_index()];
@@ -92,9 +99,12 @@ pub fn parse_frame(frame: &[u8]) -> Result<Gateway, ()> {
                     return Ok(gateway);
                 }
             }
-        },
+        }
         ETHER_TYPE_IPV6 => {
-            let src_ip: [u8; 16] = frame[Frame::SrcIpv6Addr.start_index()..Frame::SrcIpv6Addr.end_index()].try_into().unwrap();
+            let src_ip: [u8; 16] = frame
+                [Frame::SrcIpv6Addr.start_index()..Frame::SrcIpv6Addr.end_index()]
+                .try_into()
+                .unwrap();
             let next_header_protocol: u8 = frame[Frame::NextHeaderProtocolIpv6.start_index()];
             if next_header_protocol == NEXT_HEADER_ICMPV6 {
                 let icmp_type: u8 = frame[Frame::Icmpv6Type.start_index()];
@@ -109,8 +119,8 @@ pub fn parse_frame(frame: &[u8]) -> Result<Gateway, ()> {
                     }
                 }
             }
-        },
-        _ => {},
+        }
+        _ => {}
     }
     Err(())
 }

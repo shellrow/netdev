@@ -1,7 +1,7 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::fs::read_to_string;
-use crate::interface::MacAddr;
 use super::Gateway;
+use crate::interface::MacAddr;
+use std::fs::read_to_string;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 const PATH_PROC_NET_ROUTE: &str = "/proc/net/route";
 const PATH_PROC_NET_ARP: &str = "/proc/net/arp";
@@ -35,7 +35,7 @@ fn convert_hex_ipv6(hex_ip: &str) -> Ipv6Addr {
 
 pub fn get_default_gateway(interface_name: String) -> Result<Gateway, String> {
     match super::send_udp_packet() {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => return Err(format!("Failed to send UDP packet {}", e)),
     }
     let route_data = read_to_string(PATH_PROC_NET_ROUTE);

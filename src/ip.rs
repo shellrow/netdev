@@ -97,11 +97,15 @@ fn ipv6_netmask_to_prefix(netmask: Ipv6Addr) -> u8 {
 }
 
 fn prefix_to_ipv4_netmask(prefix_len: u8) -> Ipv4Addr {
-    let netmask_u32: u32 = u32::max_value().checked_shl(32 - prefix_len as u32).unwrap_or(0);
+    let netmask_u32: u32 = u32::max_value()
+        .checked_shl(32 - prefix_len as u32)
+        .unwrap_or(0);
     Ipv4Addr::from(netmask_u32)
 }
 
 fn prefix_to_ipv6_netmask(prefix_len: u8) -> Ipv6Addr {
-    let netmask_u128: u128 = u128::max_value().checked_shl((128 - prefix_len) as u32).unwrap_or(u128::min_value());
+    let netmask_u128: u128 = u128::max_value()
+        .checked_shl((128 - prefix_len) as u32)
+        .unwrap_or(u128::min_value());
     Ipv6Addr::from(netmask_u128)
 }
