@@ -12,5 +12,53 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Install Rust Toolchain
+        run: rustup toolchain install stable --profile minimal --no-self-update
+
       - name: Run rustfmt
         run: cargo fmt --all --check
+
+  check:
+    name: Check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Install Rust Toolchain
+        run: rustup toolchain install stable --profile minimal --no-self-update
+
+      - uses: swatinem/rust-cache@v2
+
+      - name: Run cargo check
+        run: cargo check
+
+  cross:
+    name: Cross compile
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - i686-unknown-linux-gnu
+          - armv7-linux-androideabi
+          - aarch64-linux-android
+
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Install Rust Toolchain
+        run: rustup toolchain install stable --profile minimal --no-self-update
+
+      - uses: swatinem/rust-cache@v2
+
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Rust check
+        run: cross check --target ${{ matrix.target }}
