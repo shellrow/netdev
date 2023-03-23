@@ -13,6 +13,15 @@ license = "MIT"
 [dependencies]
 libc = "0.2"
 
+[target.'cfg(target_os = "android")'.dependencies]
+# DL Open
+dlopen2 = "0.4"
+once_cell = "1"
+# netlink
+netlink-packet-core = "0.5"
+netlink-packet-route = "0.15"
+netlink-sys = "0.8"
+
 [target.'cfg(windows)'.dependencies]
 memalloc = "0.1.0"
 

@@ -1,6 +1,7 @@
 use super::Interface;
 use super::MacAddr;
 use crate::gateway;
+use crate::interface::InterfaceType;
 use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::sys;
 
@@ -125,7 +126,9 @@ pub fn interfaces() -> Vec<Interface> {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-fn sockaddr_to_network_addr(sa: *const libc::sockaddr) -> (Option<MacAddr>, Option<IpAddr>) {
+pub(super) fn sockaddr_to_network_addr(
+    sa: *const libc::sockaddr,
+) -> (Option<MacAddr>, Option<IpAddr>) {
     use std::net::SocketAddr;
 
     unsafe {
@@ -196,10 +199,29 @@ fn sockaddr_to_network_addr(sa: *const libc::sockaddr) -> (Option<MacAddr>, Opti
     }
 }
 
+#[cfg(target_os = "android")]
 pub fn unix_interfaces() -> Vec<Interface> {
+    use super::android;
+
+    if let Some((getifaddrs, freeifaddrs)) = android::get_libc_ifaddrs() {
+        return unix_interfaces_inner(getifaddrs, freeifaddrs);
+    }
+
+    android::netlink::unix_interfaces()
+}
+
+#[cfg(not(target_os = "android"))]
+pub fn unix_interfaces() -> Vec<Interface> {
+    unix_interfaces_inner(libc::getifaddrs, libc::freeifaddrs)
+}
+
+fn unix_interfaces_inner(
+    getifaddrs: unsafe extern "C" fn(*mut *mut libc::ifaddrs) -> libc::c_int,
+    freeifaddrs: unsafe extern "C" fn(*mut libc::ifaddrs),
+) -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = vec![];
     let mut addrs: MaybeUninit<*mut libc::ifaddrs> = MaybeUninit::uninit();
-    if unsafe { libc::getifaddrs(addrs.as_mut_ptr()) } != 0 {
+    if unsafe { getifaddrs(addrs.as_mut_ptr()) } != 0 {
         return ifaces;
     }
     let addrs = unsafe { addrs.assume_init() };
