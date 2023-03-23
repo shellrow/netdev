@@ -5,6 +5,7 @@ use crate::interface::InterfaceType;
 use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::sys;
 
+use crate::interface::InterfaceType;
 use libc;
 use std::ffi::{CStr, CString};
 use std::mem::{self, MaybeUninit};
@@ -230,7 +231,6 @@ fn unix_interfaces_inner(
         let c_str = addr_ref.ifa_name as *const c_char;
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name = unsafe { from_utf8_unchecked(bytes).to_owned() };
-
         let (mac, ip) = sockaddr_to_network_addr(addr_ref.ifa_addr as *const libc::sockaddr);
         let (_, netmask) = sockaddr_to_network_addr(addr_ref.ifa_netmask as *const libc::sockaddr);
         let mut ini_ipv4: Vec<Ipv4Net> = vec![];
@@ -316,7 +316,7 @@ fn unix_interfaces_inner(
         addr = addr_ref.ifa_next;
     }
     unsafe {
-        freeifaddrs(addrs);
+        libc::freeifaddrs(addrs);
     }
     for iface in &mut ifaces {
         let name = CString::new(iface.name.as_bytes()).unwrap();

@@ -20,17 +20,24 @@ const SIZEOF_C_UINT: libc::c_ulong = 4;
 #[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
 const SIZEOF_C_LONG: libc::c_int = 8;
 
-pub const BIOCSETIF: libc::c_ulong = IOC_IN | ((SIZEOF_IFREQ & IOCPARM_MASK) << 16usize) | (('B' as libc::c_ulong) << 8usize) | 108;
-pub const BIOCIMMEDIATE: libc::c_ulong = IOC_IN | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 112;
-pub const BIOCGDLT: libc::c_ulong = IOC_OUT | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 106;
-pub const BIOCSBLEN: libc::c_ulong = IOC_INOUT | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 102;
-pub const BIOCSHDRCMPLT: libc::c_ulong = IOC_IN | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 117;
+pub const BIOCSETIF: libc::c_ulong =
+    IOC_IN | ((SIZEOF_IFREQ & IOCPARM_MASK) << 16usize) | (('B' as libc::c_ulong) << 8usize) | 108;
+pub const BIOCIMMEDIATE: libc::c_ulong =
+    IOC_IN | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 112;
+pub const BIOCGDLT: libc::c_ulong =
+    IOC_OUT | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 106;
+pub const BIOCSBLEN: libc::c_ulong =
+    IOC_INOUT | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 102;
+pub const BIOCSHDRCMPLT: libc::c_ulong =
+    IOC_IN | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 117;
 
 #[cfg(target_os = "freebsd")]
-pub const BIOCFEEDBACK: libc::c_ulong = IOC_IN | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 124;
+pub const BIOCFEEDBACK: libc::c_ulong =
+    IOC_IN | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 124;
 
 #[cfg(target_os = "netbsd")]
-pub const BIOCFEEDBACK: libc::c_ulong = IOC_IN | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 125;
+pub const BIOCFEEDBACK: libc::c_ulong =
+    IOC_IN | ((SIZEOF_C_UINT & IOCPARM_MASK) << 16) | (('B' as libc::c_ulong) << 8) | 125;
 
 pub const DLT_NULL: libc::c_uint = 0;
 
@@ -47,10 +54,16 @@ pub fn BPF_WORDALIGN(x: isize) -> isize {
 
 pub struct ifreq {
     pub ifr_name: [libc::c_char; IFNAMSIZ],
-    pub ifru_addr: SockAddr, 
+    pub ifru_addr: SockAddr,
 }
 
-#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd", target_os = "macos", target_os = "ios"))]
+#[cfg(any(
+    target_os = "openbsd",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "macos",
+    target_os = "ios"
+))]
 pub struct sockaddr_dl {
     pub sdl_len: libc::c_uchar,
     pub sdl_family: libc::c_uchar,
@@ -65,7 +78,10 @@ pub struct sockaddr_dl {
 #[cfg(any(
     target_os = "freebsd",
     target_os = "netbsd",
-    all(any(target_os = "macos", target_os = "ios"), target_pointer_width = "32"),
+    all(
+        any(target_os = "macos", target_os = "ios"),
+        target_pointer_width = "32"
+    ),
     windows
 ))]
 #[repr(C)]
@@ -83,7 +99,10 @@ pub struct timeval32 {
 
 #[cfg(any(
     target_os = "openbsd",
-    all(any(target_os = "macos", target_os = "ios"), target_pointer_width = "64")
+    all(
+        any(target_os = "macos", target_os = "ios"),
+        target_pointer_width = "64"
+    )
 ))]
 #[repr(C)]
 pub struct bpf_hdr {

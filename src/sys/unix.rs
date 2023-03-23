@@ -27,7 +27,8 @@ pub fn sockaddr_to_addr(storage: &SockAddrStorage, len: usize) -> io::Result<Soc
             let o2 = (ip >> 16) as u8;
             let o3 = (ip >> 8) as u8;
             let o4 = ip as u8;
-            let sockaddrv4 = SocketAddrV4::new(Ipv4Addr::new(o1, o2, o3, o4), ntohs(storage.sin_port));
+            let sockaddrv4 =
+                SocketAddrV4::new(Ipv4Addr::new(o1, o2, o3, o4), ntohs(storage.sin_port));
             Ok(SocketAddr::V4(sockaddrv4))
         }
         AF_INET6 => {
@@ -51,7 +52,7 @@ pub fn sockaddr_to_addr(storage: &SockAddrStorage, len: usize) -> io::Result<Soc
                 storage.sin6_scope_id,
             )))
         }
-        _ => Err(io::Error::new(io::ErrorKind::InvalidData, "Not supported",)),
+        _ => Err(io::Error::new(io::ErrorKind::InvalidData, "Not supported")),
     }
 }
 

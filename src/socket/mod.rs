@@ -1,8 +1,8 @@
 pub mod packet;
 
-#[cfg(not(target_os="windows"))]
+#[cfg(not(target_os = "windows"))]
 mod unix;
-#[cfg(not(target_os="windows"))]
+#[cfg(not(target_os = "windows"))]
 pub use self::unix::*;
 
 #[cfg(test)]
@@ -16,7 +16,7 @@ mod tests {
             Err(e) => {
                 println!("Failed to create UDP socket {}", e);
                 return;
-            },
+            }
         };
         let dst: &str = "1.1.1.1:80";
         match socket.set_ttl(1) {
@@ -24,14 +24,14 @@ mod tests {
             Err(e) => {
                 println!("Failed to set TTL {}", e);
                 return;
-            },
+            }
         }
         match socket.send_to(&buf, dst) {
             Ok(_) => (),
             Err(e) => {
                 println!("Failed to send data {}", e);
                 return;
-            },
+            }
         }
     }
     #[test]
@@ -55,17 +55,15 @@ mod tests {
 
         loop {
             match rx.next() {
-                Ok(frame) => {
-                    match packet::parse_frame(frame){
-                        Ok(gateway) => {
-                            println!("Default Gateway:");
-                            println!("{}", gateway.mac_addr);
-                            println!("{}", gateway.ip_addr);
-                            return;
-                        },
-                        Err(_) => {
-                            println!("Parse Error");
-                        },
+                Ok(frame) => match packet::parse_frame(frame) {
+                    Ok(gateway) => {
+                        println!("Default Gateway:");
+                        println!("{}", gateway.mac_addr);
+                        println!("{}", gateway.ip_addr);
+                        return;
+                    }
+                    Err(_) => {
+                        println!("Parse Error");
                     }
                 },
                 Err(e) => {
@@ -76,4 +74,3 @@ mod tests {
         }
     }
 }
-

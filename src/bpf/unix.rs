@@ -1,6 +1,6 @@
 use super::binding;
-use crate::socket::{DataLinkReceiver, DataLinkSender};
 use crate::interface::Interface;
+use crate::socket::{DataLinkReceiver, DataLinkSender};
 
 use std::collections::VecDeque;
 use std::ffi::CString;
@@ -200,9 +200,7 @@ pub fn channel(interface_name: String, config: Config) -> io::Result<crate::sock
         fd_set: unsafe { mem::zeroed() },
         write_buffer: vec![0; config.write_buffer_size],
         loopback: loopback,
-        timeout: config
-            .write_timeout
-            .map(|to| duration_to_timespec(to)),
+        timeout: config.write_timeout.map(|to| duration_to_timespec(to)),
     });
     unsafe {
         libc::FD_ZERO(&mut sender.fd_set as *mut libc::fd_set);
@@ -213,9 +211,7 @@ pub fn channel(interface_name: String, config: Config) -> io::Result<crate::sock
         fd_set: unsafe { mem::zeroed() },
         read_buffer: vec![0; allocated_read_buffer_size],
         loopback: loopback,
-        timeout: config
-            .read_timeout
-            .map(|to| duration_to_timespec(to)),
+        timeout: config.read_timeout.map(|to| duration_to_timespec(to)),
         packets: VecDeque::with_capacity(allocated_read_buffer_size / 64),
     });
     unsafe {
@@ -245,7 +241,6 @@ impl DataLinkSender for DataLinkSenderImpl {
         if len >= self.write_buffer.len() {
             None
         } else {
-
             let offset = if self.loopback {
                 ETHERNET_HEADER_SIZE
             } else {

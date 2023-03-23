@@ -1,6 +1,6 @@
 use default_net;
 
-fn main(){
+fn main() {
     match default_net::get_default_interface() {
         Ok(default_interface) => {
             println!("Default Interface");
@@ -11,7 +11,7 @@ fn main(){
             println!("\tType: {}", default_interface.if_type.name());
             if let Some(mac_addr) = default_interface.mac_addr {
                 println!("\tMAC: {}", mac_addr);
-            }else{
+            } else {
                 println!("\tMAC: (Failed to get mac address)");
             }
             println!("\tIPv4: {:?}", default_interface.ipv4);
@@ -23,12 +23,12 @@ fn main(){
                 println!("Default Gateway");
                 println!("\tMAC: {}", gateway.mac_addr);
                 println!("\tIP: {}", gateway.ip_addr);
-            }else {
+            } else {
                 println!("Default Gateway: (Not found)");
             }
-        },
+        }
         Err(e) => {
             println!("{}", e);
-        },
+        }
     }
 }
