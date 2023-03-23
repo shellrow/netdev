@@ -4,8 +4,6 @@ use crate::gateway;
 use crate::interface::InterfaceType;
 use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::sys;
-
-use crate::interface::InterfaceType;
 use libc;
 use std::ffi::{CStr, CString};
 use std::mem::{self, MaybeUninit};
@@ -316,7 +314,7 @@ fn unix_interfaces_inner(
         addr = addr_ref.ifa_next;
     }
     unsafe {
-        libc::freeifaddrs(addrs);
+        freeifaddrs(addrs);
     }
     for iface in &mut ifaces {
         let name = CString::new(iface.name.as_bytes()).unwrap();
