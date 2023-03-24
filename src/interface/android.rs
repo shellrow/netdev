@@ -13,7 +13,7 @@ pub fn get_libc_ifaddrs() -> Option<(
 fn load_symbol<T>(sym: &'static str) -> Option<T> {
     const LIB_NAME: &str = "libc.so";
 
-    match dlopen::raw::Library::open(LIB_NAME) {
+    match dlopen2::raw::Library::open(LIB_NAME) {
         Ok(lib) => match unsafe { lib.symbol::<T>(sym) } {
             Ok(val) => Some(val),
             Err(err) => {
