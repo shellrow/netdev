@@ -6,10 +6,11 @@ use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use windows::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
 use windows::Win32::NetworkManagement::IpHelper::{
-    GetAdaptersAddresses, SendARP, GAA_FLAG_INCLUDE_GATEWAYS,
-    IP_ADAPTER_ADDRESSES_LH,
+    GetAdaptersAddresses, SendARP, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH,
 };
-use windows::Win32::Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6, AF_INET, AF_INET6, AF_UNSPEC};
+use windows::Win32::Networking::WinSock::{
+    AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
+};
 
 use crate::gateway::Gateway;
 use crate::interface::{Interface, InterfaceType, MacAddr};
