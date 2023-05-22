@@ -46,6 +46,7 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
+          - i686-unknown-linux-gnu
           - armv7-linux-androideabi
           - aarch64-linux-android
 
