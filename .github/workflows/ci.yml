@@ -45,6 +45,7 @@ jobs:
       fail-fast: false
       matrix:
         target:
+          - x86_64-unknown-linux-gnu
           - i686-unknown-linux-gnu
           - armv7-linux-androideabi
           - aarch64-linux-android
@@ -53,9 +54,7 @@ jobs:
       - uses: actions/checkout@master
 
       - name: Install Rust Toolchain
-        # See https://github.com/cross-rs/cross/issues/1222 for when
-        # stable can be used instead of 1.67 again.
-        run: rustup toolchain install 1.67 --profile minimal --no-self-update
+        run: rustup toolchain install stable --profile minimal --no-self-update
 
       - uses: swatinem/rust-cache@v2
 

@@ -6,10 +6,11 @@ use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use windows::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
 use windows::Win32::NetworkManagement::IpHelper::{
-    GetAdaptersAddresses, SendARP, AF_INET, AF_INET6, AF_UNSPEC, GAA_FLAG_INCLUDE_GATEWAYS,
-    IP_ADAPTER_ADDRESSES_LH,
+    GetAdaptersAddresses, SendARP, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH,
 };
-use windows::Win32::Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6};
+use windows::Win32::Networking::WinSock::{
+    AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
+};
 
 use crate::gateway::Gateway;
 use crate::interface::{Interface, InterfaceType, MacAddr};
@@ -61,10 +62,10 @@ pub fn interfaces() -> Vec<Interface> {
         let old_size = dwsize as usize;
         ret_val = unsafe {
             GetAdaptersAddresses(
-                AF_UNSPEC,
+                AF_UNSPEC.0 as u32,
                 GAA_FLAG_INCLUDE_GATEWAYS,
-                std::ptr::null_mut::<std::ffi::c_void>(),
-                mem,
+                Some(std::ptr::null_mut::<std::ffi::c_void>()),
+                Some(mem),
                 &mut dwsize,
             )
         };
@@ -126,7 +127,7 @@ pub fn interfaces() -> Vec<Interface> {
                 let addr = unsafe { (*cur_a).Address };
                 let prefix_len = unsafe { (*cur_a).OnLinkPrefixLength };
                 let sockaddr = unsafe { *addr.lpSockaddr };
-                if sockaddr.sa_family == AF_INET.0 as u16 {
+                if sockaddr.sa_family == AF_INET {
                     let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
                     let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
                     let ipv4 = if cfg!(target_endian = "little") {
@@ -136,7 +137,7 @@ pub fn interfaces() -> Vec<Interface> {
                     };
                     let ipv4_net: Ipv4Net = Ipv4Net::new(ipv4, prefix_len);
                     ipv4_vec.push(ipv4_net);
-                } else if sockaddr.sa_family == AF_INET6.0 as u16 {
+                } else if sockaddr.sa_family == AF_INET6 {
                     let sockaddr: *mut SOCKADDR_IN6 = addr.lpSockaddr as *mut SOCKADDR_IN6;
                     let a = unsafe { (*sockaddr).sin6_addr.u.Byte };
                     let ipv6 = Ipv6Addr::from(a);
@@ -152,7 +153,7 @@ pub fn interfaces() -> Vec<Interface> {
             while !cur_g.is_null() {
                 let addr = unsafe { (*cur_g).Address };
                 let sockaddr = unsafe { *addr.lpSockaddr };
-                if sockaddr.sa_family == AF_INET.0 as u16 {
+                if sockaddr.sa_family == AF_INET {
                     let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
                     let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
                     let ipv4 = if cfg!(target_endian = "little") {
