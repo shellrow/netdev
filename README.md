@@ -18,7 +18,7 @@
 Add `default-net` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-default-net = "0.15"
+default-net = "0.16"
 ```
 
 For more details, see [examples][examples-url] or doc.  
@@ -32,9 +32,11 @@ For more details, see [examples][examples-url] or doc.
     - Kali 
         - 2022.1 (VM)
         - 2021.1 (VM)
-- macOS 11.6
+        - 2023.2 (VM)
+- macOS 
+    - 11.6
+    - 13.4.1
 - Windows 
   - Windows 10 21H2 19044.1586
   - Windows 11 21H2 22000.493 (VM)
-  - Windows 11 Pro 21H2 22000.1335
-  
+  - Windows 11 Pro 22H2 22621.1848

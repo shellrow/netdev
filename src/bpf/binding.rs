@@ -4,7 +4,6 @@
 use libc;
 
 pub type SockAddr = libc::sockaddr;
-pub const AF_LINK: libc::c_int = 18;
 
 const IF_NAMESIZE: usize = 16;
 const IFNAMSIZ: usize = IF_NAMESIZE;
@@ -44,7 +43,7 @@ pub const DLT_NULL: libc::c_uint = 0;
 #[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
 const BPF_ALIGNMENT: libc::c_int = SIZEOF_C_LONG;
 
-#[cfg(any(target_os = "openbsd", target_os = "macos", target_os = "ios", windows))]
+#[cfg(any(target_os = "openbsd"))]
 const BPF_ALIGNMENT: libc::c_int = 4;
 
 pub fn BPF_WORDALIGN(x: isize) -> isize {
@@ -55,24 +54,6 @@ pub fn BPF_WORDALIGN(x: isize) -> isize {
 pub struct ifreq {
     pub ifr_name: [libc::c_char; IFNAMSIZ],
     pub ifru_addr: SockAddr,
-}
-
-#[cfg(any(
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "macos",
-    target_os = "ios"
-))]
-pub struct sockaddr_dl {
-    pub sdl_len: libc::c_uchar,
-    pub sdl_family: libc::c_uchar,
-    pub sdl_index: libc::c_ushort,
-    pub sdl_type: libc::c_uchar,
-    pub sdl_nlen: libc::c_uchar,
-    pub sdl_alen: libc::c_uchar,
-    pub sdl_slen: libc::c_uchar,
-    pub sdl_data: [libc::c_char; 46],
 }
 
 #[cfg(any(
@@ -97,13 +78,6 @@ pub struct timeval32 {
     pub tv_usec: i32,
 }
 
-#[cfg(any(
-    target_os = "openbsd",
-    all(
-        any(target_os = "macos", target_os = "ios"),
-        target_pointer_width = "64"
-    )
-))]
 #[repr(C)]
 pub struct bpf_hdr {
     pub bh_tstamp: timeval32,
@@ -112,7 +86,6 @@ pub struct bpf_hdr {
     pub bh_hdrlen: libc::c_ushort,
 }
 
-#[cfg(not(windows))]
 extern "C" {
     pub fn ioctl(d: libc::c_int, request: libc::c_ulong, ...) -> libc::c_int;
 }
