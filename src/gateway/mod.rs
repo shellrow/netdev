@@ -1,14 +1,7 @@
-#[cfg(any(
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd"
-))]
+#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 pub(crate) mod unix;
 
-#[cfg(any(
-    target_os = "macos",
-    target_os = "ios"
-))]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub(crate) mod macos;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]

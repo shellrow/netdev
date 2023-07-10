@@ -1,28 +1,12 @@
-#[cfg(any(
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd"
-))]
+#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 pub mod packet;
 
-#[cfg(any(
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd"
-))]
+#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 mod unix;
-#[cfg(any(
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd"
-))]
+#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 pub use self::unix::*;
 
-#[cfg(any(
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd"
-))]
+#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 #[cfg(test)]
 mod tests {
     use super::*;

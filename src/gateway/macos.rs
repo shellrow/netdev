@@ -4,8 +4,9 @@ use super::Gateway;
 use crate::interface::MacAddr;
 
 use std::{
+    collections::HashMap,
     io,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr}, collections::HashMap,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
 
 const CTL_NET: u32 = 4;
@@ -159,12 +160,12 @@ fn code_to_error(err: i32) -> io::Error {
 
 unsafe fn sa_to_ip(sa: &sockaddr) -> Option<IpAddr> {
     match sa.sa_family as u32 {
-        AF_INET=> {
+        AF_INET => {
             let inet: &sockaddr_in = std::mem::transmute(sa);
             let octets: [u8; 4] = inet.sin_addr.s_addr.to_ne_bytes();
             Some(IpAddr::from(octets))
         }
-        AF_INET6=> {
+        AF_INET6 => {
             let inet6: &sockaddr_in6 = std::mem::transmute(sa);
             let octets: [u8; 16] = inet6.sin6_addr.__u6_addr.__u6_addr8;
             Some(IpAddr::from(octets))
@@ -346,10 +347,32 @@ fn message_to_arppair(msg_bytes: *mut u8) -> (IpAddr, MacAddr) {
     const IP_END_INDEX: usize = 7;
     const MAC_START_INDEX: usize = 24;
     const MAC_END_INDEX: usize = 29;
-    let ip_bytes = unsafe { std::slice::from_raw_parts(msg_bytes.add(IP_START_INDEX), IP_END_INDEX + 1 - IP_START_INDEX) };
-    let mac_bytes = unsafe { std::slice::from_raw_parts(msg_bytes.add(MAC_START_INDEX), MAC_END_INDEX + 1 - MAC_START_INDEX) };
-    let ip_addr = IpAddr::V4(Ipv4Addr::new(ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3]));
-    let mac_addr = MacAddr::new([mac_bytes[0], mac_bytes[1], mac_bytes[2], mac_bytes[3], mac_bytes[4], mac_bytes[5]]);
+    let ip_bytes = unsafe {
+        std::slice::from_raw_parts(
+            msg_bytes.add(IP_START_INDEX),
+            IP_END_INDEX + 1 - IP_START_INDEX,
+        )
+    };
+    let mac_bytes = unsafe {
+        std::slice::from_raw_parts(
+            msg_bytes.add(MAC_START_INDEX),
+            MAC_END_INDEX + 1 - MAC_START_INDEX,
+        )
+    };
+    let ip_addr = IpAddr::V4(Ipv4Addr::new(
+        ip_bytes[0],
+        ip_bytes[1],
+        ip_bytes[2],
+        ip_bytes[3],
+    ));
+    let mac_addr = MacAddr::new([
+        mac_bytes[0],
+        mac_bytes[1],
+        mac_bytes[2],
+        mac_bytes[3],
+        mac_bytes[4],
+        mac_bytes[5],
+    ]);
     (ip_addr, mac_addr)
 }
 
@@ -358,11 +381,11 @@ fn get_arp_table() -> io::Result<HashMap<IpAddr, MacAddr>> {
     let mut mib: [u32; 6] = [0; 6];
     let mut len = 0;
     mib[0] = CTL_NET;
-	mib[1] = PF_ROUTE;
-	mib[2] = 0;
-	mib[3] = AF_INET;
-	mib[4] = NET_RT_FLAGS;
-	mib[5] = RTF_LLINFO;
+    mib[1] = PF_ROUTE;
+    mib[2] = 0;
+    mib[3] = AF_INET;
+    mib[4] = NET_RT_FLAGS;
+    mib[5] = RTF_LLINFO;
     if unsafe {
         sysctl(
             &mut mib as *mut _ as *mut _,
@@ -430,13 +453,13 @@ fn get_default_route() -> Option<Route> {
                 }
             }
         }
-        Err(_) => {},
+        Err(_) => {}
     }
     None
 }
 
 pub fn get_default_gateway(_interface_name: String) -> Result<Gateway, String> {
-    if let Some(route) = get_default_route(){    
+    if let Some(route) = get_default_route() {
         if let Some(gw_ip) = route.gateway {
             match get_arp_table() {
                 Ok(arp_map) => {
@@ -455,10 +478,10 @@ pub fn get_default_gateway(_interface_name: String) -> Result<Gateway, String> {
                 ip_addr: gw_ip,
             };
             return Ok(gateway);
-        }else {
+        } else {
             return Err(format!("Failed to get gateway IP address"));
         }
-    }else{
+    } else {
         return Err(format!("Failed to get default route"));
     }
 }
