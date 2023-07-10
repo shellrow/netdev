@@ -243,7 +243,7 @@ pub mod netlink {
                             self.size = 0;
                         }
                         match packet.payload {
-                            NetlinkPayload::Done => {
+                            NetlinkPayload::Done(_) => {
                                 self.done = true;
                                 return None;
                             }
