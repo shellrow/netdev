@@ -39,4 +39,4 @@ For more details, see [examples][examples-url] or doc.
 - Windows 
   - Windows 10 21H2 19044.1586
   - Windows 11 21H2 22000.493 (VM)
-  - Windows 11 Pro 21H2 22000.1335
+  - Windows 11 Pro 22H2 22621.1848
