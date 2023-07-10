@@ -60,7 +60,7 @@ pub fn interfaces() -> Vec<Interface> {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
                 if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
-                    match gateway::unix::get_default_gateway(iface.name.clone()) {
+                    match gateway::macos::get_default_gateway(iface.name.clone()) {
                         Ok(gateway) => {
                             iface.gateway = Some(gateway);
                         }
@@ -70,7 +70,7 @@ pub fn interfaces() -> Vec<Interface> {
             }
             IpAddr::V6(local_ipv6) => {
                 if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
-                    match gateway::unix::get_default_gateway(iface.name.clone()) {
+                    match gateway::macos::get_default_gateway(iface.name.clone()) {
                         Ok(gateway) => {
                             iface.gateway = Some(gateway);
                         }
