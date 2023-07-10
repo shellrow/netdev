@@ -59,6 +59,7 @@ pub fn get_default_gateway() -> Result<Gateway, String> {
 
 #[cfg(any(
     target_os = "linux",
+    target_os = "android",
     target_os = "openbsd",
     target_os = "freebsd",
     target_os = "netbsd"
