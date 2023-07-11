@@ -26,17 +26,18 @@ For more details, see [examples][examples-url] or doc.
 ## Tested on
 - Linux
     - Ubuntu 
+        - 22.04
         - 21.10 
         - 20.04 
         - 18.04
     - Kali 
-        - 2022.1 (VM)
-        - 2021.1 (VM)
-        - 2023.2 (VM)
+        - 2023.2
+        - 2022.1
+        - 2021.1
 - macOS 
-    - 11.6
     - 13.4.1
+    - 11.6
 - Windows 
-  - Windows 10 21H2 19044.1586
-  - Windows 11 21H2 22000.493 (VM)
-  - Windows 11 Pro 22H2 22621.1848
+    - 11 Pro 22H2 22621.1848
+    - 11 21H2 22000.493
+    - 10 21H2 19044.1586
