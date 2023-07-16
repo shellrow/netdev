@@ -200,7 +200,6 @@ fn message_to_route(hdr: &rt_msghdr, msg: *mut u8) -> Option<Route> {
                 std::mem::transmute((msg as *mut sockaddr).add(RTAX_GATEWAY as usize));
 
             gateway = sa_to_ip(gw_sa);
-
         }
     }
 
