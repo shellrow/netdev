@@ -175,35 +175,10 @@ unsafe fn sa_to_ip(sa: &sockaddr) -> Option<IpAddr> {
     }
 }
 
-unsafe fn sa_to_link(sa: &sockaddr) -> Option<(Option<[u8; 6]>, u16)> {
-    match sa.sa_family as u32 {
-        AF_LINK => {
-            let sa_dl = sa as *const _ as *const sockaddr_dl;
-            let ifindex = (*sa_dl).sdl_index;
-            let mac;
-            if (*sa_dl).sdl_alen >= 6 {
-                let i = (*sa_dl).sdl_nlen as usize;
-
-                let a = (*sa_dl).sdl_data[i + 0] as u8;
-                let b = (*sa_dl).sdl_data[i + 1] as u8;
-                let c = (*sa_dl).sdl_data[i + 2] as u8;
-                let d = (*sa_dl).sdl_data[i + 3] as u8;
-                let e = (*sa_dl).sdl_data[i + 4] as u8;
-                let f = (*sa_dl).sdl_data[i + 5] as u8;
-                mac = Some([a, b, c, d, e, f]);
-            } else {
-                mac = None;
-            }
-            Some((mac, ifindex))
-        }
-        _ => None,
-    }
-}
-
 fn message_to_route(hdr: &rt_msghdr, msg: *mut u8) -> Option<Route> {
     let destination;
     let mut gateway = None;
-    let mut ifindex = None;
+    let ifindex = None;
 
     if hdr.rtm_addrs & (1 << RTAX_DST) == 0 {
         return None;
@@ -226,11 +201,6 @@ fn message_to_route(hdr: &rt_msghdr, msg: *mut u8) -> Option<Route> {
 
             gateway = sa_to_ip(gw_sa);
 
-            if gateway.is_none() {
-                if let Some((_mac, ifidx)) = sa_to_link(gw_sa) {
-                    ifindex = Some(ifidx as u32);
-                }
-            }
         }
     }
 
