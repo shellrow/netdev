@@ -165,13 +165,12 @@ pub(super) fn sockaddr_to_network_addr(
     target_os = "ios"
 ))]
 fn sockaddr_to_network_addr(sa: *mut libc::sockaddr) -> (Option<MacAddr>, Option<IpAddr>) {
-    use crate::bpf;
     use std::net::SocketAddr;
 
     unsafe {
         if sa.is_null() {
             (None, None)
-        } else if (*sa).sa_family as libc::c_int == bpf::AF_LINK {
+        } else if (*sa).sa_family as libc::c_int == libc::AF_LINK {
             let nlen: i8 = (*sa).sa_data[3];
             let alen: i8 = (*sa).sa_data[4];
             if alen > 0 && alen as u8 + nlen as u8 + 8 <= (*sa).sa_len {
