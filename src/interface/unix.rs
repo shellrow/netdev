@@ -125,7 +125,7 @@ pub fn interfaces() -> Vec<Interface> {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub(super) fn sockaddr_to_network_addr(
-    sa: *const libc::sockaddr,
+    sa: *mut libc::sockaddr,
 ) -> (Option<MacAddr>, Option<IpAddr>) {
     use std::net::SocketAddr;
 
@@ -164,7 +164,7 @@ pub(super) fn sockaddr_to_network_addr(
     target_os = "macos",
     target_os = "ios"
 ))]
-fn sockaddr_to_network_addr(sa: *const libc::sockaddr) -> (Option<MacAddr>, Option<IpAddr>) {
+fn sockaddr_to_network_addr(sa: *mut libc::sockaddr) -> (Option<MacAddr>, Option<IpAddr>) {
     use crate::bpf;
     use std::net::SocketAddr;
 
@@ -172,18 +172,24 @@ fn sockaddr_to_network_addr(sa: *const libc::sockaddr) -> (Option<MacAddr>, Opti
         if sa.is_null() {
             (None, None)
         } else if (*sa).sa_family as libc::c_int == bpf::AF_LINK {
-            let sdl: *const bpf::sockaddr_dl = mem::transmute(sa);
-            let nlen = (*sdl).sdl_nlen as usize;
-            let mac = MacAddr(
-                (*sdl).sdl_data[nlen] as u8,
-                (*sdl).sdl_data[nlen + 1] as u8,
-                (*sdl).sdl_data[nlen + 2] as u8,
-                (*sdl).sdl_data[nlen + 3] as u8,
-                (*sdl).sdl_data[nlen + 4] as u8,
-                (*sdl).sdl_data[nlen + 5] as u8,
-            );
+            let nlen: i8 = (*sa).sa_data[3];
+            let alen: i8 = (*sa).sa_data[4];
+            if alen > 0 && alen as u8 + nlen as u8 + 8 <= (*sa).sa_len {
+                let ptr = (*sa).sa_data.as_mut_ptr();
+                let extended =
+                    std::slice::from_raw_parts_mut(ptr, 6 + nlen as usize + alen as usize);
 
-            (Some(mac), None)
+                let mac = MacAddr(
+                    extended[6 + nlen as usize] as u8,
+                    extended[6 + nlen as usize + 1] as u8,
+                    extended[6 + nlen as usize + 2] as u8,
+                    extended[6 + nlen as usize + 3] as u8,
+                    extended[6 + nlen as usize + 4] as u8,
+                    extended[6 + nlen as usize + 5] as u8,
+                );
+                return (Some(mac), None);
+            }
+            (None, None)
         } else {
             let addr =
                 sys::sockaddr_to_addr(mem::transmute(sa), mem::size_of::<libc::sockaddr_storage>());
@@ -229,8 +235,8 @@ fn unix_interfaces_inner(
         let c_str = addr_ref.ifa_name as *const c_char;
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name = unsafe { from_utf8_unchecked(bytes).to_owned() };
-        let (mac, ip) = sockaddr_to_network_addr(addr_ref.ifa_addr as *const libc::sockaddr);
-        let (_, netmask) = sockaddr_to_network_addr(addr_ref.ifa_netmask as *const libc::sockaddr);
+        let (mac, ip) = sockaddr_to_network_addr(addr_ref.ifa_addr as *mut libc::sockaddr);
+        let (_, netmask) = sockaddr_to_network_addr(addr_ref.ifa_netmask as *mut libc::sockaddr);
         let mut ini_ipv4: Vec<Ipv4Net> = vec![];
         let mut ini_ipv6: Vec<Ipv6Net> = vec![];
         if let Some(ip) = ip {
