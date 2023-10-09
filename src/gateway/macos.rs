@@ -290,7 +290,17 @@ fn list_routes() -> io::Result<Vec<Route>> {
         }
 
         let rt_hdr = unsafe { std::mem::transmute::<_, &rt_msghdr>(buf.as_ptr()) };
-        assert_eq!(rt_hdr.rtm_version as u32, RTM_VERSION);
+        if rt_hdr.rtm_version as u32 != RTM_VERSION {
+            eprintln!(
+                "unexpected RTM_VERSION: {} in {:?}",
+                rt_hdr.rtm_version, rt_hdr
+            );
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("unexpected RTM_VERSION: {}", rt_hdr.rtm_version),
+            ));
+        }
+
         if rt_hdr.rtm_errno != 0 {
             return Err(code_to_error(rt_hdr.rtm_errno));
         }
