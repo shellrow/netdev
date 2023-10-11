@@ -132,21 +132,25 @@ impl Interface {
     pub fn is_up(&self) -> bool {
         self.flags & (sys::IFF_UP as u32) != 0
     }
-    /// Check if the network interface is a loopback interface
+    /// Check if the network interface is a Loopback interface
     pub fn is_loopback(&self) -> bool {
         self.flags & (sys::IFF_LOOPBACK as u32) != 0
     }
-    /// Check if the network interface is a point-to-point interface
+    /// Check if the network interface is a Point-to-Point interface
     pub fn is_point_to_point(&self) -> bool {
         self.flags & (sys::IFF_POINTOPOINT as u32) != 0
     }
-    /// Check if the network interface is a multicast interface
+    /// Check if the network interface is a Multicast interface
     pub fn is_multicast(&self) -> bool {
         self.flags & (sys::IFF_MULTICAST as u32) != 0
     }
-    /// Check if the network interface is a broadcast interface
+    /// Check if the network interface is a Broadcast interface
     pub fn is_broadcast(&self) -> bool {
         self.flags & (sys::IFF_BROADCAST as u32) != 0
+    }
+    /// Check if the network interface is a TUN interface
+    pub fn is_tun(&self) -> bool {
+        self.is_up() && self.is_point_to_point() && !self.is_broadcast() && !self.is_loopback()
     }
 }
 
