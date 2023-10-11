@@ -8,9 +8,8 @@
 mod bpf;
 #[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 mod socket;
-#[cfg(not(target_os = "windows"))]
-mod sys;
 
+mod sys;
 pub mod gateway;
 pub mod interface;
 pub mod ip;
