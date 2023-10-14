@@ -8,10 +8,10 @@ use windows::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
 use windows::Win32::NetworkManagement::IpHelper::{
     GetAdaptersAddresses, SendARP, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH,
 };
+use windows::Win32::NetworkManagement::Ndis::{IF_OPER_STATUS, NET_IF_OPER_STATUS_UP};
 use windows::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
 };
-use windows::Win32::NetworkManagement::Ndis::{IF_OPER_STATUS, NET_IF_OPER_STATUS_UP};
 
 use crate::gateway::Gateway;
 use crate::interface::{Interface, InterfaceType, MacAddr};
@@ -101,7 +101,10 @@ pub fn interfaces() -> Vec<Interface> {
                 flags |= sys::IFF_UP;
             }
             match if_type {
-                InterfaceType::Ethernet | InterfaceType::TokenRing |InterfaceType::Wireless80211 | InterfaceType::HighPerformanceSerialBus => {
+                InterfaceType::Ethernet
+                | InterfaceType::TokenRing
+                | InterfaceType::Wireless80211
+                | InterfaceType::HighPerformanceSerialBus => {
                     flags |= sys::IFF_BROADCAST | sys::IFF_MULTICAST;
                 }
                 InterfaceType::Ppp | InterfaceType::Tunnel => {
