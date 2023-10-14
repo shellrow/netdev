@@ -43,6 +43,8 @@ use crate::gateway::Gateway;
 use crate::ip::{Ipv4Net, Ipv6Net};
 use std::net::IpAddr;
 
+use crate::sys;
+
 /// Structure of MAC address
 #[derive(Clone, Debug)]
 pub struct MacAddr(u8, u8, u8, u8, u8, u8);
@@ -123,6 +125,33 @@ pub struct Interface {
     pub receive_speed: Option<u64>,
     /// Default gateway for the network interface
     pub gateway: Option<Gateway>,
+}
+
+impl Interface {
+    /// Check if the network interface is up
+    pub fn is_up(&self) -> bool {
+        self.flags & (sys::IFF_UP as u32) != 0
+    }
+    /// Check if the network interface is a Loopback interface
+    pub fn is_loopback(&self) -> bool {
+        self.flags & (sys::IFF_LOOPBACK as u32) != 0
+    }
+    /// Check if the network interface is a Point-to-Point interface
+    pub fn is_point_to_point(&self) -> bool {
+        self.flags & (sys::IFF_POINTOPOINT as u32) != 0
+    }
+    /// Check if the network interface is a Multicast interface
+    pub fn is_multicast(&self) -> bool {
+        self.flags & (sys::IFF_MULTICAST as u32) != 0
+    }
+    /// Check if the network interface is a Broadcast interface
+    pub fn is_broadcast(&self) -> bool {
+        self.flags & (sys::IFF_BROADCAST as u32) != 0
+    }
+    /// Check if the network interface is a TUN interface
+    pub fn is_tun(&self) -> bool {
+        self.is_up() && self.is_point_to_point() && !self.is_broadcast() && !self.is_loopback()
+    }
 }
 
 /// Get default Network Interface

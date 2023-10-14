@@ -8,6 +8,7 @@ use windows::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
 use windows::Win32::NetworkManagement::IpHelper::{
     GetAdaptersAddresses, SendARP, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH,
 };
+use windows::Win32::NetworkManagement::Ndis::{IF_OPER_STATUS, NET_IF_OPER_STATUS_UP};
 use windows::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
 };
@@ -15,6 +16,7 @@ use windows::Win32::Networking::WinSock::{
 use crate::gateway::Gateway;
 use crate::interface::{Interface, InterfaceType, MacAddr};
 use crate::ip::{Ipv4Net, Ipv6Net};
+use crate::sys;
 
 #[cfg(target_endian = "little")]
 fn htonl(val: u32) -> u32 {
@@ -80,21 +82,42 @@ pub fn interfaces() -> Vec<Interface> {
         // Enumerate all adapters
         let mut cur = mem;
         while !cur.is_null() {
-            let if_type: u32 = unsafe { (*cur).IfType };
-            match InterfaceType::try_from(if_type) {
-                Ok(_) => {}
+            let if_type_int: u32 = unsafe { (*cur).IfType };
+            let if_type = match InterfaceType::try_from(if_type_int) {
+                Ok(if_type) => if_type,
                 Err(_) => {
                     cur = unsafe { (*cur).Next };
                     continue;
                 }
-            }
+            };
             // Index
             let anon1 = unsafe { (*cur).Anonymous1 };
             let anon = unsafe { anon1.Anonymous };
             let index = anon.IfIndex;
-            // Flags
-            let anon2 = unsafe { (*cur).Anonymous2 };
-            let flags = unsafe { anon2.Flags };
+            // Flags and Status
+            let mut flags: u32 = 0;
+            let status: IF_OPER_STATUS = unsafe { (*cur).OperStatus };
+            if status.0 == NET_IF_OPER_STATUS_UP.0 {
+                flags |= sys::IFF_UP;
+            }
+            match if_type {
+                InterfaceType::Ethernet
+                | InterfaceType::TokenRing
+                | InterfaceType::Wireless80211
+                | InterfaceType::HighPerformanceSerialBus => {
+                    flags |= sys::IFF_BROADCAST | sys::IFF_MULTICAST;
+                }
+                InterfaceType::Ppp | InterfaceType::Tunnel => {
+                    flags |= sys::IFF_POINTOPOINT | sys::IFF_MULTICAST;
+                }
+                InterfaceType::Loopback => {
+                    flags |= sys::IFF_LOOPBACK | sys::IFF_MULTICAST;
+                }
+                InterfaceType::Atm => {
+                    flags |= sys::IFF_BROADCAST | sys::IFF_POINTOPOINT | sys::IFF_MULTICAST;
+                }
+                _ => {}
+            }
             // Name
             let p_aname = unsafe { (*cur).AdapterName.0 };
             let aname_len = unsafe { strlen(p_aname as *const c_char) };
@@ -185,7 +208,7 @@ pub fn interfaces() -> Vec<Interface> {
                 name: adapter_name,
                 friendly_name: Some(friendly_name),
                 description: Some(description),
-                if_type: InterfaceType::try_from(if_type).unwrap_or(InterfaceType::Unknown),
+                if_type: if_type,
                 mac_addr: Some(mac_addr),
                 ipv4: ipv4_vec,
                 ipv6: ipv6_vec,
