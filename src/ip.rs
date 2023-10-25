@@ -1,7 +1,11 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 /// Structure of IPv4 Network
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Ipv4Net {
     /// IPv4 Address
     pub addr: Ipv4Addr,
@@ -32,6 +36,7 @@ impl Ipv4Net {
 
 /// Structure of IPv6 Network
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Ipv6Net {
     /// IPv6 Address
     pub addr: Ipv6Addr,
