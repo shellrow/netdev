@@ -1,7 +1,11 @@
 use std::convert::TryFrom;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 /// Type of Network Interface
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum InterfaceType {
     /// Unknown interface type
     Unknown,

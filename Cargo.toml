@@ -12,6 +12,10 @@ license = "MIT"
 
 [dependencies]
 libc = "0.2"
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+serde = ["dep:serde"]
 
 [target.'cfg(target_os = "android")'.dependencies]
 # DL Open

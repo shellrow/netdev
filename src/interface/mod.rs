@@ -30,6 +30,9 @@ mod windows;
 #[cfg(target_os = "windows")]
 use self::windows::*;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux;
 
@@ -47,6 +50,7 @@ use crate::sys;
 
 /// Structure of MAC address
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MacAddr(u8, u8, u8, u8, u8, u8);
 
 impl MacAddr {
@@ -100,6 +104,7 @@ impl std::fmt::Display for MacAddr {
 
 /// Structure of Network Interface information
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Interface {
     /// Index of network interface
     pub index: u32,

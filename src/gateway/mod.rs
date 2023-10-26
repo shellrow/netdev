@@ -7,11 +7,15 @@ pub(crate) mod macos;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub(crate) mod linux;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use crate::interface::{self, Interface, MacAddr};
 use std::net::{IpAddr, Ipv4Addr};
 
 /// Structure of default Gateway information
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Gateway {
     /// MAC address of Gateway
     pub mac_addr: MacAddr,
