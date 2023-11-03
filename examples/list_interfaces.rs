@@ -1,4 +1,4 @@
-use default_net;
+// This example shows all interfaces and their properties.
 
 fn main() {
     let interfaces = default_net::get_interfaces();

@@ -1,4 +1,4 @@
-use default_net;
+// This example shows how to get the default network interface and its properties.
 
 fn main() {
     match default_net::get_default_interface() {
