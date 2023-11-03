@@ -1,5 +1,5 @@
 use core::fmt;
-use std::net::{Ipv4Addr, Ipv6Addr, IpAddr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -66,7 +66,7 @@ impl IpNet {
             IpNet::V4(ref a) => IpAddr::V4(a.network()),
             IpNet::V6(ref a) => IpAddr::V6(a.network()),
         }
-    }    
+    }
     /// Returns the broadcast address.
     pub fn broadcast(&self) -> IpAddr {
         match *self {
@@ -136,7 +136,9 @@ impl Ipv4Net {
     }
     /// Returns the network mask. (u32)
     fn netmask_u32(&self) -> u32 {
-        u32::max_value().checked_shl(32 - self.prefix_len as u32).unwrap_or(0)
+        u32::max_value()
+            .checked_shl(32 - self.prefix_len as u32)
+            .unwrap_or(0)
     }
     /// Returns the host mask.
     pub fn hostmask(&self) -> Ipv4Addr {
@@ -144,7 +146,9 @@ impl Ipv4Net {
     }
     /// Returns the host mask. (u32)
     fn hostmask_u32(&self) -> u32 {
-        u32::max_value().checked_shr(self.prefix_len as u32).unwrap_or(0)
+        u32::max_value()
+            .checked_shr(self.prefix_len as u32)
+            .unwrap_or(0)
     }
     /// Returns the network address.
     pub fn network(&self) -> Ipv4Addr {
@@ -170,7 +174,11 @@ impl fmt::Display for Ipv4Net {
 
 impl From<Ipv4Addr> for Ipv4Net {
     fn from(addr: Ipv4Addr) -> Ipv4Net {
-        Ipv4Net { addr, prefix_len: 32,  netmask: prefix_to_ipv4_netmask(32) }
+        Ipv4Net {
+            addr,
+            prefix_len: 32,
+            netmask: prefix_to_ipv4_netmask(32),
+        }
     }
 }
 
@@ -213,7 +221,9 @@ impl Ipv6Net {
     }
     /// Returns the network mask. (u128)
     fn netmask_u128(&self) -> u128 {
-        u128::max_value().checked_shl((128 - self.prefix_len) as u32).unwrap_or(u128::min_value())
+        u128::max_value()
+            .checked_shl((128 - self.prefix_len) as u32)
+            .unwrap_or(u128::min_value())
     }
     /// Returns the host mask.
     pub fn hostmask(&self) -> Ipv6Addr {
@@ -221,7 +231,9 @@ impl Ipv6Net {
     }
     /// Returns the host mask. (u128)
     fn hostmask_u128(&self) -> u128 {
-        u128::max_value().checked_shr(self.prefix_len as u32).unwrap_or(u128::min_value())
+        u128::max_value()
+            .checked_shr(self.prefix_len as u32)
+            .unwrap_or(u128::min_value())
     }
     /// Returns the network address.
     pub fn network(&self) -> Ipv6Addr {
@@ -247,7 +259,11 @@ impl fmt::Display for Ipv6Net {
 
 impl From<Ipv6Addr> for Ipv6Net {
     fn from(addr: Ipv6Addr) -> Ipv6Net {
-        Ipv6Net { addr, prefix_len: 128, netmask: prefix_to_ipv6_netmask(128) }
+        Ipv6Net {
+            addr,
+            prefix_len: 128,
+            netmask: prefix_to_ipv6_netmask(128),
+        }
     }
 }
 
