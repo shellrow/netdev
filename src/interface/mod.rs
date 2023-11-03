@@ -49,7 +49,7 @@ use std::net::IpAddr;
 use crate::sys;
 
 /// Structure of MAC address
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MacAddr(u8, u8, u8, u8, u8, u8);
 
@@ -103,7 +103,7 @@ impl std::fmt::Display for MacAddr {
 }
 
 /// Structure of Network Interface information
-#[derive(Clone, Debug)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Interface {
     /// Index of network interface

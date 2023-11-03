@@ -14,7 +14,7 @@ use crate::interface::{self, Interface, MacAddr};
 use std::net::{IpAddr, Ipv4Addr};
 
 /// Structure of default Gateway information
-#[derive(Clone, Debug)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Gateway {
     /// MAC address of Gateway
