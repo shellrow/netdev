@@ -1,5 +1,5 @@
 use crate::gateway::Gateway;
-use crate::interface::MacAddr;
+use crate::mac::MacAddr;
 use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::u16;
@@ -93,7 +93,7 @@ pub fn parse_frame(frame: &[u8]) -> Result<Gateway, ()> {
                 let icmp_type: u8 = frame[Frame::IcmpType.start_index()];
                 if icmp_type == ICMP_TYPE_TIME_EXCEEDED {
                     let gateway = Gateway {
-                        mac_addr: MacAddr::new(src_mac),
+                        mac_addr: MacAddr::from_octets(src_mac),
                         ip_addr: IpAddr::V4(convert_ipv4_bytes(src_ip)),
                     };
                     return Ok(gateway);
@@ -112,7 +112,7 @@ pub fn parse_frame(frame: &[u8]) -> Result<Gateway, ()> {
                     let icmp_type: u8 = frame[Frame::Icmpv6Type.start_index()];
                     if icmp_type == ICMPV6_TYPE_TIME_EXCEEDED {
                         let gateway = Gateway {
-                            mac_addr: MacAddr::new(src_mac),
+                            mac_addr: MacAddr::from_octets(src_mac),
                             ip_addr: IpAddr::V6(convert_ipv6_bytes(src_ip)),
                         };
                         return Ok(gateway);
