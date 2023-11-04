@@ -6,11 +6,11 @@ fn main() {
                 println!("{}", json);
             }
             Err(e) => {
-                println!("{}", e);
+                println!("Serialization Error: {}", e);
             }
         },
         Err(e) => {
-            println!("{}", e);
+            println!("Error: {}", e);
         }
     }
 }

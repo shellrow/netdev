@@ -10,7 +10,8 @@ pub(crate) mod linux;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::interface::{self, Interface, MacAddr};
+use crate::interface::{self, Interface};
+use crate::mac::MacAddr;
 use std::net::{IpAddr, Ipv4Addr};
 
 /// Structure of default Gateway information

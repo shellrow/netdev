@@ -12,6 +12,7 @@ mod socket;
 pub mod gateway;
 pub mod interface;
 pub mod ip;
+pub mod mac;
 mod sys;
 
 pub use gateway::get_default_gateway;

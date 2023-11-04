@@ -1,5 +1,5 @@
 use super::Gateway;
-use crate::interface::MacAddr;
+use crate::mac::MacAddr;
 use std::fs::read_to_string;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 

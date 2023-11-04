@@ -58,7 +58,8 @@ pub mod netlink {
     use std::io;
     use std::net::{Ipv4Addr, Ipv6Addr};
 
-    use crate::interface::{Interface, InterfaceType, Ipv4Net, Ipv6Net, MacAddr};
+    use crate::interface::{Interface, InterfaceType, Ipv4Net, Ipv6Net};
+    use crate::mac::MacAddr;
 
     pub fn unix_interfaces() -> Vec<Interface> {
         let mut ifaces = Vec::new();
@@ -111,7 +112,7 @@ pub mod netlink {
                             match addr.len() {
                                 6 => {
                                     interface.mac_addr =
-                                        Some(MacAddr::new(addr.try_into().unwrap()));
+                                        Some(MacAddr::from_octets(addr.try_into().unwrap()));
                                 }
                                 4 => {
                                     let ip = Ipv4Addr::from(<[u8; 4]>::try_from(addr).unwrap());

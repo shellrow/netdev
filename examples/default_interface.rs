@@ -3,7 +3,7 @@
 fn main() {
     match default_net::get_default_interface() {
         Ok(interface) => {
-            println!("Default Interface");
+            println!("Default Interface:");
             println!("\tIndex: {}", interface.index);
             println!("\tName: {}", interface.name);
             println!("\tFriendly Name: {:?}", interface.friendly_name);
@@ -17,9 +17,9 @@ fn main() {
             println!("\t\tis POINT TO POINT {}", interface.is_point_to_point());
             println!("\t\tis TUN {}", interface.is_tun());
             if let Some(mac_addr) = interface.mac_addr {
-                println!("\tMAC: {}", mac_addr);
+                println!("\tMAC Address: {}", mac_addr);
             } else {
-                println!("\tMAC: (Failed to get mac address)");
+                println!("\tMAC Address: (Failed to get mac address)");
             }
             println!("\tIPv4: {:?}", interface.ipv4);
             println!("\tIPv6: {:?}", interface.ipv6);
@@ -27,14 +27,14 @@ fn main() {
             println!("\tReceive Speed: {:?}", interface.receive_speed);
             if let Some(gateway) = interface.gateway {
                 println!("Default Gateway");
-                println!("\tMAC: {}", gateway.mac_addr);
-                println!("\tIP: {}", gateway.ip_addr);
+                println!("\tMAC Address: {}", gateway.mac_addr);
+                println!("\tIP Address: {}", gateway.ip_addr);
             } else {
                 println!("Default Gateway: (Not found)");
             }
         }
         Err(e) => {
-            println!("{}", e);
+            println!("Error: {}", e);
         }
     }
 }

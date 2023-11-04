@@ -44,63 +44,9 @@ mod macos;
 
 use crate::gateway::Gateway;
 use crate::ip::{Ipv4Net, Ipv6Net};
-use std::net::IpAddr;
-
+use crate::mac::MacAddr;
 use crate::sys;
-
-/// Structure of MAC address
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct MacAddr(u8, u8, u8, u8, u8, u8);
-
-impl MacAddr {
-    /// Construct a new MacAddr instance from the given octets
-    pub fn new(octets: [u8; 6]) -> MacAddr {
-        MacAddr(
-            octets[0], octets[1], octets[2], octets[3], octets[4], octets[5],
-        )
-    }
-    /// Returns an array of MAC address octets
-    pub fn octets(&self) -> [u8; 6] {
-        [self.0, self.1, self.2, self.3, self.4, self.5]
-    }
-    /// Return a formatted string of MAC address
-    pub fn address(&self) -> String {
-        format!(
-            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            self.0, self.1, self.2, self.3, self.4, self.5
-        )
-    }
-    /// Construct an all-zero MacAddr instance
-    pub fn zero() -> MacAddr {
-        MacAddr(0, 0, 0, 0, 0, 0)
-    }
-    /// Construct a new MacAddr instance from a colon-separated string of hex format
-    pub fn from_hex_format(hex_mac_addr: &str) -> MacAddr {
-        if hex_mac_addr.len() != 17 {
-            return MacAddr(0, 0, 0, 0, 0, 0);
-        }
-        let fields: Vec<&str> = hex_mac_addr.split(":").collect();
-        let o1: u8 = u8::from_str_radix(&fields[0], 0x10).unwrap_or(0);
-        let o2: u8 = u8::from_str_radix(&fields[1], 0x10).unwrap_or(0);
-        let o3: u8 = u8::from_str_radix(&fields[2], 0x10).unwrap_or(0);
-        let o4: u8 = u8::from_str_radix(&fields[3], 0x10).unwrap_or(0);
-        let o5: u8 = u8::from_str_radix(&fields[4], 0x10).unwrap_or(0);
-        let o6: u8 = u8::from_str_radix(&fields[5], 0x10).unwrap_or(0);
-        MacAddr(o1, o2, o3, o4, o5, o6)
-    }
-}
-
-impl std::fmt::Display for MacAddr {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let _ = write!(
-            f,
-            "{:<02x}:{:<02x}:{:<02x}:{:<02x}:{:<02x}:{:<02x}",
-            self.0, self.1, self.2, self.3, self.4, self.5
-        );
-        Ok(())
-    }
-}
+use std::net::IpAddr;
 
 /// Structure of Network Interface information
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -133,6 +79,46 @@ pub struct Interface {
 }
 
 impl Interface {
+    /// Construct a new default Interface instance
+    pub fn default() -> Result<Interface, String> {
+        let local_ip: IpAddr = match get_local_ipaddr() {
+            Some(local_ip) => local_ip,
+            None => return Err(String::from("Local IP address not found")),
+        };
+        let interfaces: Vec<Interface> = interfaces();
+        for iface in interfaces {
+            match local_ip {
+                IpAddr::V4(local_ipv4) => {
+                    if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
+                        return Ok(iface);
+                    }
+                }
+                IpAddr::V6(local_ipv6) => {
+                    if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
+                        return Ok(iface);
+                    }
+                }
+            }
+        }
+        Err(String::from("Default Interface not found"))
+    }
+    // Construct a dummy Interface instance
+    pub fn dummy() -> Interface {
+        Interface {
+            index: 0,
+            name: String::new(),
+            friendly_name: None,
+            description: None,
+            if_type: InterfaceType::Unknown,
+            mac_addr: None,
+            ipv4: Vec::new(),
+            ipv6: Vec::new(),
+            flags: 0,
+            transmit_speed: None,
+            receive_speed: None,
+            gateway: None,
+        }
+    }
     /// Check if the network interface is up
     pub fn is_up(&self) -> bool {
         self.flags & (sys::IFF_UP as u32) != 0
