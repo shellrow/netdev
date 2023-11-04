@@ -1,9 +1,9 @@
+use core::str::FromStr;
 use std::error;
 use std::fmt;
-use core::str::FromStr;
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Serializer, Deserialize, Deserializer, de};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 /// Structure of MAC address
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]

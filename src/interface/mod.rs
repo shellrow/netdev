@@ -42,11 +42,11 @@ mod android;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod macos;
 
-use std::net::IpAddr;
-use crate::mac::MacAddr;
 use crate::gateway::Gateway;
 use crate::ip::{Ipv4Net, Ipv6Net};
+use crate::mac::MacAddr;
 use crate::sys;
+use std::net::IpAddr;
 
 /// Structure of Network Interface information
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]

@@ -13,10 +13,10 @@ use windows::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
 };
 
-use crate::mac::MacAddr;
 use crate::gateway::Gateway;
 use crate::interface::{Interface, InterfaceType};
 use crate::ip::{Ipv4Net, Ipv6Net};
+use crate::mac::MacAddr;
 use crate::sys;
 
 #[cfg(target_endian = "little")]
