@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types)]
 
 use super::Gateway;
-use crate::interface::MacAddr;
+use crate::mac::MacAddr;
 
 use std::{
     collections::HashMap,
@@ -344,7 +344,7 @@ fn message_to_arppair(msg_bytes: *mut u8) -> (IpAddr, MacAddr) {
         ip_bytes[2],
         ip_bytes[3],
     ));
-    let mac_addr = MacAddr::new([
+    let mac_addr = MacAddr::from_octets([
         mac_bytes[0],
         mac_bytes[1],
         mac_bytes[2],
