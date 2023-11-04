@@ -13,8 +13,9 @@ use windows::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
 };
 
+use crate::mac::MacAddr;
 use crate::gateway::Gateway;
-use crate::interface::{Interface, InterfaceType, MacAddr};
+use crate::interface::{Interface, InterfaceType};
 use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::sys;
 
@@ -46,7 +47,7 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
         )
     };
     if res == NO_ERROR.0 {
-        MacAddr::new(target_mac_addr)
+        MacAddr::from_octets(target_mac_addr)
     } else {
         MacAddr::zero()
     }
@@ -137,7 +138,7 @@ pub fn interfaces() -> Vec<Interface> {
             let mac_addr_arr: [u8; 6] = unsafe { (*cur).PhysicalAddress }[..6]
                 .try_into()
                 .unwrap_or([0, 0, 0, 0, 0, 0]);
-            let mac_addr: MacAddr = MacAddr::new(mac_addr_arr);
+            let mac_addr: MacAddr = MacAddr::from_octets(mac_addr_arr);
             // TransmitLinkSpeed (bits per second)
             let transmit_speed = unsafe { (*cur).TransmitLinkSpeed };
             // ReceiveLinkSpeed (bits per second)
