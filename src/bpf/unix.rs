@@ -75,13 +75,8 @@ impl Default for Config {
 pub fn channel(interface_name: String, config: Config) -> io::Result<crate::socket::Channel> {
     #[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
     fn get_fd(_attempts: usize) -> libc::c_int {
-        unsafe {
-            libc::open(
-                CString::new(&b"/dev/bpf"[..]).unwrap().as_ptr(),
-                libc::O_RDWR,
-                0,
-            )
-        }
+        let c_file_name = CString::new(&b"/dev/bpf"[..]).unwrap();
+        unsafe { libc::open(c_file_name.as_ptr(), libc::O_RDWR, 0) }
     }
 
     #[allow(temporary_cstring_as_ptr)]
@@ -90,11 +85,8 @@ pub fn channel(interface_name: String, config: Config) -> io::Result<crate::sock
         for i in 0..attempts {
             let fd = unsafe {
                 let file_name = format!("/dev/bpf{}", i);
-                libc::open(
-                    CString::new(file_name.as_bytes()).unwrap().as_ptr(),
-                    libc::O_RDWR,
-                    0,
-                )
+                let c_file_name = CString::new(file_name.as_bytes()).unwrap();
+                libc::open(c_file_name.as_ptr(), libc::O_RDWR, 0)
             };
             if fd != -1 {
                 return fd;
