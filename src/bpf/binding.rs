@@ -73,6 +73,13 @@ pub struct bpf_hdr {
     pub bh_hdrlen: libc::c_ushort,
 }
 
+#[cfg(any(
+    target_os = "openbsd",
+    all(
+        any(target_os = "macos", target_os = "ios"),
+        target_pointer_width = "64"
+    )
+))]
 pub struct timeval32 {
     pub tv_sec: i32,
     pub tv_usec: i32,
