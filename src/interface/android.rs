@@ -101,6 +101,8 @@ pub mod netlink {
                     transmit_speed: None,
                     receive_speed: None,
                     gateway: None,
+                    dns_servers: Vec::new(),
+                    default: false,
                 };
 
                 for nla in link_msg.nlas {

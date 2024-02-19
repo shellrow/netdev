@@ -1,9 +1,12 @@
-use super::Gateway;
+use crate::device::NetworkDevice;
 use crate::mac::MacAddr;
+use std::collections::HashMap;
 use std::fs::read_to_string;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{Ipv4Addr, Ipv6Addr};
+use std::str::FromStr;
 
 const PATH_PROC_NET_ROUTE: &str = "/proc/net/route";
+const PATH_PROC_NET_IPV6_ROUTE: &str = "/proc/net/ipv6_route";
 const PATH_PROC_NET_ARP: &str = "/proc/net/arp";
 
 fn convert_hex_ipv4(hex_ip: &str) -> Ipv4Addr {
@@ -17,7 +20,6 @@ fn convert_hex_ipv4(hex_ip: &str) -> Ipv4Addr {
     Ipv4Addr::new(o1, o2, o3, o4)
 }
 
-#[allow(dead_code)]
 fn convert_hex_ipv6(hex_ip: &str) -> Ipv6Addr {
     if hex_ip.len() != 32 {
         return Ipv6Addr::UNSPECIFIED;
@@ -33,26 +35,8 @@ fn convert_hex_ipv6(hex_ip: &str) -> Ipv6Addr {
     Ipv6Addr::new(h1, h2, h3, h4, h5, h6, h7, h8)
 }
 
-pub fn get_default_gateway(interface_name: String) -> Result<Gateway, String> {
-    match super::send_udp_packet() {
-        Ok(_) => {}
-        Err(e) => return Err(format!("Failed to send UDP packet {}", e)),
-    }
-    let route_data = read_to_string(PATH_PROC_NET_ROUTE);
-    let route_text = match route_data {
-        Ok(content) => content,
-        Err(_) => String::new(),
-    };
-    let route_table: Vec<&str> = route_text.trim().split("\n").collect();
-    let mut gateway_ip: IpAddr = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
-    for row in route_table {
-        let fields: Vec<&str> = row.split("\t").collect();
-        if fields.len() >= 3 {
-            if fields[0] == interface_name && fields[2] != "00000000" {
-                gateway_ip = IpAddr::V4(convert_hex_ipv4(fields[2]));
-            }
-        }
-    }
+fn get_arp_map() -> HashMap<Ipv4Addr, MacAddr> {
+    let mut arp_map: HashMap<Ipv4Addr, MacAddr> = HashMap::new();
     let arp_data = read_to_string(PATH_PROC_NET_ARP);
     let arp_text = match arp_data {
         Ok(content) => content,
@@ -63,14 +47,79 @@ pub fn get_default_gateway(interface_name: String) -> Result<Gateway, String> {
         let mut fields: Vec<&str> = row.split(" ").collect();
         fields.retain(|value| *value != "");
         if fields.len() >= 6 {
-            if fields[0] == gateway_ip.to_string() && fields[5] == interface_name {
-                let gateway: Gateway = Gateway {
-                    mac_addr: MacAddr::from_hex_format(fields[3]),
-                    ip_addr: gateway_ip,
-                };
-                return Ok(gateway);
+            // fields[0]: IP Address
+            // fields[3]: MAC Address (colon-separated string of hex format)
+            // fields[5]: Interface Name
+            match Ipv4Addr::from_str(fields[0]) {
+                Ok(ipv4_addr) => {
+                    arp_map.insert(ipv4_addr, MacAddr::from_hex_format(fields[3]));
+                }
+                Err(_) => {}
             }
         }
     }
-    Err(String::new())
+    arp_map
+}
+
+fn get_ipv4_gateway_map() -> HashMap<String, Ipv4Addr> {
+    let mut ipv4_gateway_map: HashMap<String, Ipv4Addr> = HashMap::new();
+    let route_data = read_to_string(PATH_PROC_NET_ROUTE);
+    let route_text = match route_data {
+        Ok(content) => content,
+        Err(_) => String::new(),
+    };
+    let route_table: Vec<&str> = route_text.trim().split("\n").collect();
+    for row in route_table {
+        let fields: Vec<&str> = row.split("\t").collect();
+        if fields.len() >= 3 {
+            // fields[0]: Interface Name
+            // fields[2]: IPv4 Address 8 hex chars
+            if fields[2] != "00000000" {
+                ipv4_gateway_map.insert(fields[0].to_string(), convert_hex_ipv4(fields[2]));
+            }
+        }
+    }
+    ipv4_gateway_map
+}
+
+fn get_ipv6_gateway_map() -> HashMap<String, Ipv6Addr> {
+    let mut ipv6_gateway_map: HashMap<String, Ipv6Addr> = HashMap::new();
+    let route_data = read_to_string(PATH_PROC_NET_IPV6_ROUTE);
+    let route_text = match route_data {
+        Ok(content) => content,
+        Err(_) => String::new(),
+    };
+    let route_table: Vec<&str> = route_text.trim().split("\n").collect();
+    for row in route_table {
+        let fields: Vec<&str> = row.split("\t").collect();
+        if fields.len() >= 10 {
+            // fields[4]: IPv6 Address 32 hex chars without colons
+            // fields[9]: Interface Name
+            if fields[4] != "00000000000000000000000000000000" {
+                ipv6_gateway_map.insert(fields[9].to_string(), convert_hex_ipv6(fields[4]));
+            }
+        }
+    }
+    ipv6_gateway_map
+}
+
+pub fn get_gateway_map() -> HashMap<String, NetworkDevice> {
+    match super::send_udp_packet() {
+        Ok(_) => {}
+        Err(_) => {}
+    }
+    let mut gateway_map: HashMap<String, NetworkDevice> = HashMap::new();
+    let arp_map: HashMap<Ipv4Addr, MacAddr> = get_arp_map();
+    for (if_name, ipv4_addr) in get_ipv4_gateway_map() {
+        let gateway = gateway_map.entry(if_name).or_insert(NetworkDevice::new());
+        if let Some(mac_addr) = arp_map.get(&ipv4_addr) {
+            gateway.mac_addr = mac_addr.clone();
+        }
+        gateway.ipv4.push(ipv4_addr);
+    }
+    for (if_name, ipv6_addr) in get_ipv6_gateway_map() {
+        let gateway = gateway_map.entry(if_name).or_insert(NetworkDevice::new());
+        gateway.ipv6.push(ipv6_addr);
+    }
+    gateway_map
 }

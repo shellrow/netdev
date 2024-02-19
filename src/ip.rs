@@ -74,6 +74,19 @@ impl IpNet {
             IpNet::V6(ref a) => IpAddr::V6(a.broadcast()),
         }
     }
+    /// Checks if the IP Address is in the network.
+    pub fn contains(&self, ip: IpAddr) -> bool {
+        match *self {
+            IpNet::V4(ref a) => match ip {
+                IpAddr::V4(ip) => a.contains(ip),
+                IpAddr::V6(_) => false,
+            },
+            IpNet::V6(ref a) => match ip {
+                IpAddr::V4(_) => false,
+                IpAddr::V6(ip) => a.contains(ip),
+            },
+        }
+    }
 }
 
 impl From<Ipv4Net> for IpNet {
@@ -157,6 +170,10 @@ impl Ipv4Net {
     /// Returns the broadcast address.
     pub fn broadcast(&self) -> Ipv4Addr {
         Ipv4Addr::from(u32::from(self.addr) | self.hostmask_u32())
+    }
+    /// Checks if the IP Address is in the network.
+    pub fn contains(&self, ip: Ipv4Addr) -> bool {
+        self.network() == Ipv4Addr::from(u32::from(ip) & self.netmask_u32())
     }
 }
 
@@ -242,6 +259,11 @@ impl Ipv6Net {
     /// Returns the broadcast address.
     pub fn broadcast(&self) -> Ipv6Addr {
         (u128::from(self.addr) | self.hostmask_u128()).into()
+    }
+    /// Checks if the IP Address is in the network.
+    pub fn contains(&self, ip: Ipv6Addr) -> bool {
+        let ipv6_network: Ipv6Addr = (u128::from(ip) & self.netmask_u128()).into();
+        self.network() == ipv6_network
     }
 }
 

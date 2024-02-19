@@ -1,20 +1,26 @@
-[crates-badge]: https://img.shields.io/crates/v/default-net.svg
-[crates-url]: https://crates.io/crates/default-net
-[license-badge]: https://img.shields.io/crates/l/default-net.svg
-[examples-url]: https://github.com/shellrow/default-net/tree/main/examples
+[crates-badge]: https://img.shields.io/crates/v/netdev.svg
+[crates-url]: https://crates.io/crates/netdev
+[license-badge]: https://img.shields.io/crates/l/netdev.svg
+[examples-url]: https://github.com/shellrow/netdev/tree/main/examples
+[doc-url]: https://docs.rs/netdev/latest/netdev
+[doc-interface-url]: https://docs.rs/netdev/latest/netdev/interface/struct.Interface.html
 [netdev-github-url]: https://github.com/shellrow/netdev
-[netdev-crates-io-url]: https://crates.io/crates/netdev
+[default-net-github-url]: https://github.com/shellrow/default-net
+[default-net-crates-io-url]: https://crates.io/crates/default-net
 
-# Notice
-- This project has been rebranded to `netdev` and repository has been moved to the https://github.com/shellrow/netdev 
-- This crate has been moved to [netdev][netdev-crates-io-url] from `0.23`
-
-# default-net [![Crates.io][crates-badge]][crates-url] ![License][license-badge]
+# netdev [![Crates.io][crates-badge]][crates-url] ![License][license-badge]
   
-`default-net` provides a cross-platform API for network interface and gateway.
+`netdev` provides a cross-platform API for network interface.
 
-- Get default Network Interface and Gateway information
-- Get list of available Network Interfaces
+## Key Features
+- Get list of available network interfaces
+- Get default network interface
+- Access additional information related to network interface
+
+Please refer to the [Interface][doc-interface-url] struct documentation for detail.
+
+## Notice
+This project was rebranded from [default-net][default-net-crates-io-url] by the author myself for future expansion, continuation, and better alignment with naming conventions.
 
 ## Supported platform
 - Linux
@@ -22,13 +28,13 @@
 - Windows
 
 ## Usage
-Add `default-net` to your dependencies  
+Add `netdev` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-default-net = "0.22"
+netdev = "0.23"
 ```
 
-For more details, see [examples][examples-url] or doc.  
+For more details, see [examples][examples-url] or [doc][doc-url].  
 
 ## Tested on
 - Linux
@@ -45,6 +51,6 @@ For more details, see [examples][examples-url] or doc.
     - 13.4.1
     - 11.6
 - Windows 
-    - 11 Pro 22H2 22621.1848
-    - 11 21H2 22000.493
+    - 11 Pro 22H2 22621.3155
+    - 11 22H2 22621.3155
     - 10 21H2 19044.1586

@@ -63,6 +63,8 @@ pub enum InterfaceType {
     Wwanpp,
     /// The network interface using a mobile broadband interface for CDMA-based devices
     Wwanpp2,
+    /// Transparent bridge interface
+    Bridge,
 }
 
 impl InterfaceType {
@@ -98,6 +100,7 @@ impl InterfaceType {
             InterfaceType::Wman => 237,
             InterfaceType::Wwanpp => 243,
             InterfaceType::Wwanpp2 => 244,
+            _ => u32::MAX,
         }
     }
     /// Returns OS-specific value of InterfaceType
@@ -159,6 +162,7 @@ impl InterfaceType {
             InterfaceType::Tunnel => String::from("Tunnel"),
             InterfaceType::MultiRateSymmetricDsl => String::from("Multi-Rate Symmetric DSL"),
             InterfaceType::HighPerformanceSerialBus => String::from("High Performance Serial Bus"),
+            InterfaceType::Bridge => String::from("Bridge"),
             InterfaceType::Wman => String::from("WMAN"),
             InterfaceType::Wwanpp => String::from("WWANPP"),
             InterfaceType::Wwanpp2 => String::from("WWANPP2"),

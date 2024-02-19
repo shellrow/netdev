@@ -9,11 +9,12 @@ use windows::Win32::NetworkManagement::IpHelper::{
     GetAdaptersAddresses, SendARP, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH,
 };
 use windows::Win32::NetworkManagement::Ndis::{IF_OPER_STATUS, NET_IF_OPER_STATUS_UP};
+use windows::Win32::Networking::WinSock::SOCKET_ADDRESS;
 use windows::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
 };
 
-use crate::gateway::Gateway;
+use crate::device::NetworkDevice;
 use crate::interface::{Interface, InterfaceType};
 use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
@@ -53,9 +54,33 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
     }
 }
 
+unsafe fn socket_address_to_ipaddr(addr: &SOCKET_ADDRESS) -> Option<IpAddr> {
+    let sockaddr = unsafe { *addr.lpSockaddr };
+    if sockaddr.sa_family == AF_INET {
+        let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
+        let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
+        let ipv4 = if cfg!(target_endian = "little") {
+            Ipv4Addr::from(a.swap_bytes())
+        } else {
+            Ipv4Addr::from(a)
+        };
+        return Some(IpAddr::V4(ipv4));
+    } else if sockaddr.sa_family == AF_INET6 {
+        let sockaddr: *mut SOCKADDR_IN6 = addr.lpSockaddr as *mut SOCKADDR_IN6;
+        let a = unsafe { (*sockaddr).sin6_addr.u.Byte };
+        let ipv6 = Ipv6Addr::from(a);
+        return Some(IpAddr::V6(ipv6));
+    }
+    None
+}
+
 // Get network interfaces using the IP Helper API
 // Reference: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
 pub fn interfaces() -> Vec<Interface> {
+    let local_ip: IpAddr = match super::get_local_ipaddr() {
+        Some(local_ip) => local_ip,
+        None => IpAddr::V4(Ipv4Addr::LOCALHOST),
+    };
     let mut interfaces: Vec<Interface> = vec![];
     let mut dwsize: u32 = 2000;
     let mut mem = unsafe { allocate(dwsize as usize) } as *mut IP_ADAPTER_ADDRESSES_LH;
@@ -148,61 +173,63 @@ pub fn interfaces() -> Vec<Interface> {
             // Enumerate all IPs
             let mut cur_a = unsafe { (*cur).FirstUnicastAddress };
             while !cur_a.is_null() {
-                let addr = unsafe { (*cur_a).Address };
+                let addr: SOCKET_ADDRESS = unsafe { (*cur_a).Address };
+                let ip_addr = unsafe { socket_address_to_ipaddr(&addr) };
                 let prefix_len = unsafe { (*cur_a).OnLinkPrefixLength };
-                let sockaddr = unsafe { *addr.lpSockaddr };
-                if sockaddr.sa_family == AF_INET {
-                    let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
-                    let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
-                    let ipv4 = if cfg!(target_endian = "little") {
-                        Ipv4Addr::from(a.swap_bytes())
-                    } else {
-                        Ipv4Addr::from(a)
-                    };
-                    let ipv4_net: Ipv4Net = Ipv4Net::new(ipv4, prefix_len);
-                    ipv4_vec.push(ipv4_net);
-                } else if sockaddr.sa_family == AF_INET6 {
-                    let sockaddr: *mut SOCKADDR_IN6 = addr.lpSockaddr as *mut SOCKADDR_IN6;
-                    let a = unsafe { (*sockaddr).sin6_addr.u.Byte };
-                    let ipv6 = Ipv6Addr::from(a);
-                    let ipv6_net: Ipv6Net = Ipv6Net::new(ipv6, prefix_len);
-                    ipv6_vec.push(ipv6_net);
+                if let Some(ip_addr) = ip_addr {
+                    match ip_addr {
+                        IpAddr::V4(ipv4) => {
+                            let ipv4_net: Ipv4Net = Ipv4Net::new(ipv4, prefix_len);
+                            ipv4_vec.push(ipv4_net);
+                        }
+                        IpAddr::V6(ipv6) => {
+                            let ipv6_net: Ipv6Net = Ipv6Net::new(ipv6, prefix_len);
+                            ipv6_vec.push(ipv6_net);
+                        }
+                    }
                 }
                 cur_a = unsafe { (*cur_a).Next };
             }
             // Gateway
-            // TODO: IPv6 support
-            let mut gateway_ips: Vec<Ipv4Addr> = vec![];
+            let mut gateway_ips: Vec<IpAddr> = vec![];
             let mut cur_g = unsafe { (*cur).FirstGatewayAddress };
             while !cur_g.is_null() {
-                let addr = unsafe { (*cur_g).Address };
-                let sockaddr = unsafe { *addr.lpSockaddr };
-                if sockaddr.sa_family == AF_INET {
-                    let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
-                    let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
-                    let ipv4 = if cfg!(target_endian = "little") {
-                        Ipv4Addr::from(a.swap_bytes())
-                    } else {
-                        Ipv4Addr::from(a)
-                    };
-                    gateway_ips.push(ipv4);
+                let addr: SOCKET_ADDRESS = unsafe { (*cur_g).Address };
+                if let Some(ip_addr) = unsafe { socket_address_to_ipaddr(&addr) } {
+                    gateway_ips.push(ip_addr);
                 }
                 cur_g = unsafe { (*cur_g).Next };
             }
-            let default_gateway: Option<Gateway> = match gateway_ips.get(0) {
-                Some(gateway_ip) => {
-                    if let Some(ip_net) = ipv4_vec.get(0) {
-                        let mac_addr = get_mac_through_arp(ip_net.addr, *gateway_ip);
-                        let gateway = Gateway {
-                            mac_addr: mac_addr,
-                            ip_addr: IpAddr::V4(*gateway_ip),
-                        };
-                        Some(gateway)
-                    } else {
-                        None
+            let mut default_gateway: NetworkDevice = NetworkDevice::new();
+            for gateway_ip in gateway_ips {
+                match gateway_ip {
+                    IpAddr::V4(ipv4) => {
+                        if let Some(ip_net) = ipv4_vec.get(0) {
+                            let mac_addr = get_mac_through_arp(ip_net.addr, ipv4);
+                            default_gateway.mac_addr = mac_addr;
+                            default_gateway.ipv4.push(ipv4);
+                        }
+                    }
+                    IpAddr::V6(ipv6) => {
+                        if let Some(_ip_net) = ipv6_vec.get(0) {
+                            default_gateway.ipv6.push(ipv6);
+                        }
                     }
                 }
-                None => None,
+            }
+            // DNS Servers
+            let mut dns_servers: Vec<IpAddr> = vec![];
+            let mut cur_d = unsafe { (*cur).FirstDnsServerAddress };
+            while !cur_d.is_null() {
+                let addr: SOCKET_ADDRESS = unsafe { (*cur_d).Address };
+                if let Some(ip_addr) = unsafe { socket_address_to_ipaddr(&addr) } {
+                    dns_servers.push(ip_addr);
+                }
+                cur_d = unsafe { (*cur_d).Next };
+            }
+            let default: bool = match local_ip {
+                IpAddr::V4(local_ipv4) => ipv4_vec.iter().any(|x| x.addr == local_ipv4),
+                IpAddr::V6(local_ipv6) => ipv6_vec.iter().any(|x| x.addr == local_ipv6),
             };
             let interface: Interface = Interface {
                 index: index,
@@ -216,7 +243,13 @@ pub fn interfaces() -> Vec<Interface> {
                 flags: flags,
                 transmit_speed: Some(transmit_speed),
                 receive_speed: Some(receive_speed),
-                gateway: default_gateway,
+                gateway: if default_gateway.mac_addr == MacAddr::zero() {
+                    None
+                } else {
+                    Some(default_gateway)
+                },
+                dns_servers: dns_servers,
+                default: default,
             };
             interfaces.push(interface);
             cur = unsafe { (*cur).Next };

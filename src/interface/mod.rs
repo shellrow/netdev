@@ -42,7 +42,7 @@ mod android;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod macos;
 
-use crate::gateway::Gateway;
+use crate::device::NetworkDevice;
 use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
 use crate::sys;
@@ -75,17 +75,26 @@ pub struct Interface {
     /// Speed in bits per second of the receive for the network interface
     pub receive_speed: Option<u64>,
     /// Default gateway for the network interface
-    pub gateway: Option<Gateway>,
+    pub gateway: Option<NetworkDevice>,
+    /// DNS servers for the network interface
+    pub dns_servers: Vec<IpAddr>,
+    /// is default interface
+    pub default: bool,
 }
 
 impl Interface {
     /// Construct a new default Interface instance
     pub fn default() -> Result<Interface, String> {
+        let interfaces: Vec<Interface> = interfaces();
+        for iface in &interfaces {
+            if iface.default {
+                return Ok(iface.clone());
+            }
+        }
         let local_ip: IpAddr = match get_local_ipaddr() {
             Some(local_ip) => local_ip,
             None => return Err(String::from("Local IP address not found")),
         };
-        let interfaces: Vec<Interface> = interfaces();
         for iface in interfaces {
             match local_ip {
                 IpAddr::V4(local_ipv4) => {
@@ -117,6 +126,8 @@ impl Interface {
             transmit_speed: None,
             receive_speed: None,
             gateway: None,
+            dns_servers: Vec::new(),
+            default: false,
         }
     }
     /// Check if the network interface is up
@@ -147,11 +158,16 @@ impl Interface {
 
 /// Get default Network Interface
 pub fn get_default_interface() -> Result<Interface, String> {
+    let interfaces: Vec<Interface> = interfaces();
+    for iface in &interfaces {
+        if iface.default {
+            return Ok(iface.clone());
+        }
+    }
     let local_ip: IpAddr = match get_local_ipaddr() {
         Some(local_ip) => local_ip,
         None => return Err(String::from("Local IP address not found")),
     };
-    let interfaces: Vec<Interface> = interfaces();
     for iface in interfaces {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
@@ -167,54 +183,6 @@ pub fn get_default_interface() -> Result<Interface, String> {
         }
     }
     Err(String::from("Default Interface not found"))
-}
-
-/// Get default Network Interface index
-pub fn get_default_interface_index() -> Option<u32> {
-    let local_ip: IpAddr = match get_local_ipaddr() {
-        Some(local_ip) => local_ip,
-        None => return None,
-    };
-    let interfaces = interfaces();
-    for iface in interfaces {
-        match local_ip {
-            IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
-                    return Some(iface.index);
-                }
-            }
-            IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
-                    return Some(iface.index);
-                }
-            }
-        }
-    }
-    None
-}
-
-/// Get default Network Interface name
-pub fn get_default_interface_name() -> Option<String> {
-    let local_ip: IpAddr = match get_local_ipaddr() {
-        Some(local_ip) => local_ip,
-        None => return None,
-    };
-    let interfaces = interfaces();
-    for iface in interfaces {
-        match local_ip {
-            IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
-                    return Some(iface.name);
-                }
-            }
-            IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
-                    return Some(iface.name);
-                }
-            }
-        }
-    }
-    None
 }
 
 /// Get a list of available Network Interfaces
@@ -235,13 +203,5 @@ mod tests {
     #[test]
     fn test_default_interface() {
         println!("{:#?}", get_default_interface());
-    }
-    #[test]
-    fn test_default_interface_index() {
-        println!("{:?}", get_default_interface_index());
-    }
-    #[test]
-    fn test_default_interface_name() {
-        println!("{:?}", get_default_interface_name());
     }
 }

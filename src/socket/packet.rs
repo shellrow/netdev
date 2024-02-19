@@ -1,7 +1,7 @@
-use crate::gateway::Gateway;
+use crate::device::NetworkDevice;
 use crate::mac::MacAddr;
 use std::convert::TryInto;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::u16;
 
 pub const ETHER_TYPE_IPV4: [u8; 2] = [8, 0];
@@ -75,7 +75,7 @@ fn convert_ipv6_bytes(bytes: [u8; 16]) -> Ipv6Addr {
     Ipv6Addr::new(h1, h2, h3, h4, h5, h6, h7, h8)
 }
 
-pub fn parse_frame(frame: &[u8]) -> Result<Gateway, ()> {
+pub fn parse_frame(frame: &[u8]) -> Result<NetworkDevice, ()> {
     let src_mac: [u8; 6] = frame[Frame::SrcMacAddr.start_index()..Frame::SrcMacAddr.end_index()]
         .try_into()
         .unwrap();
@@ -92,9 +92,10 @@ pub fn parse_frame(frame: &[u8]) -> Result<Gateway, ()> {
             if next_header_protocol == NEXT_HEADER_ICMP {
                 let icmp_type: u8 = frame[Frame::IcmpType.start_index()];
                 if icmp_type == ICMP_TYPE_TIME_EXCEEDED {
-                    let gateway = Gateway {
+                    let gateway = NetworkDevice {
                         mac_addr: MacAddr::from_octets(src_mac),
-                        ip_addr: IpAddr::V4(convert_ipv4_bytes(src_ip)),
+                        ipv4: vec![convert_ipv4_bytes(src_ip)],
+                        ipv6: vec![],
                     };
                     return Ok(gateway);
                 }
@@ -111,9 +112,10 @@ pub fn parse_frame(frame: &[u8]) -> Result<Gateway, ()> {
                 if icmp_type == ICMPV6_TYPE_TIME_EXCEEDED {
                     let icmp_type: u8 = frame[Frame::Icmpv6Type.start_index()];
                     if icmp_type == ICMPV6_TYPE_TIME_EXCEEDED {
-                        let gateway = Gateway {
+                        let gateway = NetworkDevice {
                             mac_addr: MacAddr::from_octets(src_mac),
-                            ip_addr: IpAddr::V6(convert_ipv6_bytes(src_ip)),
+                            ipv4: vec![],
+                            ipv6: vec![convert_ipv6_bytes(src_ip)],
                         };
                         return Ok(gateway);
                     }

@@ -1,7 +1,7 @@
 // This example shows all interfaces and their properties.
 
 fn main() {
-    let interfaces = default_net::get_interfaces();
+    let interfaces = netdev::get_interfaces();
     for interface in interfaces {
         println!("Interface:");
         println!("\tIndex: {}", interface.index);
@@ -28,10 +28,13 @@ fn main() {
         if let Some(gateway) = interface.gateway {
             println!("Gateway");
             println!("\tMAC Address: {}", gateway.mac_addr);
-            println!("\tIP Address: {}", gateway.ip_addr);
+            println!("\tIPv4 Address: {:?}", gateway.ipv4);
+            println!("\tIPv6 Address: {:?}", gateway.ipv6);
         } else {
             println!("Gateway: (Not found)");
         }
+        println!("DNS Servers: {:?}", interface.dns_servers);
+        println!("Default: {}", interface.default);
         println!();
     }
 }

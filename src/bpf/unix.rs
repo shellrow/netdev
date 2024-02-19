@@ -1,6 +1,6 @@
 use super::binding;
 use crate::interface::Interface;
-use crate::socket::{DataLinkReceiver, DataLinkSender};
+use crate::socket::{FrameReceiver, FrameSender};
 
 use std::collections::VecDeque;
 use std::ffi::CString;
@@ -187,7 +187,7 @@ pub fn channel(interface_name: String, config: Config) -> io::Result<crate::sock
     }
 
     let fd = Arc::new(FileDesc { fd: fd });
-    let mut sender = Box::new(DataLinkSenderImpl {
+    let mut sender = Box::new(FrameSenderImpl {
         fd: fd.clone(),
         fd_set: unsafe { mem::zeroed() },
         write_buffer: vec![0; config.write_buffer_size],
@@ -198,7 +198,7 @@ pub fn channel(interface_name: String, config: Config) -> io::Result<crate::sock
         libc::FD_ZERO(&mut sender.fd_set as *mut libc::fd_set);
         libc::FD_SET(fd.fd, &mut sender.fd_set as *mut libc::fd_set);
     }
-    let mut receiver = Box::new(DataLinkReceiverImpl {
+    let mut receiver = Box::new(FrameReceiverImpl {
         fd: fd.clone(),
         fd_set: unsafe { mem::zeroed() },
         read_buffer: vec![0; allocated_read_buffer_size],
@@ -213,7 +213,7 @@ pub fn channel(interface_name: String, config: Config) -> io::Result<crate::sock
     Ok(crate::socket::Channel::Ethernet(sender, receiver))
 }
 
-struct DataLinkSenderImpl {
+struct FrameSenderImpl {
     fd: Arc<FileDesc>,
     fd_set: libc::fd_set,
     write_buffer: Vec<u8>,
@@ -221,7 +221,7 @@ struct DataLinkSenderImpl {
     timeout: Option<libc::timespec>,
 }
 
-impl DataLinkSender for DataLinkSenderImpl {
+impl FrameSender for FrameSenderImpl {
     #[inline]
     fn build_and_send(
         &mut self,
@@ -315,7 +315,7 @@ impl DataLinkSender for DataLinkSenderImpl {
     }
 }
 
-struct DataLinkReceiverImpl {
+struct FrameReceiverImpl {
     fd: Arc<FileDesc>,
     fd_set: libc::fd_set,
     read_buffer: Vec<u8>,
@@ -324,7 +324,7 @@ struct DataLinkReceiverImpl {
     packets: VecDeque<(usize, usize)>,
 }
 
-impl DataLinkReceiver for DataLinkReceiverImpl {
+impl FrameReceiver for FrameReceiverImpl {
     fn next(&mut self) -> io::Result<&[u8]> {
         let (header_size, buffer_offset) = if self.loopback {
             (4, ETHERNET_HEADER_SIZE)
