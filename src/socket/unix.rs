@@ -15,7 +15,7 @@ pub enum ChannelType {
 
 #[non_exhaustive]
 pub enum Channel {
-    Ethernet(Box<dyn DataLinkSender>, Box<dyn DataLinkReceiver>),
+    Ethernet(Box<dyn FrameSender>, Box<dyn FrameReceiver>),
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -55,7 +55,7 @@ pub fn channel(interface_name: String, configuration: Config) -> io::Result<Chan
     bpf::channel(interface_name, (&configuration).into())
 }
 
-pub trait DataLinkSender: Send {
+pub trait FrameSender: Send {
     fn build_and_send(
         &mut self,
         num_packets: usize,
@@ -66,6 +66,6 @@ pub trait DataLinkSender: Send {
     fn send_to(&mut self, packet: &[u8], dst: Option<Interface>) -> Option<io::Result<()>>;
 }
 
-pub trait DataLinkReceiver: Send {
+pub trait FrameReceiver: Send {
     fn next(&mut self) -> io::Result<&[u8]>;
 }

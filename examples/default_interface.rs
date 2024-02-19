@@ -1,7 +1,7 @@
 // This example shows how to get the default network interface and its properties.
 
 fn main() {
-    match default_net::get_default_interface() {
+    match netdev::get_default_interface() {
         Ok(interface) => {
             println!("Default Interface:");
             println!("\tIndex: {}", interface.index);
@@ -28,10 +28,13 @@ fn main() {
             if let Some(gateway) = interface.gateway {
                 println!("Default Gateway");
                 println!("\tMAC Address: {}", gateway.mac_addr);
-                println!("\tIP Address: {}", gateway.ip_addr);
+                println!("\tIPv4: {:?}", gateway.ipv4);
+                println!("\tIPv6: {:?}", gateway.ipv6);
             } else {
                 println!("Default Gateway: (Not found)");
             }
+            println!("DNS Servers: {:?}", interface.dns_servers);
+            println!("Default: {}", interface.default);
         }
         Err(e) => {
             println!("Error: {}", e);

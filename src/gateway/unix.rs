@@ -1,10 +1,10 @@
-use super::Gateway;
+use crate::device::NetworkDevice;
 use crate::socket;
 use std::time::{Duration, Instant};
 
 const TIMEOUT: u64 = 3000;
 
-pub fn get_default_gateway(interface_name: String) -> Result<Gateway, String> {
+pub fn get_default_gateway(interface_name: String) -> Result<NetworkDevice, String> {
     let timeout = Duration::from_millis(TIMEOUT);
     let start_time = Instant::now();
     let config = socket::Config {

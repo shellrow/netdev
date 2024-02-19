@@ -7,35 +7,12 @@ pub(crate) mod macos;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub(crate) mod linux;
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
+use crate::device::NetworkDevice;
 use crate::interface::{self, Interface};
-use crate::mac::MacAddr;
-use std::net::{IpAddr, Ipv4Addr};
-
-/// Structure of default Gateway information
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Gateway {
-    /// MAC address of Gateway
-    pub mac_addr: MacAddr,
-    /// IP address of Gateway
-    pub ip_addr: IpAddr,
-}
-
-impl Gateway {
-    /// Construct a new Gateway instance
-    pub fn new() -> Gateway {
-        Gateway {
-            mac_addr: MacAddr::zero(),
-            ip_addr: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-        }
-    }
-}
+use std::net::IpAddr;
 
 /// Get default Gateway
-pub fn get_default_gateway() -> Result<Gateway, String> {
+pub fn get_default_gateway() -> Result<NetworkDevice, String> {
     let local_ip: IpAddr = match interface::get_local_ipaddr() {
         Some(local_ip) => local_ip,
         None => return Err(String::from("Local IP address not found")),

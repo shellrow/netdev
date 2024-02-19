@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
 
-use super::Gateway;
+use crate::device::NetworkDevice;
 use crate::mac::MacAddr;
 
 use std::{
@@ -8,6 +8,8 @@ use std::{
     io,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
+
+use libc::RTAX_MAX;
 
 const CTL_NET: u32 = 4;
 const AF_INET: u32 = 2;
@@ -158,16 +160,16 @@ fn code_to_error(err: i32) -> io::Error {
     io::Error::new(kind, format!("rtm_errno {}", err))
 }
 
-unsafe fn sa_to_ip(sa: &sockaddr) -> Option<IpAddr> {
+fn socketaddr_to_ipaddr(sa: &sockaddr) -> Option<IpAddr> {
     match sa.sa_family as u32 {
         AF_INET => {
-            let inet: &sockaddr_in = std::mem::transmute(sa);
+            let inet: &sockaddr_in = unsafe { std::mem::transmute(sa) };
             let octets: [u8; 4] = inet.sin_addr.s_addr.to_ne_bytes();
             Some(IpAddr::from(octets))
         }
         AF_INET6 => {
-            let inet6: &sockaddr_in6 = std::mem::transmute(sa);
-            let octets: [u8; 16] = inet6.sin6_addr.__u6_addr.__u6_addr8;
+            let inet6: &sockaddr_in6 = unsafe { std::mem::transmute(sa) };
+            let octets: [u8; 16] = unsafe { inet6.sin6_addr.__u6_addr.__u6_addr8 };
             Some(IpAddr::from(octets))
         }
         AF_LINK => None,
@@ -175,48 +177,81 @@ unsafe fn sa_to_ip(sa: &sockaddr) -> Option<IpAddr> {
     }
 }
 
-fn message_to_route(hdr: &rt_msghdr, msg: *mut u8) -> Option<Route> {
-    let destination;
+// https://opensource.apple.com/source/network_cmds/network_cmds-606.40.2/netstat.tproj/route.c.auto.html
+// See function get_rtaddrs, macro ROUNDUP, function p_sockaddr
+fn message_to_route(hdr: &rt_msghdr, msg: &[u8]) -> Option<Route> {
     let mut gateway = None;
-    let ifindex = None;
-
+    // Check if message has destination
     if hdr.rtm_addrs & (1 << RTAX_DST) == 0 {
         return None;
     }
-
-    unsafe {
-        let dst_sa: &sockaddr = std::mem::transmute((msg as *mut sockaddr).add(RTAX_DST as usize));
-        destination = sa_to_ip(dst_sa)?;
+    let mut route_addresses = [None; RTAX_MAX as usize];
+    let mut cur_pos = 0;
+    for idx in 0..RTAX_MAX as usize {
+        if hdr.rtm_addrs & (1 << idx) != 0 {
+            let buf = &msg[cur_pos..];
+            let sa: &sockaddr = unsafe { &*(buf.as_ptr() as *const sockaddr) };
+            route_addresses[idx] = Some(sa);
+            let aligned_len = if sa.sa_len == 0 {
+                4
+            } else {
+                ((sa.sa_len - 1) | 0x3) + 1
+            };
+            cur_pos += aligned_len as usize;
+        }
     }
+
+    let sa = match route_addresses[RTAX_DST as usize] {
+        Some(sa) => sa,
+        None => return None,
+    };
+    let destination = socketaddr_to_ipaddr(sa)?;
 
     let mut prefix = match destination {
         IpAddr::V4(_) => 32,
         IpAddr::V6(_) => 128,
     };
 
+    // Check if message has a gateway
     if hdr.rtm_addrs & (1 << RTAX_GATEWAY) != 0 {
-        unsafe {
-            let gw_sa: &sockaddr =
-                std::mem::transmute((msg as *mut sockaddr).add(RTAX_GATEWAY as usize));
-
-            gateway = sa_to_ip(gw_sa);
+        let gw_sa = match route_addresses[RTAX_GATEWAY as usize] {
+            Some(sa) => sa,
+            None => return None,
+        };
+        gateway = socketaddr_to_ipaddr(gw_sa);
+        if let Some(IpAddr::V6(ipv6gw)) = gateway {
+            // Unicast link local start with FE80::
+            let is_unicast_ll = ipv6gw.segments()[0] == 0xfe80;
+            // IPv6 multicast starts with FF
+            let is_multicast = ipv6gw.octets()[0] == 0xff;
+            // lower 4 bit of byte1 encode the multicast scope
+            let multicast_scope = ipv6gw.octets()[1] & 0x0f;
+            // scope 1: interface/node-local
+            // scope 2: link-local
+            if is_unicast_ll || (is_multicast && (multicast_scope == 1 || multicast_scope == 2)) {
+                let segs = ipv6gw.segments();
+                gateway = Some(IpAddr::V6(Ipv6Addr::new(
+                    segs[0], 0, segs[2], segs[3], segs[4], segs[5], segs[6], segs[7],
+                )))
+            }
         }
     }
 
+    // Check if message has netmask
     if hdr.rtm_addrs & (1 << RTAX_NETMASK) != 0 {
-        unsafe {
+        let sa = route_addresses[RTAX_NETMASK as usize].unwrap();
+        if sa.sa_len == 0 {
+            prefix = 0;
+        } else {
             match destination {
                 IpAddr::V4(_) => {
-                    let mask_sa: &sockaddr_in =
-                        std::mem::transmute((msg as *mut sockaddr).add(RTAX_NETMASK as usize));
-                    let octets: [u8; 4] = mask_sa.sin_addr.s_addr.to_ne_bytes();
-                    prefix = u32::from_be_bytes(octets).leading_ones() as u8;
+                    let mask_sa: &sockaddr_in = unsafe { std::mem::transmute(sa) };
+                    prefix = u32::from_be(mask_sa.sin_addr.s_addr).leading_ones() as u8;
                 }
                 IpAddr::V6(_) => {
-                    let mask_sa: &sockaddr_in6 =
-                        std::mem::transmute((msg as *mut sockaddr).add(RTAX_NETMASK as usize));
-                    let octets: [u8; 16] = mask_sa.sin6_addr.__u6_addr.__u6_addr8;
-                    prefix = u128::from_be_bytes(octets).leading_ones() as u8;
+                    let mask_sa: &sockaddr_in6 = unsafe { std::mem::transmute(sa) };
+                    prefix = u128::from_be_bytes(unsafe { mask_sa.sin6_addr.__u6_addr.__u6_addr8 })
+                        .leading_ones() as u8;
                 }
             }
         }
@@ -226,7 +261,7 @@ fn message_to_route(hdr: &rt_msghdr, msg: *mut u8) -> Option<Route> {
         destination,
         prefix,
         gateway,
-        ifindex,
+        ifindex: Some(hdr.rtm_index as u32),
     })
 }
 
@@ -282,7 +317,7 @@ fn list_routes() -> io::Result<Vec<Route>> {
     let mut routes = vec![];
     let mut offset = 0;
 
-    loop {
+    while offset + std::mem::size_of::<rt_msghdr>() <= len as usize {
         let buf = &mut msgs_buf[offset..];
 
         if buf.len() < std::mem::size_of::<rt_msghdr>() {
@@ -313,7 +348,7 @@ fn list_routes() -> io::Result<Vec<Route>> {
         }
         let rt_msg = &mut buf[std::mem::size_of::<rt_msghdr>()..msg_len];
 
-        if let Some(route) = message_to_route(rt_hdr, rt_msg.as_mut_ptr()) {
+        if let Some(route) = message_to_route(rt_hdr, rt_msg) {
             routes.push(route);
         }
     }
@@ -418,7 +453,8 @@ fn get_arp_table() -> io::Result<HashMap<IpAddr, MacAddr>> {
     Ok(arp_map)
 }
 
-fn get_default_route() -> Option<Route> {
+fn get_default_routes() -> Vec<Route> {
+    let mut default_routes = Vec::new();
     match list_routes() {
         Ok(routes) => {
             for route in routes {
@@ -428,39 +464,36 @@ fn get_default_route() -> Option<Route> {
                     && route.gateway != Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
                     && route.gateway != Some(IpAddr::V6(Ipv6Addr::UNSPECIFIED))
                 {
-                    return Some(route);
+                    default_routes.push(route);
                 }
             }
         }
         Err(_) => {}
     }
-    None
+    default_routes
 }
 
-pub fn get_default_gateway(_interface_name: String) -> Result<Gateway, String> {
-    if let Some(route) = get_default_route() {
+pub fn get_gateway_map() -> HashMap<u32, NetworkDevice> {
+    let mut gateway_map: HashMap<u32, NetworkDevice> = HashMap::new();
+    let routes = get_default_routes();
+    let arp_map = get_arp_table().unwrap_or(HashMap::new());
+    for route in routes {
         if let Some(gw_ip) = route.gateway {
-            match get_arp_table() {
-                Ok(arp_map) => {
-                    if let Some(mac_addr) = arp_map.get(&gw_ip) {
-                        let gateway = Gateway {
-                            mac_addr: mac_addr.clone(),
-                            ip_addr: gw_ip,
-                        };
-                        return Ok(gateway);
-                    }
-                }
-                Err(_) => {}
+            let gateway = gateway_map
+                .entry(route.ifindex.unwrap_or(0))
+                .or_insert(NetworkDevice::new());
+            if let Some(mac_addr) = arp_map.get(&gw_ip) {
+                gateway.mac_addr = mac_addr.clone();
             }
-            let gateway = Gateway {
-                mac_addr: MacAddr::zero(),
-                ip_addr: gw_ip,
-            };
-            return Ok(gateway);
-        } else {
-            return Err(format!("Failed to get gateway IP address"));
+            match gw_ip {
+                IpAddr::V4(ipv4) => {
+                    gateway.ipv4.push(ipv4);
+                }
+                IpAddr::V6(ipv6) => {
+                    gateway.ipv6.push(ipv6);
+                }
+            }
         }
-    } else {
-        return Err(format!("Failed to get default route"));
     }
+    gateway_map
 }

@@ -11,6 +11,77 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub fn interfaces() -> Vec<Interface> {
+    use super::macos;
+
+    let type_map = macos::get_if_type_map();
+    let mut interfaces: Vec<Interface> = unix_interfaces();
+    let local_ip: IpAddr = match super::get_local_ipaddr() {
+        Some(local_ip) => local_ip,
+        None => return interfaces,
+    };
+    let gateway_map = gateway::macos::get_gateway_map();
+    for iface in &mut interfaces {
+        if let Some(sc_interface) = type_map.get(&iface.name) {
+            iface.if_type = sc_interface.interface_type;
+            iface.friendly_name = sc_interface.friendly_name.clone();
+        }
+        if let Some(gateway) = gateway_map.get(&iface.index) {
+            iface.gateway = Some(gateway.clone());
+        }
+        iface.ipv4.iter().for_each(|ipv4| {
+            if IpAddr::V4(ipv4.addr) == local_ip {
+                iface.dns_servers = macos::get_system_dns_conf();
+                iface.default = true;
+            }
+        });
+        iface.ipv6.iter().for_each(|ipv6| {
+            if IpAddr::V6(ipv6.addr) == local_ip {
+                iface.dns_servers = macos::get_system_dns_conf();
+                iface.default = true;
+            }
+        });
+    }
+    interfaces
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub fn interfaces() -> Vec<Interface> {
+    use super::linux;
+
+    let mut interfaces: Vec<Interface> = unix_interfaces();
+    let local_ip: IpAddr = match super::get_local_ipaddr() {
+        Some(local_ip) => local_ip,
+        None => return interfaces,
+    };
+    let gateway_map = gateway::linux::get_gateway_map();
+    for iface in &mut interfaces {
+        iface.if_type = linux::get_interface_type(iface.name.clone());
+        let if_speed: Option<u64> = linux::get_interface_speed(iface.name.clone());
+        iface.transmit_speed = if_speed;
+        iface.receive_speed = if_speed;
+        if let Some(gateway) = gateway_map.get(&iface.name) {
+            iface.gateway = Some(gateway.clone());
+        }
+        match local_ip {
+            IpAddr::V4(local_ipv4) => {
+                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
+                    iface.default = true;
+                    iface.dns_servers = linux::get_system_dns_conf();
+                }
+            }
+            IpAddr::V6(local_ipv6) => {
+                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
+                    iface.default = true;
+                    iface.dns_servers = linux::get_system_dns_conf();
+                }
+            }
+        }
+    }
+    interfaces
+}
+
 #[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 pub fn interfaces() -> Vec<Interface> {
     let mut interfaces: Vec<Interface> = unix_interfaces();
@@ -33,84 +104,6 @@ pub fn interfaces() -> Vec<Interface> {
             IpAddr::V6(local_ipv6) => {
                 if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
                     match gateway::unix::get_default_gateway(iface.name.clone()) {
-                        Ok(gateway) => {
-                            iface.gateway = Some(gateway);
-                        }
-                        Err(_) => {}
-                    }
-                }
-            }
-        }
-    }
-    interfaces
-}
-
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-pub fn interfaces() -> Vec<Interface> {
-    use super::macos;
-
-    let type_map = macos::get_if_type_map();
-    let mut interfaces: Vec<Interface> = unix_interfaces();
-    let local_ip: IpAddr = match super::get_local_ipaddr() {
-        Some(local_ip) => local_ip,
-        None => return interfaces,
-    };
-    for iface in &mut interfaces {
-        iface.if_type = *type_map.get(&iface.name).unwrap_or(&InterfaceType::Unknown);
-        match local_ip {
-            IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
-                    match gateway::macos::get_default_gateway(iface.name.clone()) {
-                        Ok(gateway) => {
-                            iface.gateway = Some(gateway);
-                        }
-                        Err(_) => {}
-                    }
-                }
-            }
-            IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
-                    match gateway::macos::get_default_gateway(iface.name.clone()) {
-                        Ok(gateway) => {
-                            iface.gateway = Some(gateway);
-                        }
-                        Err(_) => {}
-                    }
-                }
-            }
-        }
-    }
-    interfaces
-}
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub fn interfaces() -> Vec<Interface> {
-    use super::linux;
-
-    let mut interfaces: Vec<Interface> = unix_interfaces();
-    let local_ip: IpAddr = match super::get_local_ipaddr() {
-        Some(local_ip) => local_ip,
-        None => return interfaces,
-    };
-    for iface in &mut interfaces {
-        iface.if_type = linux::get_interface_type(iface.name.clone());
-        let if_speed: Option<u64> = linux::get_interface_speed(iface.name.clone());
-        iface.transmit_speed = if_speed;
-        iface.receive_speed = if_speed;
-        match local_ip {
-            IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
-                    match gateway::linux::get_default_gateway(iface.name.clone()) {
-                        Ok(gateway) => {
-                            iface.gateway = Some(gateway);
-                        }
-                        Err(_) => {}
-                    }
-                }
-            }
-            IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
-                    match gateway::linux::get_default_gateway(iface.name.clone()) {
                         Ok(gateway) => {
                             iface.gateway = Some(gateway);
                         }
@@ -277,6 +270,8 @@ fn unix_interfaces_inner(
             transmit_speed: None,
             receive_speed: None,
             gateway: None,
+            dns_servers: Vec::new(),
+            default: false,
         };
         let mut found: bool = false;
         for iface in &mut ifaces {
