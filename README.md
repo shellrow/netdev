@@ -2,6 +2,13 @@
 [crates-url]: https://crates.io/crates/default-net
 [license-badge]: https://img.shields.io/crates/l/default-net.svg
 [examples-url]: https://github.com/shellrow/default-net/tree/main/examples
+[netdev-github-url]: https://github.com/shellrow/netdev
+[netdev-crates-io-url]: https://crates.io/crates/netdev
+
+# Notice
+- This project has been rebranded to `netdev` and repository has been moved to the https://github.com/shellrow/netdev 
+- This crate has been moved to [netdev][netdev-crates-io-url] from `0.23`
+
 # default-net [![Crates.io][crates-badge]][crates-url] ![License][license-badge]
   
 `default-net` provides a cross-platform API for network interface and gateway.
