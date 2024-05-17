@@ -96,19 +96,6 @@ struct sockaddr {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
-struct sockaddr_dl {
-    pub sdl_len: u_char,
-    pub sdl_family: u_char,
-    pub sdl_index: u_short,
-    pub sdl_type: u_char,
-    pub sdl_nlen: u_char,
-    pub sdl_alen: u_char,
-    pub sdl_slen: u_char,
-    pub sdl_data: [::std::os::raw::c_char; 12usize],
-}
-
-#[repr(C)]
 #[derive(Copy, Clone)]
 union in6_addr_bind {
     pub __u6_addr8: [__uint8_t; 16usize],
