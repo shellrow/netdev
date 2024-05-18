@@ -1,7 +1,7 @@
 [package]
 name = "netdev"
-version = "0.25.0"
-authors = ["shellrow <shellrow@foctet.com>"]
+version = "0.26.0"
+authors = ["shellrow <shellrow@fortnium.com>"]
 edition = "2021"
 description = "Cross-platform library for network interface"
 repository = "https://github.com/shellrow/netdev"
