@@ -31,7 +31,7 @@ This project was rebranded from [default-net][default-net-crates-io-url] by the 
 Add `netdev` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netdev = "0.25"
+netdev = "0.26"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
@@ -39,6 +39,7 @@ For more details, see [examples][examples-url] or [doc][doc-url].
 ## Tested on
 - Linux
     - Ubuntu 
+        - 24.04
         - 22.04
         - 21.10 
         - 20.04 
@@ -47,10 +48,15 @@ For more details, see [examples][examples-url] or [doc][doc-url].
         - 2023.2
         - 2022.1
         - 2021.1
-- macOS 
+    - Arch 
+        - 2024.05.01
+- macOS (Apple Silicon)
+    - 14.5
+- macOS (Intel)
     - 13.4.1
     - 11.6
 - Windows 
+    - 11 23H2 22631.3593
     - 11 Pro 22H2 22621.3155
     - 11 22H2 22621.3155
     - 10 21H2 19044.1586
