@@ -106,17 +106,20 @@ impl InterfaceType {
     /// Returns OS-specific value of InterfaceType
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn value(&self) -> u32 {
+        use crate::sys;
         match *self {
-            InterfaceType::Ethernet => 1,
-            InterfaceType::TokenRing => 4,
-            InterfaceType::Fddi => 774,
-            InterfaceType::Ppp => 512,
-            InterfaceType::Loopback => 772,
-            InterfaceType::Ethernet3Megabit => 2,
-            InterfaceType::Slip => 256,
-            InterfaceType::Atm => 19,
-            InterfaceType::Wireless80211 => 801,
-            InterfaceType::Tunnel => 768,
+            InterfaceType::Ethernet => sys::if_arp::ARPHRD_ETHER,
+            InterfaceType::TokenRing => sys::if_arp::ARPHRD_IEEE802,
+            InterfaceType::Fddi => sys::if_arp::ARPHRD_FDDI,
+            InterfaceType::Ppp => sys::if_arp::ARPHRD_PPP,
+            InterfaceType::Loopback => sys::if_arp::ARPHRD_LOOPBACK,
+            InterfaceType::Ethernet3Megabit => sys::if_arp::ARPHRD_EETHER,
+            InterfaceType::Slip => sys::if_arp::ARPHRD_SLIP,
+            InterfaceType::Atm => sys::if_arp::ARPHRD_ATM,
+            InterfaceType::Wireless80211 => sys::if_arp::ARPHRD_IEEE80211,
+            InterfaceType::Tunnel => sys::if_arp::ARPHRD_TUNNEL,
+            InterfaceType::Isdn => sys::if_arp::ARPHRD_X25,
+            InterfaceType::HighPerformanceSerialBus => sys::if_arp::ARPHRD_IEEE1394,
             _ => u32::MAX,
         }
     }
