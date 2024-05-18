@@ -5,6 +5,12 @@ use std::net::IpAddr;
 
 const PATH_RESOLV_CONF: &str = "/etc/resolv.conf";
 
+fn is_wifi_interface(interface_name: &str) -> bool {
+    let wireless_path = format!("/sys/class/net/{}/wireless", interface_name);
+    let phy80211_path = format!("/sys/class/net/{}/phy80211", interface_name);
+    std::path::Path::new(&wireless_path).exists() || std::path::Path::new(&phy80211_path).exists()
+}
+
 pub fn get_interface_type(if_name: String) -> InterfaceType {
     let if_type_path: String = format!("/sys/class/net/{}/type", if_name);
     let r = read_to_string(if_type_path);
@@ -13,7 +19,17 @@ pub fn get_interface_type(if_name: String) -> InterfaceType {
             let if_type_string = content.trim().to_string();
             match if_type_string.parse::<u32>() {
                 Ok(if_type) => {
-                    return InterfaceType::try_from(if_type).unwrap_or(InterfaceType::Unknown);
+                    if if_type == crate::sys::if_arp::ARPHRD_ETHER {
+                        // Since some Wi-Fi interfaces may also be reported as Ethernet,
+                        // further check if the interface is actually Wi-Fi.
+                        if is_wifi_interface(&if_name) {
+                            return InterfaceType::Wireless80211;
+                        } else {
+                            return InterfaceType::Ethernet;
+                        }
+                    } else {
+                        return InterfaceType::try_from(if_type).unwrap_or(InterfaceType::Unknown);
+                    }
                 }
                 Err(_) => {
                     return InterfaceType::Unknown;
