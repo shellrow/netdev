@@ -24,10 +24,10 @@ pub fn get_interface_type(if_name: String) -> InterfaceType {
                         // further check if the interface is actually Wi-Fi.
                         if is_wifi_interface(&if_name) {
                             return InterfaceType::Wireless80211;
-                        }else{
+                        } else {
                             return InterfaceType::Ethernet;
                         }
-                    }else {
+                    } else {
                         return InterfaceType::try_from(if_type).unwrap_or(InterfaceType::Unknown);
                     }
                 }
