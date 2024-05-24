@@ -201,18 +201,20 @@ pub fn interfaces() -> Vec<Interface> {
                 cur_g = unsafe { (*cur_g).Next };
             }
             let mut default_gateway: NetworkDevice = NetworkDevice::new();
-            for gateway_ip in gateway_ips {
-                match gateway_ip {
-                    IpAddr::V4(ipv4) => {
-                        if let Some(ip_net) = ipv4_vec.get(0) {
-                            let mac_addr = get_mac_through_arp(ip_net.addr, ipv4);
-                            default_gateway.mac_addr = mac_addr;
-                            default_gateway.ipv4.push(ipv4);
+            if flags & sys::IFF_UP != 0 {
+                for gateway_ip in gateway_ips {
+                    match gateway_ip {
+                        IpAddr::V4(ipv4) => {
+                            if let Some(ip_net) = ipv4_vec.get(0) {
+                                let mac_addr = get_mac_through_arp(ip_net.addr, ipv4);
+                                default_gateway.mac_addr = mac_addr;
+                                default_gateway.ipv4.push(ipv4);
+                            }
                         }
-                    }
-                    IpAddr::V6(ipv6) => {
-                        if let Some(_ip_net) = ipv6_vec.get(0) {
-                            default_gateway.ipv6.push(ipv6);
+                        IpAddr::V6(ipv6) => {
+                            if let Some(_ip_net) = ipv6_vec.get(0) {
+                                default_gateway.ipv6.push(ipv6);
+                            }
                         }
                     }
                 }
