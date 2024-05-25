@@ -255,8 +255,12 @@ fn unix_interfaces_inner(
     let mut addr = addrs;
     while !addr.is_null() {
         let addr_ref: &libc::ifaddrs = unsafe { &*addr };
-        let if_data = unsafe { &*(addr_ref.ifa_data as *const libc::if_data) };
-        let if_type = InterfaceType::try_from(if_data.ifi_type as u32).unwrap_or(InterfaceType::Unknown);
+        let if_type = if !addr_ref.ifa_data.is_null() {
+            let if_data = unsafe { &*(addr_ref.ifa_data as *const libc::if_data) };
+            InterfaceType::try_from(if_data.ifi_type as u32).unwrap_or(InterfaceType::Unknown)
+        } else {
+            InterfaceType::Unknown
+        };
         let c_str = addr_ref.ifa_name as *const c_char;
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name = unsafe { from_utf8_unchecked(bytes).to_owned() };

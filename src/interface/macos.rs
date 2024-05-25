@@ -1,9 +1,6 @@
 use crate::interface::InterfaceType;
-use std::fs::read_to_string;
-use std::{collections::HashMap, net::IpAddr};
+use std::collections::HashMap;
 use system_configuration::network_configuration;
-
-const PATH_RESOLV_CONF: &str = "/etc/resolv.conf";
 
 fn get_if_type_from_id(type_id: String) -> InterfaceType {
     match type_id.as_str() {
@@ -49,32 +46,4 @@ pub fn get_if_type_map() -> HashMap<String, SCInterface> {
         map.insert(if_name, sc_if);
     }
     return map;
-}
-
-pub fn get_system_dns_conf() -> Vec<IpAddr> {
-    let r = read_to_string(PATH_RESOLV_CONF);
-    match r {
-        Ok(content) => {
-            let conf_lines: Vec<&str> = content.trim().split("\n").collect();
-            let mut dns_servers = Vec::new();
-            for line in conf_lines {
-                let fields: Vec<&str> = line.split_whitespace().collect();
-                if fields.len() >= 2 {
-                    // field [0]: Configuration type (e.g., "nameserver", "domain", "search")
-                    // field [1]: Corresponding value (e.g., IP address, domain name)
-                    if fields[0] == "nameserver" {
-                        if let Ok(ip) = fields[1].parse::<IpAddr>() {
-                            dns_servers.push(ip);
-                        } else {
-                            eprintln!("Invalid IP address format: {}", fields[1]);
-                        }
-                    }
-                }
-            }
-            dns_servers
-        }
-        Err(_) => {
-            return Vec::new();
-        }
-    }
 }
