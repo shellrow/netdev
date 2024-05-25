@@ -104,10 +104,6 @@ fn get_ipv6_gateway_map() -> HashMap<String, Ipv6Addr> {
 }
 
 pub fn get_gateway_map() -> HashMap<String, NetworkDevice> {
-    match super::send_udp_packet() {
-        Ok(_) => {}
-        Err(_) => {}
-    }
     let mut gateway_map: HashMap<String, NetworkDevice> = HashMap::new();
     let arp_map: HashMap<Ipv4Addr, MacAddr> = get_arp_map();
     for (if_name, ipv4_addr) in get_ipv4_gateway_map() {
