@@ -243,7 +243,7 @@ fn get_interface_type(addr_ref: &libc::ifaddrs) -> InterfaceType {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-fn get_interface_type(addr_ref: &libc::ifaddrs) -> InterfaceType {
+fn get_interface_type(_addr_ref: &libc::ifaddrs) -> InterfaceType {
     InterfaceType::Unknown
 }
 
