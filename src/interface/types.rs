@@ -132,9 +132,25 @@ impl InterfaceType {
         target_os = "ios"
     ))]
     pub fn value(&self) -> u32 {
-        // TODO
         match *self {
-            _ => 0,
+            InterfaceType::Ethernet => 0x6,
+            InterfaceType::TokenRing => 0x9,
+            InterfaceType::Fddi => 0xf,
+            InterfaceType::Isdn => 0x14,
+            InterfaceType::PrimaryIsdn => 0x15,
+            InterfaceType::Ppp => 0x17,
+            InterfaceType::Loopback => 0x18,
+            InterfaceType::Ethernet3Megabit => 0x1a,
+            InterfaceType::Slip => 0x1c,
+            InterfaceType::Atm => 0x25,
+            InterfaceType::GenericModem => 0x30,
+            InterfaceType::Wireless80211 => 0x47,
+            InterfaceType::AsymmetricDsl => 0x95,
+            InterfaceType::RateAdaptDsl => 0x96,
+            InterfaceType::SymmetricDsl => 0x97,
+            InterfaceType::IPOverAtm => 0x31,
+            InterfaceType::HighPerformanceSerialBus => 0x90,
+            _ => u32::MAX,
         }
     }
     /// Returns name of InterfaceType

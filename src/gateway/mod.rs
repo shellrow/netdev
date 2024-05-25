@@ -1,5 +1,5 @@
 #[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
-pub(crate) mod unix;
+pub(crate) mod bsd;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub(crate) mod macos;
@@ -37,32 +37,6 @@ pub fn get_default_gateway() -> Result<NetworkDevice, String> {
         }
     }
     Err(String::from("Default Gateway not found"))
-}
-
-#[cfg(any(
-    target_os = "linux",
-    target_os = "android",
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd"
-))]
-fn send_udp_packet() -> Result<(), String> {
-    use std::net::UdpSocket;
-    let buf = [0u8; 0];
-    let socket = match UdpSocket::bind("0.0.0.0:0") {
-        Ok(s) => s,
-        Err(e) => return Err(format!("Failed to create UDP socket {}", e)),
-    };
-    let dst: &str = "1.1.1.1:80";
-    match socket.set_ttl(1) {
-        Ok(_) => (),
-        Err(e) => return Err(format!("Failed to set TTL {}", e)),
-    }
-    match socket.send_to(&buf, dst) {
-        Ok(_) => (),
-        Err(e) => return Err(format!("Failed to send data {}", e)),
-    }
-    Ok(())
 }
 
 #[cfg(test)]
