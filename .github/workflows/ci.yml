@@ -49,7 +49,9 @@ jobs:
           - i686-unknown-linux-musl
           - armv7-linux-androideabi
           - aarch64-linux-android
-
+          - x86_64-unknown-freebsd
+          - x86_64-unknown-netbsd
+          
     steps:
       - uses: actions/checkout@master
 
