@@ -368,23 +368,32 @@ fn message_to_arppair(msg_bytes: *mut u8) -> (IpAddr, MacAddr) {
 
 fn get_arp_table() -> io::Result<HashMap<IpAddr, MacAddr>> {
     let mut arp_map: HashMap<IpAddr, MacAddr> = HashMap::new();
-    let mut mib: [u32; 6] = [
-        CTL_NET,
-        AF_ROUTE,
-        0,
-        AF_INET,
-        NET_RT_FLAGS,
-        RTF_LLINFO,
-    ];
+    let mut mib: [u32; 6] = [CTL_NET, AF_ROUTE, 0, AF_INET, NET_RT_FLAGS, RTF_LLINFO];
     let mut len: libc::size_t = 0;
 
     unsafe {
-        if sysctl(&mut mib as *mut _ as *mut _, mib.len() as u32, std::ptr::null_mut(), &mut len, std::ptr::null_mut(), 0) < 0 {
+        if sysctl(
+            &mut mib as *mut _ as *mut _,
+            mib.len() as u32,
+            std::ptr::null_mut(),
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        ) < 0
+        {
             return Err(io::Error::last_os_error());
         }
 
         let mut buf: Vec<u8> = vec![0; len as usize];
-        if sysctl(&mut mib as *mut _ as *mut _, mib.len() as u32, buf.as_mut_ptr() as *mut _, &mut len, std::ptr::null_mut(), 0) < 0 {
+        if sysctl(
+            &mut mib as *mut _ as *mut _,
+            mib.len() as u32,
+            buf.as_mut_ptr() as *mut _,
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        ) < 0
+        {
             return Err(io::Error::last_os_error());
         }
 
