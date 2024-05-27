@@ -11,6 +11,43 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
 
+#[cfg(any(
+    target_os = "openbsd",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "macos",
+    target_os = "ios"
+))]
+pub fn get_system_dns_conf() -> Vec<IpAddr> {
+    use std::fs::read_to_string;
+    const PATH_RESOLV_CONF: &str = "/etc/resolv.conf";
+    let r = read_to_string(PATH_RESOLV_CONF);
+    match r {
+        Ok(content) => {
+            let conf_lines: Vec<&str> = content.trim().split("\n").collect();
+            let mut dns_servers = Vec::new();
+            for line in conf_lines {
+                let fields: Vec<&str> = line.split_whitespace().collect();
+                if fields.len() >= 2 {
+                    // field [0]: Configuration type (e.g., "nameserver", "domain", "search")
+                    // field [1]: Corresponding value (e.g., IP address, domain name)
+                    if fields[0] == "nameserver" {
+                        if let Ok(ip) = fields[1].parse::<IpAddr>() {
+                            dns_servers.push(ip);
+                        } else {
+                            eprintln!("Invalid IP address format: {}", fields[1]);
+                        }
+                    }
+                }
+            }
+            dns_servers
+        }
+        Err(_) => {
+            return Vec::new();
+        }
+    }
+}
+
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub fn interfaces() -> Vec<Interface> {
     use super::macos;
@@ -32,13 +69,13 @@ pub fn interfaces() -> Vec<Interface> {
         }
         iface.ipv4.iter().for_each(|ipv4| {
             if IpAddr::V4(ipv4.addr) == local_ip {
-                iface.dns_servers = macos::get_system_dns_conf();
+                iface.dns_servers = get_system_dns_conf();
                 iface.default = true;
             }
         });
         iface.ipv6.iter().for_each(|ipv6| {
             if IpAddr::V6(ipv6.addr) == local_ip {
-                iface.dns_servers = macos::get_system_dns_conf();
+                iface.dns_servers = get_system_dns_conf();
                 iface.default = true;
             }
         });
@@ -89,29 +126,23 @@ pub fn interfaces() -> Vec<Interface> {
         Some(local_ip) => local_ip,
         None => return interfaces,
     };
+    let gateway_map = gateway::bsd::get_gateway_map();
     for iface in &mut interfaces {
-        match local_ip {
-            IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
-                    match gateway::unix::get_default_gateway(iface.name.clone()) {
-                        Ok(gateway) => {
-                            iface.gateway = Some(gateway);
-                        }
-                        Err(_) => {}
-                    }
-                }
-            }
-            IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
-                    match gateway::unix::get_default_gateway(iface.name.clone()) {
-                        Ok(gateway) => {
-                            iface.gateway = Some(gateway);
-                        }
-                        Err(_) => {}
-                    }
-                }
-            }
+        if let Some(gateway) = gateway_map.get(&iface.index) {
+            iface.gateway = Some(gateway.clone());
         }
+        iface.ipv4.iter().for_each(|ipv4| {
+            if IpAddr::V4(ipv4.addr) == local_ip {
+                iface.dns_servers = get_system_dns_conf();
+                iface.default = true;
+            }
+        });
+        iface.ipv6.iter().for_each(|ipv6| {
+            if IpAddr::V6(ipv6.addr) == local_ip {
+                iface.dns_servers = get_system_dns_conf();
+                iface.default = true;
+            }
+        });
     }
     interfaces
 }
@@ -195,6 +226,27 @@ fn sockaddr_to_network_addr(sa: *mut libc::sockaddr) -> (Option<MacAddr>, Option
     }
 }
 
+#[cfg(any(
+    target_os = "openbsd",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "macos",
+    target_os = "ios"
+))]
+fn get_interface_type(addr_ref: &libc::ifaddrs) -> InterfaceType {
+    if !addr_ref.ifa_data.is_null() {
+        let if_data = unsafe { &*(addr_ref.ifa_data as *const libc::if_data) };
+        InterfaceType::try_from(if_data.ifi_type as u32).unwrap_or(InterfaceType::Unknown)
+    } else {
+        InterfaceType::Unknown
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn get_interface_type(_addr_ref: &libc::ifaddrs) -> InterfaceType {
+    InterfaceType::Unknown
+}
+
 #[cfg(target_os = "android")]
 pub fn unix_interfaces() -> Vec<Interface> {
     use super::android;
@@ -224,6 +276,7 @@ fn unix_interfaces_inner(
     let mut addr = addrs;
     while !addr.is_null() {
         let addr_ref: &libc::ifaddrs = unsafe { &*addr };
+        let if_type = get_interface_type(addr_ref);
         let c_str = addr_ref.ifa_name as *const c_char;
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name = unsafe { from_utf8_unchecked(bytes).to_owned() };
@@ -262,7 +315,7 @@ fn unix_interfaces_inner(
             name: name.clone(),
             friendly_name: None,
             description: None,
-            if_type: InterfaceType::Unknown,
+            if_type: if_type,
             mac_addr: mac.clone(),
             ipv4: ini_ipv4,
             ipv6: ini_ipv6,
