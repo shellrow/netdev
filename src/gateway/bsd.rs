@@ -17,13 +17,24 @@ const AF_INET6: u32 = 30;
 const PF_ROUTE: u32 = 17;
 const NET_RT_DUMP: u32 = 1;
 const NET_RT_FLAGS: u32 = 2;
+
+#[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
 const RTM_VERSION: u32 = 5;
+#[cfg(target_os = "netbsd")]
+const RTM_VERSION: u32 = 4;
+
 const RTF_LLINFO: u32 = 1024;
 const RTF_WASCLONED: u32 = 0x20000;
 const RTAX_DST: u32 = 0;
 const RTAX_GATEWAY: u32 = 1;
 const RTAX_NETMASK: u32 = 2;
+
+#[cfg(target_os = "freebsd")]
 const RTAX_MAX: u32 = 8;
+#[cfg(target_os = "netbsd")]
+const RTAX_MAX: u32 = 9;
+#[cfg(target_os = "openbsd")]
+const RTAX_MAX: u32 = 15;
 
 type __int32_t = ::std::os::raw::c_int;
 type __uint8_t = ::std::os::raw::c_uchar;
