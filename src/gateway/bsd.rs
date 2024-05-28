@@ -18,7 +18,7 @@ const PF_ROUTE: u32 = 17;
 const NET_RT_DUMP: u32 = 1;
 const NET_RT_FLAGS: u32 = 2;
 
-#[cfg(target_os = "freebsd", target_os = "openbsd")]
+#[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
 const RTM_VERSION: u32 = 5;
 #[cfg(target_os = "netbsd")]
 const RTM_VERSION: u32 = 4;
