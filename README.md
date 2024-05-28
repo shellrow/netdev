@@ -31,7 +31,7 @@ This project was rebranded from [default-net][default-net-crates-io-url] by the 
 Add `netdev` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netdev = "0.26"
+netdev = "0.27"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
@@ -60,3 +60,5 @@ For more details, see [examples][examples-url] or [doc][doc-url].
     - 11 Pro 22H2 22621.3155
     - 11 22H2 22621.3155
     - 10 21H2 19044.1586
+- FreeBSD
+    - 14
