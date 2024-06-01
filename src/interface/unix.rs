@@ -226,7 +226,13 @@ fn sockaddr_to_network_addr(sa: *mut libc::sockaddr) -> (Option<MacAddr>, Option
     }
 }
 
-#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "openbsd",
+    target_os = "freebsd",
+    target_os = "netbsd"
+))]
 fn get_interface_type(addr_ref: &libc::ifaddrs) -> InterfaceType {
     if !addr_ref.ifa_data.is_null() {
         let if_data = unsafe { &*(addr_ref.ifa_data as *const libc::if_data) };
@@ -236,12 +242,7 @@ fn get_interface_type(addr_ref: &libc::ifaddrs) -> InterfaceType {
     }
 }
 
-#[cfg(any(
-    target_os = "linux",
-    target_os = "android",
-    target_os = "macos",
-    target_os = "ios"
-))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn get_interface_type(_addr_ref: &libc::ifaddrs) -> InterfaceType {
     InterfaceType::Unknown
 }

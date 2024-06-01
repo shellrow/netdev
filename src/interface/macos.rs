@@ -4,10 +4,12 @@ use system_configuration::network_configuration;
 
 fn get_if_type_from_id(type_id: String) -> InterfaceType {
     match type_id.as_str() {
+        "Bridge" => InterfaceType::Bridge,
         "Ethernet" => InterfaceType::Ethernet,
         "IEEE80211" => InterfaceType::Wireless80211,
+        "Loopback" => InterfaceType::Loopback,
+        "Modem" => InterfaceType::GenericModem,
         "PPP" => InterfaceType::Ppp,
-        "Bridge" => InterfaceType::Bridge,
         _ => InterfaceType::Unknown,
     }
 }
