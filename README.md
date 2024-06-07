@@ -31,7 +31,7 @@ This project was rebranded from [default-net][default-net-crates-io-url] by the 
 Add `netdev` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netdev = "0.27"
+netdev = "0.28"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
@@ -45,6 +45,7 @@ For more details, see [examples][examples-url] or [doc][doc-url].
         - 20.04 
         - 18.04
     - Kali 
+        - 2024.2
         - 2023.2
         - 2022.1
         - 2021.1
