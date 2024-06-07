@@ -4,13 +4,13 @@ use memalloc::{allocate, deallocate};
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use windows::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
-use windows::Win32::NetworkManagement::IpHelper::{
+use windows_sys::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
+use windows_sys::Win32::NetworkManagement::IpHelper::{
     GetAdaptersAddresses, SendARP, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH,
 };
-use windows::Win32::NetworkManagement::Ndis::{IF_OPER_STATUS, NET_IF_OPER_STATUS_UP};
-use windows::Win32::Networking::WinSock::SOCKET_ADDRESS;
-use windows::Win32::Networking::WinSock::{
+use windows_sys::Win32::NetworkManagement::Ndis::{IF_OPER_STATUS, NET_IF_OPER_STATUS_UP};
+use windows_sys::Win32::Networking::WinSock::SOCKET_ADDRESS;
+use windows_sys::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
 };
 
@@ -47,7 +47,7 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
             &mut out_buf_len,
         )
     };
-    if res == NO_ERROR.0 {
+    if res == NO_ERROR {
         MacAddr::from_octets(target_mac_addr)
     } else {
         MacAddr::zero()
@@ -90,21 +90,21 @@ pub fn interfaces() -> Vec<Interface> {
         let old_size = dwsize as usize;
         ret_val = unsafe {
             GetAdaptersAddresses(
-                AF_UNSPEC.0 as u32,
+                AF_UNSPEC as u32,
                 GAA_FLAG_INCLUDE_GATEWAYS,
-                Some(std::ptr::null_mut::<std::ffi::c_void>()),
-                Some(mem),
+                std::ptr::null_mut::<std::ffi::c_void>(),
+                mem,
                 &mut dwsize,
             )
         };
-        if ret_val != ERROR_BUFFER_OVERFLOW.0 || retries <= 0 {
+        if ret_val != ERROR_BUFFER_OVERFLOW || retries <= 0 {
             break;
         }
         unsafe { deallocate(mem as *mut u8, old_size as usize) };
         mem = unsafe { allocate(dwsize as usize) as *mut IP_ADAPTER_ADDRESSES_LH };
         retries -= 1;
     }
-    if ret_val == NO_ERROR.0 {
+    if ret_val == NO_ERROR {
         // Enumerate all adapters
         let mut cur = mem;
         while !cur.is_null() {
@@ -123,7 +123,7 @@ pub fn interfaces() -> Vec<Interface> {
             // Flags and Status
             let mut flags: u32 = 0;
             let status: IF_OPER_STATUS = unsafe { (*cur).OperStatus };
-            if status.0 == NET_IF_OPER_STATUS_UP.0 {
+            if status == NET_IF_OPER_STATUS_UP {
                 flags |= sys::IFF_UP;
             }
             match if_type {
@@ -145,17 +145,17 @@ pub fn interfaces() -> Vec<Interface> {
                 _ => {}
             }
             // Name
-            let p_aname = unsafe { (*cur).AdapterName.0 };
+            let p_aname = unsafe { (*cur).AdapterName };
             let aname_len = unsafe { strlen(p_aname as *const c_char) };
             let aname_slice = unsafe { std::slice::from_raw_parts(p_aname, aname_len) };
             let adapter_name = String::from_utf8(aname_slice.to_vec()).unwrap();
             // Friendly Name
-            let p_fname = unsafe { (*cur).FriendlyName.0 };
+            let p_fname = unsafe { (*cur).FriendlyName };
             let fname_len = unsafe { wcslen(p_fname as *const wchar_t) };
             let fname_slice = unsafe { std::slice::from_raw_parts(p_fname, fname_len) };
             let friendly_name = String::from_utf16(fname_slice).unwrap();
             // Description
-            let p_desc = unsafe { (*cur).Description.0 };
+            let p_desc = unsafe { (*cur).Description };
             let desc_len = unsafe { wcslen(p_desc as *const wchar_t) };
             let desc_slice = unsafe { std::slice::from_raw_parts(p_desc, desc_len) };
             let description = String::from_utf16(desc_slice).unwrap();

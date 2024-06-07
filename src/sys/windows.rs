@@ -1,4 +1,4 @@
-use windows::Win32::Networking::WinSock as ws;
+use windows_sys::Win32::Networking::WinSock as ws;
 
 pub const IFF_UP: u32 = ws::IFF_UP;
 pub const IFF_BROADCAST: u32 = ws::IFF_BROADCAST;
