@@ -7,24 +7,17 @@ use crate::sys;
 use libc;
 use std::ffi::{CStr, CString};
 use std::mem::{self, MaybeUninit};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
 
-#[cfg(any(
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "macos",
-    target_os = "ios"
-))]
 pub fn get_system_dns_conf() -> Vec<IpAddr> {
     use std::fs::read_to_string;
     const PATH_RESOLV_CONF: &str = "/etc/resolv.conf";
     let r = read_to_string(PATH_RESOLV_CONF);
     match r {
         Ok(content) => {
-            let conf_lines: Vec<&str> = content.trim().split("\n").collect();
+            let conf_lines: Vec<&str> = content.trim().split('\n').collect();
             let mut dns_servers = Vec::new();
             for line in conf_lines {
                 let fields: Vec<&str> = line.split_whitespace().collect();
@@ -32,8 +25,11 @@ pub fn get_system_dns_conf() -> Vec<IpAddr> {
                     // field [0]: Configuration type (e.g., "nameserver", "domain", "search")
                     // field [1]: Corresponding value (e.g., IP address, domain name)
                     if fields[0] == "nameserver" {
-                        if let Ok(ip) = fields[1].parse::<IpAddr>() {
-                            dns_servers.push(ip);
+                        let sock_addr = format!("{}:53", fields[1]);
+                        if let Ok(mut addrs) = sock_addr.to_socket_addrs() {
+                            if let Some(addr) = addrs.next() {
+                                dns_servers.push(addr.ip());
+                            }
                         } else {
                             eprintln!("Invalid IP address format: {}", fields[1]);
                         }
@@ -42,9 +38,7 @@ pub fn get_system_dns_conf() -> Vec<IpAddr> {
             }
             dns_servers
         }
-        Err(_) => {
-            return Vec::new();
-        }
+        Err(_) => Vec::new(),
     }
 }
 
@@ -105,13 +99,13 @@ pub fn interfaces() -> Vec<Interface> {
             IpAddr::V4(local_ipv4) => {
                 if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
                     iface.default = true;
-                    iface.dns_servers = linux::get_system_dns_conf();
+                    iface.dns_servers = get_system_dns_conf();
                 }
             }
             IpAddr::V6(local_ipv6) => {
                 if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
                     iface.default = true;
-                    iface.dns_servers = linux::get_system_dns_conf();
+                    iface.dns_servers = get_system_dns_conf();
                 }
             }
         }
