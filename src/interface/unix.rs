@@ -38,9 +38,7 @@ pub fn get_system_dns_conf() -> Vec<IpAddr> {
             }
             dns_servers
         }
-        Err(_) => {
-            Vec::new()
-        }
+        Err(_) => Vec::new(),
     }
 }
 
