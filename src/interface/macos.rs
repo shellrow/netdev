@@ -16,6 +16,7 @@ fn get_if_type_from_id(type_id: String) -> InterfaceType {
 
 #[derive(Debug)]
 pub struct SCInterface {
+    #[allow(dead_code)]
     pub name: String,
     pub friendly_name: Option<String>,
     pub interface_type: InterfaceType,
