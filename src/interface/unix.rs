@@ -11,13 +11,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
 
-#[cfg(any(
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "macos",
-    target_os = "ios"
-))]
 pub fn get_system_dns_conf() -> Vec<IpAddr> {
     use std::fs::read_to_string;
     const PATH_RESOLV_CONF: &str = "/etc/resolv.conf";
@@ -108,13 +101,13 @@ pub fn interfaces() -> Vec<Interface> {
             IpAddr::V4(local_ipv4) => {
                 if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
                     iface.default = true;
-                    iface.dns_servers = linux::get_system_dns_conf();
+                    iface.dns_servers = get_system_dns_conf();
                 }
             }
             IpAddr::V6(local_ipv6) => {
                 if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
                     iface.default = true;
-                    iface.dns_servers = linux::get_system_dns_conf();
+                    iface.dns_servers = get_system_dns_conf();
                 }
             }
         }
