@@ -258,7 +258,10 @@ pub fn is_physical_interface(interface: &Interface) -> bool {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn is_physical_interface(interface: &Interface) -> bool {
-    interface.flags & (crate::sys::IFF_LOWER_UP as u32) != 0 && !interface.is_loopback()
+    use super::linux;
+    interface.flags & (crate::sys::IFF_LOWER_UP as u32) != 0 
+    && !interface.is_loopback()
+    && !linux::is_virtual_interface(&interface.name)
 }
 
 #[cfg(target_os = "android")]
