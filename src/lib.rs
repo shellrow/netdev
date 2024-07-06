@@ -4,6 +4,7 @@ pub mod interface;
 pub mod ip;
 pub mod mac;
 mod sys;
+mod db;
 
 pub use device::NetworkDevice;
 pub use gateway::get_default_gateway;
