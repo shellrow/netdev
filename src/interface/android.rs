@@ -200,7 +200,12 @@ pub mod netlink {
             packet.finalize();
 
             let mut buf = vec![0; packet.header.length as usize];
-            assert_eq!(buf.len(), packet.buffer_len());
+            if buf.len() != packet.buffer_len() {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Buffer length mismatch in netlink packet",
+                ));
+            }
             packet.serialize(&mut buf[..]);
             socket.send(&buf[..], 0)?;
 
