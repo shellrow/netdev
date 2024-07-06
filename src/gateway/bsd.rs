@@ -411,7 +411,16 @@ fn get_arp_table() -> io::Result<HashMap<IpAddr, MacAddr>> {
         let mut offset = 0;
         while offset < len as usize {
             let rt_hdr = &*(buf.as_ptr().add(offset) as *const rt_msghdr);
-            assert_eq!(rt_hdr.rtm_version as u32, RTM_VERSION);
+            if rt_hdr.rtm_version as u32 != RTM_VERSION {
+                eprintln!(
+                    "Unexpected RTM_VERSION: {} in {:?}",
+                    rt_hdr.rtm_version, rt_hdr
+                );
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Unexpected RTM_VERSION: {}", rt_hdr.rtm_version),
+                ));
+            }
 
             let msg_len = rt_hdr.rtm_msglen as usize;
             offset += msg_len;
