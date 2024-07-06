@@ -13,3 +13,5 @@ pub mod if_arp {
     pub const ARPHRD_X25: u32 = libc::ARPHRD_X25 as u32;
     pub const ARPHRD_IEEE1394: u32 = libc::ARPHRD_IEEE1394 as u32;
 }
+
+pub use libc::IFF_LOWER_UP;

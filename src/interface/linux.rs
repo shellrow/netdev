@@ -1,11 +1,22 @@
 use crate::interface::InterfaceType;
 use std::convert::TryFrom;
-use std::fs::read_to_string;
+use std::fs::{read_link, read_to_string};
 
 fn is_wifi_interface(interface_name: &str) -> bool {
     let wireless_path = format!("/sys/class/net/{}/wireless", interface_name);
     let phy80211_path = format!("/sys/class/net/{}/phy80211", interface_name);
     std::path::Path::new(&wireless_path).exists() || std::path::Path::new(&phy80211_path).exists()
+}
+
+pub fn is_virtual_interface(interface_name: &str) -> bool {
+    let device_path = format!("/sys/class/net/{}", interface_name);
+    match read_link(device_path) {
+        Ok(link_path) => {
+            // If the link path contains `virtual`, then it is a virtual interface.
+            link_path.to_string_lossy().contains("virtual")
+        }
+        Err(_) => false,
+    }
 }
 
 pub fn get_interface_type(if_name: String) -> InterfaceType {

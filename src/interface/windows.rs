@@ -6,7 +6,8 @@ use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use windows_sys::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
-    GetAdaptersAddresses, SendARP, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH,
+    GetAdaptersAddresses, GetIfEntry2, SendARP, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH,
+    MIB_IF_ROW2, MIB_IF_ROW2_0,
 };
 use windows_sys::Win32::NetworkManagement::Ndis::{IF_OPER_STATUS, NET_IF_OPER_STATUS_UP};
 use windows_sys::Win32::Networking::WinSock::SOCKET_ADDRESS;
@@ -19,6 +20,15 @@ use crate::interface::{Interface, InterfaceType};
 use crate::ip::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
 use crate::sys;
+
+//const IFF_HARDWARE_INTERFACE: u8 = 0b0000_0001;
+//const IFF_FILTER_INTERFACE: u8 = 0b0000_0010;
+const IFF_CONNECTOR_PRESENT: u8 = 0b0000_0100;
+//const IFF_NOT_AUTHENTICATED: u8 = 0b0000_1000;
+//const IFF_NOT_MEDIA_CONNECTED: u8 = 0b0001_0000;
+//const IFF_PAUSED: u8 = 0b0010_0000;
+//const IFF_LOW_POWER: u8 = 0b0100_0000;
+//const IFF_END_POINT_INTERFACE: u8 = 0b1000_0000;
 
 #[cfg(target_endian = "little")]
 fn htonl(val: u32) -> u32 {
@@ -72,6 +82,35 @@ unsafe fn socket_address_to_ipaddr(addr: &SOCKET_ADDRESS) -> Option<IpAddr> {
         return Some(IpAddr::V6(ipv6));
     }
     None
+}
+
+pub fn is_running(interface: &Interface) -> bool {
+    interface.is_up()
+}
+
+/// Check if a network interface has a connector present, indicating it is a physical interface.
+fn is_connector_present(if_index: u32) -> bool {
+    // Initialize MIB_IF_ROW2
+    let mut row: MIB_IF_ROW2 = unsafe { std::mem::zeroed() };
+    row.InterfaceIndex = if_index;
+    // Retrieve interface information using GetIfEntry2
+    unsafe {
+        if GetIfEntry2(&mut row) != 0 {
+            eprintln!("Failed to get interface entry for index: {}", if_index);
+            return false;
+        }
+    }
+    // Check if the connector is present
+    let oper_status_flags: MIB_IF_ROW2_0 = row.InterfaceAndOperStatusFlags;
+    oper_status_flags._bitfield & IFF_CONNECTOR_PRESENT != 0
+}
+
+pub fn is_physical_interface(interface: &Interface) -> bool {
+    is_connector_present(interface.index)
+        || (interface.is_up()
+            && interface.is_running()
+            && !interface.is_tun()
+            && !interface.is_loopback())
 }
 
 // Get network interfaces using the IP Helper API

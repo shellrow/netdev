@@ -1,3 +1,4 @@
+mod db;
 pub mod device;
 pub mod gateway;
 pub mod interface;

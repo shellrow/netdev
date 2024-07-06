@@ -241,6 +241,28 @@ fn get_interface_type(_addr_ref: &libc::ifaddrs) -> InterfaceType {
     InterfaceType::Unknown
 }
 
+pub fn is_running(interface: &Interface) -> bool {
+    interface.flags & (crate::sys::IFF_RUNNING as u32) != 0
+}
+
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "openbsd",
+    target_os = "freebsd",
+    target_os = "netbsd"
+))]
+pub fn is_physical_interface(interface: &Interface) -> bool {
+    interface.is_up() && interface.is_running() && !interface.is_tun() && !interface.is_loopback()
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub fn is_physical_interface(interface: &Interface) -> bool {
+    use super::linux;
+    (interface.flags & (crate::sys::IFF_LOWER_UP as u32) != 0)
+        || (!interface.is_loopback() && !linux::is_virtual_interface(&interface.name))
+}
+
 #[cfg(target_os = "android")]
 pub fn unix_interfaces() -> Vec<Interface> {
     use super::android;
