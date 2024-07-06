@@ -16,6 +16,8 @@ fn main() {
             println!("\t\tis BROADCAST {}", interface.is_broadcast());
             println!("\t\tis POINT TO POINT {}", interface.is_point_to_point());
             println!("\t\tis TUN {}", interface.is_tun());
+            println!("\t\tis RUNNING {}", interface.is_running());
+            println!("\t\tis PHYSICAL {}", interface.is_physical());
             if let Some(mac_addr) = interface.mac_addr {
                 println!("\tMAC Address: {}", mac_addr);
             } else {

@@ -10,7 +10,7 @@ pub type InAddr = libc::in_addr;
 pub const AF_INET: libc::c_int = libc::AF_INET;
 pub const AF_INET6: libc::c_int = libc::AF_INET6;
 
-pub use libc::{IFF_BROADCAST, IFF_LOOPBACK, IFF_MULTICAST, IFF_POINTOPOINT, IFF_UP};
+pub use libc::{IFF_BROADCAST, IFF_LOOPBACK, IFF_MULTICAST, IFF_POINTOPOINT, IFF_UP, IFF_RUNNING};
 
 fn ntohs(u: u16) -> u16 {
     u16::from_be(u)

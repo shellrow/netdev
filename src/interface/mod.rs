@@ -154,6 +154,14 @@ impl Interface {
     pub fn is_tun(&self) -> bool {
         self.is_up() && self.is_point_to_point() && !self.is_broadcast() && !self.is_loopback()
     }
+    /// Check if the network interface is running and ready to send/receive packets
+    pub fn is_running(&self) -> bool {
+        is_running(&self)
+    }
+    /// Check if the network interface is a physical interface
+    pub fn is_physical(&self) -> bool {
+        is_physical_interface(&self)
+    }
 }
 
 /// Get default Network Interface

@@ -74,6 +74,14 @@ unsafe fn socket_address_to_ipaddr(addr: &SOCKET_ADDRESS) -> Option<IpAddr> {
     None
 }
 
+pub fn is_running(interface: &Interface) -> bool {
+    interface.is_up()
+}
+
+pub fn is_physical_interface(interface: &Interface) -> bool {
+    interface.is_up() && interface.is_running() && !interface.is_tun() && !interface.is_loopback()
+}
+
 // Get network interfaces using the IP Helper API
 // Reference: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
 pub fn interfaces() -> Vec<Interface> {
