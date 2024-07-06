@@ -160,9 +160,9 @@ impl Interface {
     }
     /// Check if the network interface is a physical interface
     pub fn is_physical(&self) -> bool {
-        is_physical_interface(&self) 
-        && !crate::db::oui::is_virtual_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
-        && !crate::db::oui::is_known_loopback_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
+        is_physical_interface(&self)
+            && !crate::db::oui::is_virtual_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
+            && !crate::db::oui::is_known_loopback_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
     }
 }
 

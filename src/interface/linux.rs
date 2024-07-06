@@ -1,6 +1,6 @@
 use crate::interface::InterfaceType;
 use std::convert::TryFrom;
-use std::fs::{read_to_string, read_link};
+use std::fs::{read_link, read_to_string};
 
 fn is_wifi_interface(interface_name: &str) -> bool {
     let wireless_path = format!("/sys/class/net/{}/wireless", interface_name);

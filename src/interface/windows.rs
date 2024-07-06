@@ -6,7 +6,8 @@ use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use windows_sys::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
-    GetAdaptersAddresses, SendARP, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH, MIB_IF_ROW2, MIB_IF_ROW2_0, GetIfEntry2
+    GetAdaptersAddresses, GetIfEntry2, SendARP, GAA_FLAG_INCLUDE_GATEWAYS, IP_ADAPTER_ADDRESSES_LH,
+    MIB_IF_ROW2, MIB_IF_ROW2_0,
 };
 use windows_sys::Win32::NetworkManagement::Ndis::{IF_OPER_STATUS, NET_IF_OPER_STATUS_UP};
 use windows_sys::Win32::Networking::WinSock::SOCKET_ADDRESS;
@@ -106,7 +107,10 @@ fn is_connector_present(if_index: u32) -> bool {
 
 pub fn is_physical_interface(interface: &Interface) -> bool {
     is_connector_present(interface.index)
-    || (interface.is_up() && interface.is_running() && !interface.is_tun() && !interface.is_loopback())
+        || (interface.is_up()
+            && interface.is_running()
+            && !interface.is_tun()
+            && !interface.is_loopback())
 }
 
 // Get network interfaces using the IP Helper API
