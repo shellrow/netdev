@@ -65,6 +65,8 @@ pub enum InterfaceType {
     Wwanpp2,
     /// Transparent bridge interface
     Bridge,
+    /// Controller Area Network
+    Can,
 }
 
 impl InterfaceType {
@@ -120,6 +122,7 @@ impl InterfaceType {
             InterfaceType::Tunnel => sys::if_arp::ARPHRD_TUNNEL,
             InterfaceType::Isdn => sys::if_arp::ARPHRD_X25,
             InterfaceType::HighPerformanceSerialBus => sys::if_arp::ARPHRD_IEEE1394,
+            InterfaceType::Can => sys::if_arp::ARPHRD_CAN,
             _ => u32::MAX,
         }
     }
@@ -185,6 +188,7 @@ impl InterfaceType {
             InterfaceType::Wman => String::from("WMAN"),
             InterfaceType::Wwanpp => String::from("WWANPP"),
             InterfaceType::Wwanpp2 => String::from("WWANPP2"),
+            InterfaceType::Can => String::from("CAN"),
         }
     }
 }
@@ -229,6 +233,7 @@ impl TryFrom<u32> for InterfaceType {
             x if x == InterfaceType::Wman.value() => Ok(InterfaceType::Wman),
             x if x == InterfaceType::Wwanpp.value() => Ok(InterfaceType::Wwanpp),
             x if x == InterfaceType::Wwanpp2.value() => Ok(InterfaceType::Wwanpp2),
+            x if x == InterfaceType::Can.value() => Ok(InterfaceType::Can),
             _ => Err(()),
         }
     }
