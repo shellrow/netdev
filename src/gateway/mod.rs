@@ -21,14 +21,14 @@ pub fn get_default_gateway() -> Result<NetworkDevice, String> {
     for iface in interfaces {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
+                if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
                     if let Some(gateway) = iface.gateway {
                         return Ok(gateway);
                     }
                 }
             }
             IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
+                if iface.ipv6.iter().any(|x| x.addr() == local_ipv6) {
                     if let Some(gateway) = iface.gateway {
                         return Ok(gateway);
                     }
