@@ -12,7 +12,7 @@ use windows_sys::Win32::Networking::WinSock::{
 
 use crate::device::NetworkDevice;
 use crate::interface::{Interface, InterfaceType};
-use crate::ip::{Ipv4Net, Ipv6Net};
+use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
 use crate::sys;
 use std::ffi::CStr;
@@ -206,12 +206,16 @@ pub fn interfaces() -> Vec<Interface> {
                 let prefix_len = cur_a.OnLinkPrefixLength;
                 match ip_addr {
                     IpAddr::V4(ipv4) => {
-                        let ipv4_net: Ipv4Net = Ipv4Net::new(ipv4, prefix_len);
-                        ipv4_vec.push(ipv4_net);
+                        match Ipv4Net::new(ipv4, prefix_len) {
+                            Ok(ipv4_net) => ipv4_vec.push(ipv4_net),
+                            Err(_) => {},
+                        }
                     }
                     IpAddr::V6(ipv6) => {
-                        let ipv6_net: Ipv6Net = Ipv6Net::new(ipv6, prefix_len);
-                        ipv6_vec.push(ipv6_net);
+                        match Ipv6Net::new(ipv6, prefix_len) {
+                            Ok(ipv6_net) => ipv6_vec.push(ipv6_net),
+                            Err(_) => {},
+                        }
                     }
                 }
             }
@@ -225,7 +229,7 @@ pub fn interfaces() -> Vec<Interface> {
                     match gateway_ip {
                         IpAddr::V4(ipv4) => {
                             if let Some(ip_net) = ipv4_vec.first() {
-                                let mac_addr = get_mac_through_arp(ip_net.addr, ipv4);
+                                let mac_addr = get_mac_through_arp(ip_net.addr(), ipv4);
                                 default_gateway.mac_addr = mac_addr;
                                 default_gateway.ipv4.push(ipv4);
                             }
@@ -243,8 +247,8 @@ pub fn interfaces() -> Vec<Interface> {
                 .filter_map(|cur_d| unsafe { socket_address_to_ipaddr(&cur_d.Address) })
                 .collect();
             let default: bool = match local_ip {
-                IpAddr::V4(local_ipv4) => ipv4_vec.iter().any(|x| x.addr == local_ipv4),
-                IpAddr::V6(local_ipv6) => ipv6_vec.iter().any(|x| x.addr == local_ipv6),
+                IpAddr::V4(local_ipv4) => ipv4_vec.iter().any(|x| x.addr() == local_ipv4),
+                IpAddr::V6(local_ipv6) => ipv6_vec.iter().any(|x| x.addr() == local_ipv6),
             };
             let interface: Interface = Interface {
                 index,
