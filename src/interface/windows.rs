@@ -205,18 +205,14 @@ pub fn interfaces() -> Vec<Interface> {
                 };
                 let prefix_len = cur_a.OnLinkPrefixLength;
                 match ip_addr {
-                    IpAddr::V4(ipv4) => {
-                        match Ipv4Net::new(ipv4, prefix_len) {
-                            Ok(ipv4_net) => ipv4_vec.push(ipv4_net),
-                            Err(_) => {},
-                        }
-                    }
-                    IpAddr::V6(ipv6) => {
-                        match Ipv6Net::new(ipv6, prefix_len) {
-                            Ok(ipv6_net) => ipv6_vec.push(ipv6_net),
-                            Err(_) => {},
-                        }
-                    }
+                    IpAddr::V4(ipv4) => match Ipv4Net::new(ipv4, prefix_len) {
+                        Ok(ipv4_net) => ipv4_vec.push(ipv4_net),
+                        Err(_) => {}
+                    },
+                    IpAddr::V6(ipv6) => match Ipv6Net::new(ipv6, prefix_len) {
+                        Ok(ipv6_net) => ipv6_vec.push(ipv6_net),
+                        Err(_) => {}
+                    },
                 }
             }
             // Gateway

@@ -152,14 +152,14 @@ pub mod netlink {
                                     let ip = Ipv4Addr::from(<[u8; 4]>::try_from(addr).unwrap());
                                     match Ipv4Net::new(ip, addr_msg.header.prefix_len) {
                                         Ok(ipv4) => interface.ipv4.push(ipv4),
-                                        Err(_) => {},
+                                        Err(_) => {}
                                     }
                                 }
                                 16 => {
                                     let ip = Ipv6Addr::from(<[u8; 16]>::try_from(addr).unwrap());
                                     match Ipv6Net::new(ip, addr_msg.header.prefix_len) {
                                         Ok(ipv6) => interface.ipv6.push(ipv6),
-                                        Err(_) => {},
+                                        Err(_) => {}
                                     }
                                 }
                                 _ => {
