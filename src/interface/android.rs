@@ -118,9 +118,10 @@ pub mod netlink {
                                 }
                                 4 => {
                                     let ip = Ipv4Addr::from(<[u8; 4]>::try_from(addr).unwrap());
-                                    interface
-                                        .ipv4
-                                        .push(Ipv4Net::new_with_netmask(ip, Ipv4Addr::UNSPECIFIED));
+                                    match Ipv4Net::with_netmask(ip, Ipv4Addr::UNSPECIFIED) {
+                                        Ok(ipv4) => interface.ipv4.push(ipv4),
+                                        Err(_) => {}
+                                    }
                                 }
                                 _ => {
                                     // unclear what these would be
@@ -149,15 +150,17 @@ pub mod netlink {
                             AddressNla::Address(addr) => match addr.len() {
                                 4 => {
                                     let ip = Ipv4Addr::from(<[u8; 4]>::try_from(addr).unwrap());
-                                    interface
-                                        .ipv4
-                                        .push(Ipv4Net::new(ip, addr_msg.header.prefix_len));
+                                    match Ipv4Net::new(ip, addr_msg.header.prefix_len) {
+                                        Ok(ipv4) => interface.ipv4.push(ipv4),
+                                        Err(_) => {},
+                                    }
                                 }
                                 16 => {
                                     let ip = Ipv6Addr::from(<[u8; 16]>::try_from(addr).unwrap());
-                                    interface
-                                        .ipv6
-                                        .push(Ipv6Net::new(ip, addr_msg.header.prefix_len));
+                                    match Ipv6Net::new(ip, addr_msg.header.prefix_len) {
+                                        Ok(ipv6) => interface.ipv6.push(ipv6),
+                                        Err(_) => {},
+                                    }
                                 }
                                 _ => {
                                     // what else?
