@@ -43,7 +43,7 @@ mod android;
 mod macos;
 
 use crate::device::NetworkDevice;
-use crate::ip::{Ipv4Net, Ipv6Net};
+use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
 use crate::sys;
 use std::net::IpAddr;
@@ -98,12 +98,12 @@ impl Interface {
         for iface in interfaces {
             match local_ip {
                 IpAddr::V4(local_ipv4) => {
-                    if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
+                    if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
                         return Ok(iface);
                     }
                 }
                 IpAddr::V6(local_ipv6) => {
-                    if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
+                    if iface.ipv6.iter().any(|x| x.addr() == local_ipv6) {
                         return Ok(iface);
                     }
                 }
@@ -181,12 +181,12 @@ pub fn get_default_interface() -> Result<Interface, String> {
     for iface in interfaces {
         match local_ip {
             IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
+                if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
                     return Ok(iface);
                 }
             }
             IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
+                if iface.ipv6.iter().any(|x| x.addr() == local_ipv6) {
                     return Ok(iface);
                 }
             }

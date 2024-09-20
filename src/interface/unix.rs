@@ -2,7 +2,7 @@ use super::Interface;
 use super::MacAddr;
 use crate::gateway;
 use crate::interface::InterfaceType;
-use crate::ip::{Ipv4Net, Ipv6Net};
+use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::sys;
 use libc;
 use std::ffi::{CStr, CString};
@@ -62,13 +62,13 @@ pub fn interfaces() -> Vec<Interface> {
             iface.gateway = Some(gateway.clone());
         }
         iface.ipv4.iter().for_each(|ipv4| {
-            if IpAddr::V4(ipv4.addr) == local_ip {
+            if IpAddr::V4(ipv4.addr()) == local_ip {
                 iface.dns_servers = get_system_dns_conf();
                 iface.default = true;
             }
         });
         iface.ipv6.iter().for_each(|ipv6| {
-            if IpAddr::V6(ipv6.addr) == local_ip {
+            if IpAddr::V6(ipv6.addr()) == local_ip {
                 iface.dns_servers = get_system_dns_conf();
                 iface.default = true;
             }
@@ -97,13 +97,13 @@ pub fn interfaces() -> Vec<Interface> {
         }
         match local_ip {
             IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
+                if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
                     iface.default = true;
                     iface.dns_servers = get_system_dns_conf();
                 }
             }
             IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
+                if iface.ipv6.iter().any(|x| x.addr() == local_ipv6) {
                     iface.default = true;
                     iface.dns_servers = get_system_dns_conf();
                 }
@@ -126,13 +126,13 @@ pub fn interfaces() -> Vec<Interface> {
             iface.gateway = Some(gateway.clone());
         }
         iface.ipv4.iter().for_each(|ipv4| {
-            if IpAddr::V4(ipv4.addr) == local_ip {
+            if IpAddr::V4(ipv4.addr()) == local_ip {
                 iface.dns_servers = get_system_dns_conf();
                 iface.default = true;
             }
         });
         iface.ipv6.iter().for_each(|ipv6| {
-            if IpAddr::V6(ipv6.addr) == local_ip {
+            if IpAddr::V6(ipv6.addr()) == local_ip {
                 iface.dns_servers = get_system_dns_conf();
                 iface.default = true;
             }
@@ -310,8 +310,10 @@ fn unix_interfaces_inner(
                         },
                         None => Ipv4Addr::UNSPECIFIED,
                     };
-                    let ipv4_net: Ipv4Net = Ipv4Net::new_with_netmask(ipv4, netmask);
-                    ini_ipv4.push(ipv4_net);
+                    match Ipv4Net::with_netmask(ipv4, netmask) {
+                        Ok(ipv4_net) => ini_ipv4.push(ipv4_net),
+                        Err(_) => {}
+                    }
                 }
                 IpAddr::V6(ipv6) => {
                     let netmask: Ipv6Addr = match netmask {
@@ -321,8 +323,10 @@ fn unix_interfaces_inner(
                         },
                         None => Ipv6Addr::UNSPECIFIED,
                     };
-                    let ipv6_net: Ipv6Net = Ipv6Net::new_with_netmask(ipv6, netmask);
-                    ini_ipv6.push(ipv6_net);
+                    match Ipv6Net::with_netmask(ipv6, netmask) {
+                        Ok(ipv6_net) => ini_ipv6.push(ipv6_net),
+                        Err(_) => {}
+                    }
                 }
             }
         }
@@ -358,8 +362,10 @@ fn unix_interfaces_inner(
                                 },
                                 None => Ipv4Addr::UNSPECIFIED,
                             };
-                            let ipv4_net: Ipv4Net = Ipv4Net::new_with_netmask(ipv4, netmask);
-                            iface.ipv4.push(ipv4_net);
+                            match Ipv4Net::with_netmask(ipv4, netmask) {
+                                Ok(ipv4_net) => iface.ipv4.push(ipv4_net),
+                                Err(_) => {}
+                            }
                         }
                         IpAddr::V6(ipv6) => {
                             let netmask: Ipv6Addr = match netmask {
@@ -369,8 +375,10 @@ fn unix_interfaces_inner(
                                 },
                                 None => Ipv6Addr::UNSPECIFIED,
                             };
-                            let ipv6_net: Ipv6Net = Ipv6Net::new_with_netmask(ipv6, netmask);
-                            iface.ipv6.push(ipv6_net);
+                            match Ipv6Net::with_netmask(ipv6, netmask) {
+                                Ok(ipv6_net) => iface.ipv6.push(ipv6_net),
+                                Err(_) => {}
+                            }
                         }
                     }
                 }
