@@ -97,13 +97,13 @@ pub fn interfaces() -> Vec<Interface> {
         }
         match local_ip {
             IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr == local_ipv4) {
+                if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
                     iface.default = true;
                     iface.dns_servers = get_system_dns_conf();
                 }
             }
             IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr == local_ipv6) {
+                if iface.ipv6.iter().any(|x| x.addr() == local_ipv6) {
                     iface.default = true;
                     iface.dns_servers = get_system_dns_conf();
                 }
@@ -126,13 +126,13 @@ pub fn interfaces() -> Vec<Interface> {
             iface.gateway = Some(gateway.clone());
         }
         iface.ipv4.iter().for_each(|ipv4| {
-            if IpAddr::V4(ipv4.addr) == local_ip {
+            if IpAddr::V4(ipv4.addr()) == local_ip {
                 iface.dns_servers = get_system_dns_conf();
                 iface.default = true;
             }
         });
         iface.ipv6.iter().for_each(|ipv6| {
-            if IpAddr::V6(ipv6.addr) == local_ip {
+            if IpAddr::V6(ipv6.addr()) == local_ip {
                 iface.dns_servers = get_system_dns_conf();
                 iface.default = true;
             }
