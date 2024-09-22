@@ -31,7 +31,7 @@ This project was rebranded from [default-net][default-net-crates-io-url] by the 
 Add `netdev` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netdev = "0.30"
+netdev = "0.31"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
