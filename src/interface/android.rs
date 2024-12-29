@@ -51,22 +51,27 @@ pub mod netlink {
         NetlinkHeader, NetlinkMessage, NetlinkPayload, NLM_F_DUMP, NLM_F_REQUEST,
     };
     use netlink_packet_route::{
-        rtnl::address::nlas::Nla as AddressNla, rtnl::link::nlas::Nla as LinkNla, AddressMessage,
-        LinkMessage, RtnlMessage,
+        address::{AddressAttribute, AddressMessage},
+        link::{LinkAttribute, LinkMessage},
+        RouteNetlinkMessage,
     };
     use netlink_sys::{protocols::NETLINK_ROUTE, Socket};
-    use std::io;
-    use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::{
+        io,
+        net::{IpAddr, Ipv4Addr},
+    };
 
-    use crate::interface::{Interface, InterfaceType, Ipv4Net, Ipv6Net};
-    use crate::mac::MacAddr;
+    use crate::{
+        interface::{Interface, InterfaceType, Ipv4Net, Ipv6Net},
+        mac::MacAddr,
+    };
 
     pub fn unix_interfaces() -> Vec<Interface> {
         let mut ifaces = Vec::new();
         if let Ok(socket) = Socket::new(NETLINK_ROUTE) {
             if let Err(err) = enumerate_netlink(
                 &socket,
-                RtnlMessage::GetLink(LinkMessage::default()),
+                RouteNetlinkMessage::GetLink(LinkMessage::default()),
                 &mut ifaces,
                 handle_new_link,
             ) {
@@ -74,7 +79,7 @@ pub mod netlink {
             };
             if let Err(err) = enumerate_netlink(
                 &socket,
-                RtnlMessage::GetAddress(AddressMessage::default()),
+                RouteNetlinkMessage::GetAddress(AddressMessage::default()),
                 &mut ifaces,
                 handle_new_addr,
             ) {
@@ -84,101 +89,82 @@ pub mod netlink {
         ifaces
     }
 
-    fn handle_new_link(ifaces: &mut Vec<Interface>, msg: RtnlMessage) -> io::Result<()> {
-        match msg {
-            RtnlMessage::NewLink(link_msg) => {
-                let mut interface: Interface = Interface {
-                    index: link_msg.header.index,
-                    name: String::new(),
-                    friendly_name: None,
-                    description: None,
-                    if_type: InterfaceType::try_from(link_msg.header.link_layer_type as u32)
-                        .unwrap_or(InterfaceType::Unknown),
-                    mac_addr: None,
-                    ipv4: Vec::new(),
-                    ipv6: Vec::new(),
-                    flags: link_msg.header.flags,
-                    transmit_speed: None,
-                    receive_speed: None,
-                    gateway: None,
-                    dns_servers: Vec::new(),
-                    default: false,
-                };
+    fn handle_new_link(ifaces: &mut Vec<Interface>, msg: RouteNetlinkMessage) -> io::Result<()> {
+        if let RouteNetlinkMessage::NewLink(link_msg) = msg {
+            let mut interface: Interface = Interface {
+                index: link_msg.header.index,
+                name: String::new(),
+                friendly_name: None,
+                description: None,
+                if_type: InterfaceType::try_from(link_msg.header.link_layer_type as u32)
+                    .unwrap_or(InterfaceType::Unknown),
+                mac_addr: None,
+                ipv4: Vec::new(),
+                ipv6: Vec::new(),
+                flags: link_msg.header.flags.bits(),
+                transmit_speed: None,
+                receive_speed: None,
+                gateway: None,
+                dns_servers: Vec::new(),
+                default: false,
+            };
 
-                for nla in link_msg.nlas {
-                    match nla {
-                        LinkNla::IfName(name) => {
-                            interface.name = name;
-                        }
-                        LinkNla::Address(addr) => {
-                            match addr.len() {
-                                6 => {
-                                    interface.mac_addr =
-                                        Some(MacAddr::from_octets(addr.try_into().unwrap()));
-                                }
-                                4 => {
-                                    let ip = Ipv4Addr::from(<[u8; 4]>::try_from(addr).unwrap());
-                                    match Ipv4Net::with_netmask(ip, Ipv4Addr::UNSPECIFIED) {
-                                        Ok(ipv4) => interface.ipv4.push(ipv4),
-                                        Err(_) => {}
-                                    }
-                                }
-                                _ => {
-                                    // unclear what these would be
+            for nla in link_msg.attributes.into_iter() {
+                match nla {
+                    LinkAttribute::IfName(name) => {
+                        interface.name = name;
+                    }
+                    LinkAttribute::Address(addr) => {
+                        match addr.len() {
+                            6 => {
+                                interface.mac_addr =
+                                    Some(MacAddr::from_octets(addr.try_into().unwrap()));
+                            }
+                            4 => {
+                                let ip = Ipv4Addr::from(<[u8; 4]>::try_from(addr).unwrap());
+                                match Ipv4Net::with_netmask(ip, Ipv4Addr::UNSPECIFIED) {
+                                    Ok(ipv4) => interface.ipv4.push(ipv4),
+                                    Err(_) => {}
                                 }
                             }
+                            _ => {
+                                // unclear what these would be
+                            }
                         }
-                        _ => {}
                     }
+                    _ => {}
                 }
-                ifaces.push(interface);
             }
-            _ => {}
+            ifaces.push(interface);
         }
 
         Ok(())
     }
 
-    fn handle_new_addr(ifaces: &mut Vec<Interface>, msg: RtnlMessage) -> io::Result<()> {
-        match msg {
-            RtnlMessage::NewAddress(addr_msg) => {
-                if let Some(interface) =
-                    ifaces.iter_mut().find(|i| i.index == addr_msg.header.index)
-                {
-                    for nla in addr_msg.nlas {
-                        match nla {
-                            AddressNla::Address(addr) => match addr.len() {
-                                4 => {
-                                    let ip = Ipv4Addr::from(<[u8; 4]>::try_from(addr).unwrap());
-                                    match Ipv4Net::new(ip, addr_msg.header.prefix_len) {
-                                        Ok(ipv4) => interface.ipv4.push(ipv4),
-                                        Err(_) => {}
-                                    }
-                                }
-                                16 => {
-                                    let ip = Ipv6Addr::from(<[u8; 16]>::try_from(addr).unwrap());
-                                    match Ipv6Net::new(ip, addr_msg.header.prefix_len) {
-                                        Ok(ipv6) => interface.ipv6.push(ipv6),
-                                        Err(_) => {}
-                                    }
-                                }
-                                _ => {
-                                    // what else?
-                                }
+    fn handle_new_addr(ifaces: &mut Vec<Interface>, msg: RouteNetlinkMessage) -> io::Result<()> {
+        if let RouteNetlinkMessage::NewAddress(addr_msg) = msg {
+            if let Some(interface) = ifaces.iter_mut().find(|i| i.index == addr_msg.header.index) {
+                for nla in addr_msg.attributes.into_iter() {
+                    if let AddressAttribute::Address(addr) = nla {
+                        match addr {
+                            IpAddr::V4(ip) => match Ipv4Net::new(ip, addr_msg.header.prefix_len) {
+                                Ok(ipv4) => interface.ipv4.push(ipv4),
+                                Err(_) => {}
                             },
-                            _ => {}
+                            IpAddr::V6(ip) => match Ipv6Net::new(ip, addr_msg.header.prefix_len) {
+                                Ok(ipv6) => interface.ipv6.push(ipv6),
+                                Err(_) => {}
+                            },
                         }
                     }
-                } else {
-                    eprintln!(
-                        "found unknown interface with index: {}",
-                        addr_msg.header.index
-                    );
                 }
+            } else {
+                eprintln!(
+                    "found unknown interface with index: {}",
+                    addr_msg.header.index
+                );
             }
-            _ => {}
         }
-
         Ok(())
     }
 
@@ -195,7 +181,7 @@ pub mod netlink {
     }
 
     impl<'a> NetlinkIter<'a> {
-        fn new(socket: &'a Socket, msg: RtnlMessage) -> io::Result<Self> {
+        fn new(socket: &'a Socket, msg: RouteNetlinkMessage) -> io::Result<Self> {
             let mut packet =
                 NetlinkMessage::new(NetlinkHeader::default(), NetlinkPayload::from(msg));
             packet.header.flags = NLM_F_DUMP | NLM_F_REQUEST;
@@ -223,7 +209,7 @@ pub mod netlink {
     }
 
     impl<'a> Iterator for NetlinkIter<'a> {
-        type Item = io::Result<RtnlMessage>;
+        type Item = io::Result<RouteNetlinkMessage>;
 
         fn next(&mut self) -> Option<Self::Item> {
             if self.done {
@@ -246,7 +232,7 @@ pub mod netlink {
                 }
 
                 let bytes = &self.buf[self.offset..];
-                match NetlinkMessage::<RtnlMessage>::deserialize(bytes) {
+                match NetlinkMessage::<RouteNetlinkMessage>::deserialize(bytes) {
                     Ok(packet) => {
                         self.offset += packet.header.length as usize;
                         if packet.header.length == 0 || self.offset == self.size {
@@ -284,12 +270,12 @@ pub mod netlink {
 
     fn enumerate_netlink<F>(
         socket: &Socket,
-        msg: RtnlMessage,
+        msg: RouteNetlinkMessage,
         ifaces: &mut Vec<Interface>,
         cb: F,
     ) -> io::Result<()>
     where
-        F: Fn(&mut Vec<Interface>, RtnlMessage) -> io::Result<()>,
+        F: Fn(&mut Vec<Interface>, RouteNetlinkMessage) -> io::Result<()>,
     {
         let iter = NetlinkIter::new(socket, msg)?;
         for msg in iter {
