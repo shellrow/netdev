@@ -221,7 +221,9 @@ impl TryFrom<u32> for InterfaceType {
             x if x == InterfaceType::Slip.value() => Ok(InterfaceType::Slip),
             x if x == InterfaceType::Atm.value() => Ok(InterfaceType::Atm),
             x if x == InterfaceType::GenericModem.value() => Ok(InterfaceType::GenericModem),
-            x if x == InterfaceType::ProprietaryVirtual.value() => Ok(InterfaceType::ProprietaryVirtual),
+            x if x == InterfaceType::ProprietaryVirtual.value() => {
+                Ok(InterfaceType::ProprietaryVirtual)
+            }
             x if x == InterfaceType::FastEthernetT.value() => Ok(InterfaceType::FastEthernetT),
             x if x == InterfaceType::Isdn.value() => Ok(InterfaceType::Isdn),
             x if x == InterfaceType::FastEthernetFx.value() => Ok(InterfaceType::FastEthernetFx),
