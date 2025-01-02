@@ -27,7 +27,7 @@ netlink-packet-route = "0.21"
 netlink-sys = "0.8"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.52"
+version = "0.59"
 features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_NetworkManagement_Ndis"]
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
