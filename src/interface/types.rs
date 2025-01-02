@@ -31,6 +31,8 @@ pub enum InterfaceType {
     Atm,
     /// The network interface using a modem
     GenericModem,
+    /// Proprietary virtual/internal interface
+    ProprietaryVirtual,
     /// The network interface using a Fast Ethernet connection over twisted pair and provides a data rate of 100 megabits per second (100BASE-T)
     FastEthernetT,
     /// The network interface using a connection configured for ISDN and the X.25 protocol.
@@ -67,6 +69,8 @@ pub enum InterfaceType {
     Bridge,
     /// Controller Area Network
     Can,
+    /// Unknown interface type with a specific value
+    UnknownWithValue(u32),
 }
 
 impl InterfaceType {
@@ -86,6 +90,7 @@ impl InterfaceType {
             InterfaceType::Slip => 28,
             InterfaceType::Atm => 37,
             InterfaceType::GenericModem => 48,
+            InterfaceType::ProprietaryVirtual => 53,
             InterfaceType::FastEthernetT => 62,
             InterfaceType::Isdn => 63,
             InterfaceType::FastEthernetFx => 69,
@@ -102,6 +107,7 @@ impl InterfaceType {
             InterfaceType::Wman => 237,
             InterfaceType::Wwanpp => 243,
             InterfaceType::Wwanpp2 => 244,
+            InterfaceType::UnknownWithValue(v) => v,
             _ => u32::MAX,
         }
     }
@@ -123,6 +129,7 @@ impl InterfaceType {
             InterfaceType::Isdn => sys::if_arp::ARPHRD_X25,
             InterfaceType::HighPerformanceSerialBus => sys::if_arp::ARPHRD_IEEE1394,
             InterfaceType::Can => sys::if_arp::ARPHRD_CAN,
+            InterfaceType::UnknownWithValue(v) => v,
             _ => u32::MAX,
         }
     }
@@ -153,6 +160,7 @@ impl InterfaceType {
             InterfaceType::SymmetricDsl => 0x97,
             InterfaceType::IPOverAtm => 0x31,
             InterfaceType::HighPerformanceSerialBus => 0x90,
+            InterfaceType::UnknownWithValue(v) => v,
             _ => u32::MAX,
         }
     }
@@ -171,6 +179,7 @@ impl InterfaceType {
             InterfaceType::Slip => String::from("SLIP"),
             InterfaceType::Atm => String::from("ATM"),
             InterfaceType::GenericModem => String::from("Generic Modem"),
+            InterfaceType::ProprietaryVirtual => String::from("Proprietary Virtual/Internal"),
             InterfaceType::FastEthernetT => String::from("Fast Ethernet T"),
             InterfaceType::Isdn => String::from("ISDN"),
             InterfaceType::FastEthernetFx => String::from("Fast Ethernet FX"),
@@ -189,6 +198,7 @@ impl InterfaceType {
             InterfaceType::Wwanpp => String::from("WWANPP"),
             InterfaceType::Wwanpp2 => String::from("WWANPP2"),
             InterfaceType::Can => String::from("CAN"),
+            InterfaceType::UnknownWithValue(v) => format!("Unknown ({})", v),
         }
     }
 }
@@ -211,6 +221,7 @@ impl TryFrom<u32> for InterfaceType {
             x if x == InterfaceType::Slip.value() => Ok(InterfaceType::Slip),
             x if x == InterfaceType::Atm.value() => Ok(InterfaceType::Atm),
             x if x == InterfaceType::GenericModem.value() => Ok(InterfaceType::GenericModem),
+            x if x == InterfaceType::ProprietaryVirtual.value() => Ok(InterfaceType::ProprietaryVirtual),
             x if x == InterfaceType::FastEthernetT.value() => Ok(InterfaceType::FastEthernetT),
             x if x == InterfaceType::Isdn.value() => Ok(InterfaceType::Isdn),
             x if x == InterfaceType::FastEthernetFx.value() => Ok(InterfaceType::FastEthernetFx),
@@ -234,7 +245,7 @@ impl TryFrom<u32> for InterfaceType {
             x if x == InterfaceType::Wwanpp.value() => Ok(InterfaceType::Wwanpp),
             x if x == InterfaceType::Wwanpp2.value() => Ok(InterfaceType::Wwanpp2),
             x if x == InterfaceType::Can.value() => Ok(InterfaceType::Can),
-            _ => Err(()),
+            _ => Ok(InterfaceType::UnknownWithValue(v)),
         }
     }
 }
