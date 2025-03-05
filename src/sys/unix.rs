@@ -16,6 +16,7 @@ fn ntohs(u: u16) -> u16 {
     u16::from_be(u)
 }
 
+// Converts libc socket address type to Rust SocketAddr struct
 pub fn sockaddr_to_addr(storage: &SockAddrStorage, len: usize) -> io::Result<SocketAddr> {
     match storage.ss_family as libc::c_int {
         AF_INET => {
