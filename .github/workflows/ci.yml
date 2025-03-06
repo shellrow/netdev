@@ -65,8 +65,6 @@ jobs:
       - name: Install Rust Toolchain
         run: rustup toolchain install stable --profile minimal --no-self-update
 
-      - uses: swatinem/rust-cache@v2
-
       - name: Install cross
         run: cargo install cross
 

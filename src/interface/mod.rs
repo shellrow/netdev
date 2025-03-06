@@ -242,10 +242,7 @@ mod tests {
         // Try and find the loopback interface
         let loopback_interfaces: Vec<&Interface> = interfaces
             .iter()
-            .filter(|iface| match iface.mac_addr {
-                Some(mac) => crate::db::oui::is_known_loopback_mac(&mac),
-                None => false,
-            })
+            .filter(|iface| iface.if_type == InterfaceType::Loopback)
             .collect();
         assert_eq!(
             loopback_interfaces.len(),
@@ -282,9 +279,10 @@ mod tests {
         );
         println!("Found IP {:?} on the loopback interface", matching_ipv6s[0]);
 
-        // Make sure that the loopback has the same number of scope IDs as it does IPv6 addresses
+        // Make sure that the loopback interface has the same number of scope IDs as it does IPv6 addresses
         assert_eq!(loopback.ipv6.len(), loopback.ipv6_scope_ids.len());
 
+        // Check flags
         assert!(
             loopback.is_running(),
             "Loopback interface should be running!"
@@ -293,5 +291,11 @@ mod tests {
             !loopback.is_physical(),
             "Loopback interface should not be physical!"
         );
+
+        // Make sure that, if the loopback interface has a MAC, it has a known loopback MAC
+        match loopback.mac_addr {
+            Some(mac) => assert!(crate::db::oui::is_known_loopback_mac(&mac), "Loopback interface MAC not a known loopback MAC"),
+            None => {}
+        }
     }
 }
