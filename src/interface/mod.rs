@@ -52,21 +52,27 @@ use std::net::IpAddr;
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Interface {
-    /// Index of network interface
+    /// Index of network interface. This is an integer which uniquely identifies the interface
+    /// on this machine.
     pub index: u32,
-    /// Name of network interface
+    /// Machine-readable name of the network interface. On unix-like OSs, this is the interface
+    /// name, like 'eth0' or 'eno1'. On Windows, this is the interface's GUID as a string.
     pub name: String,
-    /// Friendly Name of network interface
+    /// Friendly name of network interface. On Windows, this is the network adapter configured
+    /// name, e.g. "Ethernet 5" or "Wi-Fi". On Mac, this is the interface display name,
+    /// such as "Ethernet" or "FireWire". If no friendly name is available, this is left as None.
     pub friendly_name: Option<String>,
-    /// Description of the network interface
+    /// Description of the network interface. On Windows, this is the network adapter model, such
+    /// as "Realtek USB GbE Family Controller #4" or "Software Loopback Interface 1". Currently
+    /// this is not available on platforms other than Windows.
     pub description: Option<String>,
     /// Interface Type
     pub if_type: InterfaceType,
     /// MAC address of network interface
     pub mac_addr: Option<MacAddr>,
-    /// List of Ipv4Net for the network interface
+    /// List of Ipv4Nets (IPv4 address + netmask) for the network interface
     pub ipv4: Vec<Ipv4Net>,
-    /// List of Ipv6Net for the network interface
+    /// List of Ipv6Nets (IPv6 address + netmask) for the network interface
     pub ipv6: Vec<Ipv6Net>,
     /// List of Ipv6 Scope IDs for each of the corresponding elements in the ipv6 address vector.
     /// The Scope ID is an integer which uniquely identifies this interface address on the system,
@@ -75,15 +81,19 @@ pub struct Interface {
     pub ipv6_scope_ids: Vec<u32>,
     /// Flags for the network interface (OS Specific)
     pub flags: u32,
-    /// Speed in bits per second of the transmit for the network interface
+    /// Speed in bits per second of the transmit for the network interface, if known.
+    /// Currently only supported on Linux, Android, and Windows.
     pub transmit_speed: Option<u64>,
-    /// Speed in bits per second of the receive for the network interface
+    /// Speed in bits per second of the receive for the network interface.
+    /// Currently only supported on Linux, Android, and Windows.
     pub receive_speed: Option<u64>,
-    /// Default gateway for the network interface
+    /// Default gateway for the network interface. This is the address of the router to which
+    /// IP packets are forwarded when they need to be sent to a device outside
+    /// of the local network.
     pub gateway: Option<NetworkDevice>,
-    /// DNS servers for the network interface
+    /// DNS server addresses for the network interface
     pub dns_servers: Vec<IpAddr>,
-    /// is default interface
+    /// Whether this is the default interface for accessing the Internet.
     pub default: bool,
 }
 
