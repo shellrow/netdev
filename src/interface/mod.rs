@@ -294,7 +294,10 @@ mod tests {
 
         // Make sure that, if the loopback interface has a MAC, it has a known loopback MAC
         match loopback.mac_addr {
-            Some(mac) => assert!(crate::db::oui::is_known_loopback_mac(&mac), "Loopback interface MAC not a known loopback MAC"),
+            Some(mac) => assert!(
+                crate::db::oui::is_known_loopback_mac(&mac),
+                "Loopback interface MAC not a known loopback MAC"
+            ),
             None => {}
         }
     }
