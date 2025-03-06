@@ -26,7 +26,12 @@ fn main() {
         println!("\tIPv4: {:?}", interface.ipv4);
 
         // Print the IPv6 addresses with the scope ID after them as a suffix
-        let ipv6_strs: Vec<String> = interface.ipv6.iter().zip(interface.ipv6_scope_ids).map(|(ipv6, scope_id)| format!("{:?}%{}", ipv6, scope_id)).collect();
+        let ipv6_strs: Vec<String> = interface
+            .ipv6
+            .iter()
+            .zip(interface.ipv6_scope_ids)
+            .map(|(ipv6, scope_id)| format!("{:?}%{}", ipv6, scope_id))
+            .collect();
         println!("\tIPv6: [{}]", ipv6_strs.join(", "));
 
         println!("\tTransmit Speed: {:?}", interface.transmit_speed);

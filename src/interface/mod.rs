@@ -238,26 +238,58 @@ mod tests {
         assert!(interfaces.len() >= 2, "There should be at least 2 network interfaces on any machine, the loopback and one other one");
 
         // Try and find the loopback interface
-        let loopback_interfaces: Vec<&Interface> = interfaces.iter().filter(|iface| match iface.mac_addr { Some(mac) => crate::db::oui::is_known_loopback_mac(&mac), None => false}).collect();
-        assert_eq!(loopback_interfaces.len(), 1, "There should be exactly one loopback interface on the machine");
+        let loopback_interfaces: Vec<&Interface> = interfaces
+            .iter()
+            .filter(|iface| match iface.mac_addr {
+                Some(mac) => crate::db::oui::is_known_loopback_mac(&mac),
+                None => false,
+            })
+            .collect();
+        assert_eq!(
+            loopback_interfaces.len(),
+            1,
+            "There should be exactly one loopback interface on the machine"
+        );
         let loopback = loopback_interfaces[0];
 
         // Make sure that 127.0.0.1 is one of loopback's IPv4 addresses
         let loopback_expected_ipv4: std::net::Ipv4Addr = "127.0.0.1".parse().unwrap();
-        let matching_ipv4s: Vec<&Ipv4Net> = loopback.ipv4.iter().filter(|&ipv4_net| ipv4_net.addr() == loopback_expected_ipv4).collect();
-        assert_eq!(matching_ipv4s.len(), 1, "The loopback interface should have IP 127.0.0.1");
+        let matching_ipv4s: Vec<&Ipv4Net> = loopback
+            .ipv4
+            .iter()
+            .filter(|&ipv4_net| ipv4_net.addr() == loopback_expected_ipv4)
+            .collect();
+        assert_eq!(
+            matching_ipv4s.len(),
+            1,
+            "The loopback interface should have IP 127.0.0.1"
+        );
         println!("Found IP {:?} on the loopback interface", matching_ipv4s[0]);
 
         // Make sure that ::1 is one of loopback's IPv6 addresses
         let loopback_expected_ipv6: std::net::Ipv6Addr = "::1".parse().unwrap();
-        let matching_ipv6s: Vec<&Ipv6Net> = loopback.ipv6.iter().filter(|&ipv6_net| ipv6_net.addr() == loopback_expected_ipv6).collect();
-        assert_eq!(matching_ipv6s.len(), 1, "The loopback interface should have IP ::1");
+        let matching_ipv6s: Vec<&Ipv6Net> = loopback
+            .ipv6
+            .iter()
+            .filter(|&ipv6_net| ipv6_net.addr() == loopback_expected_ipv6)
+            .collect();
+        assert_eq!(
+            matching_ipv6s.len(),
+            1,
+            "The loopback interface should have IP ::1"
+        );
         println!("Found IP {:?} on the loopback interface", matching_ipv6s[0]);
 
         // Make sure that the loopback has the same number of scope IDs as it does IPv6 addresses
         assert_eq!(loopback.ipv6.len(), loopback.ipv6_scope_ids.len());
 
-        assert!(loopback.is_running(), "Loopback interface should be running!");
-        assert!(!loopback.is_physical(), "Loopback interface should not be physical!");
+        assert!(
+            loopback.is_running(),
+            "Loopback interface should be running!"
+        );
+        assert!(
+            !loopback.is_physical(),
+            "Loopback interface should not be physical!"
+        );
     }
 }

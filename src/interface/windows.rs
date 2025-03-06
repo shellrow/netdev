@@ -51,25 +51,22 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
 // Convert a socket address into a Rust IpAddr object and also a scope ID if it's an
 // IPv6 address
 unsafe fn socket_address_to_ipaddr(addr: &SOCKET_ADDRESS) -> (Option<IpAddr>, Option<u32>) {
-
     match addr.lpSockaddr.cast::<SOCKADDR_INET>().as_ref() {
         None => (None, None),
-        Some(sockaddr) => {
-            match sockaddr.si_family {
-                AF_INET => {
-                    let addr: IpAddr = unsafe { sockaddr.Ipv4.sin_addr.S_un.S_addr }
-                        .to_ne_bytes()
-                        .into();
-                    (Some(addr), None)
-                },
-                AF_INET6 => {
-                    let addr: IpAddr = unsafe { sockaddr.Ipv6.sin6_addr.u.Byte }.into();
-                    let scope_id = sockaddr.Ipv6.Anonymous.sin6_scope_id;
-                    (Some(addr), Some(scope_id))
-                },
-                _ => (None, None),
+        Some(sockaddr) => match sockaddr.si_family {
+            AF_INET => {
+                let addr: IpAddr = unsafe { sockaddr.Ipv4.sin_addr.S_un.S_addr }
+                    .to_ne_bytes()
+                    .into();
+                (Some(addr), None)
             }
-        }
+            AF_INET6 => {
+                let addr: IpAddr = unsafe { sockaddr.Ipv6.sin6_addr.u.Byte }.into();
+                let scope_id = sockaddr.Ipv6.Anonymous.sin6_scope_id;
+                (Some(addr), Some(scope_id))
+            }
+            _ => (None, None),
+        },
     }
 }
 
@@ -214,7 +211,7 @@ pub fn interfaces() -> Vec<Interface> {
             let mut ipv6_scope_id_vec: Vec<u32> = vec![];
             // Enumerate all IPs
             for cur_a in unsafe { linked_list_iter!(&cur.FirstUnicastAddress) } {
-                let (ip_addr, ipv6_scope_id) = unsafe { socket_address_to_ipaddr(&cur_a.Address)};
+                let (ip_addr, ipv6_scope_id) = unsafe { socket_address_to_ipaddr(&cur_a.Address) };
 
                 let prefix_len = cur_a.OnLinkPrefixLength;
                 match ip_addr {
@@ -226,7 +223,7 @@ pub fn interfaces() -> Vec<Interface> {
                         Ok(ipv6_net) => {
                             ipv6_vec.push(ipv6_net);
                             ipv6_scope_id_vec.push(ipv6_scope_id.unwrap());
-                        },
+                        }
                         Err(_) => {}
                     },
                     None => {}

@@ -298,7 +298,8 @@ fn unix_interfaces_inner(
         let c_str = addr_ref.ifa_name as *const c_char;
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name = unsafe { from_utf8_unchecked(bytes).to_owned() };
-        let (mac, ip, ipv6_scope_id) = sockaddr_to_network_addr(addr_ref.ifa_addr as *mut libc::sockaddr);
+        let (mac, ip, ipv6_scope_id) =
+            sockaddr_to_network_addr(addr_ref.ifa_addr as *mut libc::sockaddr);
         let (_, netmask, _) = sockaddr_to_network_addr(addr_ref.ifa_netmask as *mut libc::sockaddr);
         let mut ini_ipv4: Option<Ipv4Net> = None;
         let mut ini_ipv6: Option<Ipv6Net> = None;
@@ -313,9 +314,7 @@ fn unix_interfaces_inner(
                         None => Ipv4Addr::UNSPECIFIED,
                     };
                     match Ipv4Net::with_netmask(ipv4, netmask) {
-                        Ok(ipv4_net) => {
-                            ini_ipv4 = Some(ipv4_net)
-                        },
+                        Ok(ipv4_net) => ini_ipv4 = Some(ipv4_net),
                         Err(_) => {}
                     }
                 }
@@ -333,7 +332,7 @@ fn unix_interfaces_inner(
                             if ipv6_scope_id.is_none() {
                                 panic!("IPv6 address without scope ID!")
                             }
-                        },
+                        }
                         Err(_) => {}
                     };
                 }
@@ -369,9 +368,18 @@ fn unix_interfaces_inner(
                 description: None,
                 if_type: if_type,
                 mac_addr: mac.clone(),
-                ipv4: match ini_ipv4 { Some(ipv4_addr) => vec![ipv4_addr], None => vec![]},
-                ipv6: match ini_ipv6 { Some(ipv6_addr) => vec![ipv6_addr], None => vec![]},
-                ipv6_scope_ids: match ini_ipv6 { Some(_) => vec![ipv6_scope_id.unwrap()], None => vec![]},
+                ipv4: match ini_ipv4 {
+                    Some(ipv4_addr) => vec![ipv4_addr],
+                    None => vec![],
+                },
+                ipv6: match ini_ipv6 {
+                    Some(ipv6_addr) => vec![ipv6_addr],
+                    None => vec![],
+                },
+                ipv6_scope_ids: match ini_ipv6 {
+                    Some(_) => vec![ipv6_scope_id.unwrap()],
+                    None => vec![],
+                },
                 flags: addr_ref.ifa_flags,
                 transmit_speed: None,
                 receive_speed: None,
