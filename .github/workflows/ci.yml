@@ -36,6 +36,9 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
 
+      - name: "Display network interfaces on machine (for test failure debugging)"
+        run: cargo run --example list_interfaces
+
       - name: Run cargo build
         run: cargo build
 

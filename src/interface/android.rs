@@ -101,6 +101,7 @@ pub mod netlink {
                 mac_addr: None,
                 ipv4: Vec::new(),
                 ipv6: Vec::new(),
+                ipv6_scope_ids: Vec::new(),
                 flags: link_msg.header.flags.bits(),
                 transmit_speed: None,
                 receive_speed: None,
@@ -152,7 +153,14 @@ pub mod netlink {
                                 Err(_) => {}
                             },
                             IpAddr::V6(ip) => match Ipv6Net::new(ip, addr_msg.header.prefix_len) {
-                                Ok(ipv6) => interface.ipv6.push(ipv6),
+                                Ok(ipv6) => {
+                                    interface.ipv6.push(ipv6);
+
+                                    // Note: On Unix platforms the scope ID is equal to the interface index, or at least
+                                    // that's what the glibc devs seemed to think when implementing getifaddrs!
+                                    // https://github.com/lattera/glibc/blob/895ef79e04a953cac1493863bcae29ad85657ee1/sysdeps/unix/sysv/linux/ifaddrs.c#L621
+                                    interface.ipv6_scope_ids.push(interface.index);
+                                }
                                 Err(_) => {}
                             },
                         }

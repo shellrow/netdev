@@ -184,7 +184,9 @@ pub(super) fn sockaddr_to_network_addr(
     target_os = "macos",
     target_os = "ios"
 ))]
-fn sockaddr_to_network_addr(sa: *mut libc::sockaddr) -> (Option<MacAddr>, Option<IpAddr>, Option<u32>) {
+fn sockaddr_to_network_addr(
+    sa: *mut libc::sockaddr,
+) -> (Option<MacAddr>, Option<IpAddr>, Option<u32>) {
     use std::net::SocketAddr;
 
     unsafe {

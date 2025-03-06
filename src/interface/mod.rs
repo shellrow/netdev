@@ -74,10 +74,12 @@ pub struct Interface {
     pub ipv4: Vec<Ipv4Net>,
     /// List of Ipv6Nets (IPv6 address + netmask) for the network interface
     pub ipv6: Vec<Ipv6Net>,
-    /// List of Ipv6 Scope IDs for each of the corresponding elements in the ipv6 address vector.
+    /// List of IPv6 Scope IDs for each of the corresponding elements in the ipv6 address vector.
     /// The Scope ID is an integer which uniquely identifies this interface address on the system,
-    /// and generally has to be provided when opening a IPv6 socket on this interface for link-
-    /// local communications.
+    /// and must be provided when using link-local addressing to specify which interface
+    /// you wish to use. The scope ID can be the same as the interface index, but is not
+    /// required to be by the standard.
+    /// The scope ID can also be referred to as the zone index.
     pub ipv6_scope_ids: Vec<u32>,
     /// Flags for the network interface (OS Specific)
     pub flags: u32,
