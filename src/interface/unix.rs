@@ -184,12 +184,12 @@ pub(super) fn sockaddr_to_network_addr(
     target_os = "macos",
     target_os = "ios"
 ))]
-fn sockaddr_to_network_addr(sa: *mut libc::sockaddr) -> (Option<MacAddr>, Option<IpAddr>) {
+fn sockaddr_to_network_addr(sa: *mut libc::sockaddr) -> (Option<MacAddr>, Option<IpAddr>, Option<u32>) {
     use std::net::SocketAddr;
 
     unsafe {
         if sa.is_null() {
-            (None, None)
+            (None, None, None)
         } else if (*sa).sa_family as libc::c_int == libc::AF_LINK {
             let nlen: i8 = (*sa).sa_data[3];
             let alen: i8 = (*sa).sa_data[4];
@@ -206,17 +206,17 @@ fn sockaddr_to_network_addr(sa: *mut libc::sockaddr) -> (Option<MacAddr>, Option
                     extended[6 + nlen as usize + 4] as u8,
                     extended[6 + nlen as usize + 5] as u8,
                 );
-                return (Some(mac), None);
+                return (Some(mac), None, None);
             }
-            (None, None)
+            (None, None, None)
         } else {
             let addr =
                 sys::sockaddr_to_addr(mem::transmute(sa), mem::size_of::<libc::sockaddr_storage>());
 
             match addr {
-                Ok(SocketAddr::V4(sa)) => (None, Some(IpAddr::V4(*sa.ip()))),
-                Ok(SocketAddr::V6(sa)) => (None, Some(IpAddr::V6(*sa.ip()))),
-                Err(_) => (None, None),
+                Ok(SocketAddr::V4(sa)) => (None, Some(IpAddr::V4(*sa.ip())), None),
+                Ok(SocketAddr::V6(sa)) => (None, Some(IpAddr::V6(*sa.ip())), Some(sa.scope_id())),
+                Err(_) => (None, None, None),
             }
         }
     }
