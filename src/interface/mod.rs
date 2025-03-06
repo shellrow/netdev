@@ -256,5 +256,8 @@ mod tests {
 
         // Make sure that the loopback has the same number of scope IDs as it does IPv6 addresses
         assert_eq!(loopback.ipv6.len(), loopback.ipv6_scope_ids.len());
+
+        assert!(loopback.is_running(), "Loopback interface should be running!");
+        assert!(!loopback.is_physical(), "Loopback interface should not be physical!");
     }
 }
