@@ -317,7 +317,7 @@ fn get_mtu(_ifa: &libc::ifaddrs, name: &str) -> Option<u32> {
     }
 
     // Retrieve the MTU using ioctl
-    let ret: c_int = unsafe { ioctl(sock, SIOCGIFMTU, &mut ifr) };
+    let ret: c_int = unsafe { ioctl(sock, SIOCGIFMTU as _, &mut ifr) };
     if ret < 0 {
         eprintln!("ioctl(SIOCGIFMTU) failed for {}: {:?}", name, std::io::Error::last_os_error());
         unsafe { close(sock) };
