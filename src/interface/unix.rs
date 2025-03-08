@@ -141,15 +141,17 @@ pub fn interfaces() -> Vec<Interface> {
     interfaces
 }
 
+// Convert a socket address struct into a Rust IP address or MAC address struct.
+// If the socket address is an IPv6 address, also returns the scope ID.
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub(super) fn sockaddr_to_network_addr(
     sa: *mut libc::sockaddr,
-) -> (Option<MacAddr>, Option<IpAddr>) {
+) -> (Option<MacAddr>, Option<IpAddr>, Option<u32>) {
     use std::net::SocketAddr;
 
     unsafe {
         if sa.is_null() {
-            (None, None)
+            (None, None, None)
         } else if (*sa).sa_family as libc::c_int == libc::AF_PACKET {
             let sll: *const libc::sockaddr_ll = mem::transmute(sa);
             let mac = MacAddr(
@@ -161,15 +163,15 @@ pub(super) fn sockaddr_to_network_addr(
                 (*sll).sll_addr[5],
             );
 
-            (Some(mac), None)
+            (Some(mac), None, None)
         } else {
             let addr =
                 sys::sockaddr_to_addr(mem::transmute(sa), mem::size_of::<libc::sockaddr_storage>());
 
             match addr {
-                Ok(SocketAddr::V4(sa)) => (None, Some(IpAddr::V4(*sa.ip()))),
-                Ok(SocketAddr::V6(sa)) => (None, Some(IpAddr::V6(*sa.ip()))),
-                Err(_) => (None, None),
+                Ok(SocketAddr::V4(sa)) => (None, Some(IpAddr::V4(*sa.ip())), None),
+                Ok(SocketAddr::V6(sa)) => (None, Some(IpAddr::V6(*sa.ip())), Some(sa.scope_id())),
+                Err(_) => (None, None, None),
             }
         }
     }
@@ -182,12 +184,14 @@ pub(super) fn sockaddr_to_network_addr(
     target_os = "macos",
     target_os = "ios"
 ))]
-fn sockaddr_to_network_addr(sa: *mut libc::sockaddr) -> (Option<MacAddr>, Option<IpAddr>) {
+fn sockaddr_to_network_addr(
+    sa: *mut libc::sockaddr,
+) -> (Option<MacAddr>, Option<IpAddr>, Option<u32>) {
     use std::net::SocketAddr;
 
     unsafe {
         if sa.is_null() {
-            (None, None)
+            (None, None, None)
         } else if (*sa).sa_family as libc::c_int == libc::AF_LINK {
             let nlen: i8 = (*sa).sa_data[3];
             let alen: i8 = (*sa).sa_data[4];
@@ -204,17 +208,17 @@ fn sockaddr_to_network_addr(sa: *mut libc::sockaddr) -> (Option<MacAddr>, Option
                     extended[6 + nlen as usize + 4] as u8,
                     extended[6 + nlen as usize + 5] as u8,
                 );
-                return (Some(mac), None);
+                return (Some(mac), None, None);
             }
-            (None, None)
+            (None, None, None)
         } else {
             let addr =
                 sys::sockaddr_to_addr(mem::transmute(sa), mem::size_of::<libc::sockaddr_storage>());
 
             match addr {
-                Ok(SocketAddr::V4(sa)) => (None, Some(IpAddr::V4(*sa.ip()))),
-                Ok(SocketAddr::V6(sa)) => (None, Some(IpAddr::V6(*sa.ip()))),
-                Err(_) => (None, None),
+                Ok(SocketAddr::V4(sa)) => (None, Some(IpAddr::V4(*sa.ip())), None),
+                Ok(SocketAddr::V6(sa)) => (None, Some(IpAddr::V6(*sa.ip())), Some(sa.scope_id())),
+                Err(_) => (None, None, None),
             }
         }
     }
@@ -296,10 +300,11 @@ fn unix_interfaces_inner(
         let c_str = addr_ref.ifa_name as *const c_char;
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name = unsafe { from_utf8_unchecked(bytes).to_owned() };
-        let (mac, ip) = sockaddr_to_network_addr(addr_ref.ifa_addr as *mut libc::sockaddr);
-        let (_, netmask) = sockaddr_to_network_addr(addr_ref.ifa_netmask as *mut libc::sockaddr);
-        let mut ini_ipv4: Vec<Ipv4Net> = vec![];
-        let mut ini_ipv6: Vec<Ipv6Net> = vec![];
+        let (mac, ip, ipv6_scope_id) =
+            sockaddr_to_network_addr(addr_ref.ifa_addr as *mut libc::sockaddr);
+        let (_, netmask, _) = sockaddr_to_network_addr(addr_ref.ifa_netmask as *mut libc::sockaddr);
+        let mut ini_ipv4: Option<Ipv4Net> = None;
+        let mut ini_ipv6: Option<Ipv6Net> = None;
         if let Some(ip) = ip {
             match ip {
                 IpAddr::V4(ipv4) => {
@@ -311,7 +316,7 @@ fn unix_interfaces_inner(
                         None => Ipv4Addr::UNSPECIFIED,
                     };
                     match Ipv4Net::with_netmask(ipv4, netmask) {
-                        Ok(ipv4_net) => ini_ipv4.push(ipv4_net),
+                        Ok(ipv4_net) => ini_ipv4 = Some(ipv4_net),
                         Err(_) => {}
                     }
                 }
@@ -324,68 +329,66 @@ fn unix_interfaces_inner(
                         None => Ipv6Addr::UNSPECIFIED,
                     };
                     match Ipv6Net::with_netmask(ipv6, netmask) {
-                        Ok(ipv6_net) => ini_ipv6.push(ipv6_net),
+                        Ok(ipv6_net) => {
+                            ini_ipv6 = Some(ipv6_net);
+                            if ipv6_scope_id.is_none() {
+                                panic!("IPv6 address without scope ID!")
+                            }
+                        }
                         Err(_) => {}
-                    }
+                    };
                 }
             }
         }
-        let interface: Interface = Interface {
-            index: 0,
-            name: name.clone(),
-            friendly_name: None,
-            description: None,
-            if_type: if_type,
-            mac_addr: mac.clone(),
-            ipv4: ini_ipv4,
-            ipv6: ini_ipv6,
-            flags: addr_ref.ifa_flags,
-            transmit_speed: None,
-            receive_speed: None,
-            gateway: None,
-            dns_servers: Vec::new(),
-            default: false,
-        };
+
+        // Check if there is already an interface with this name (since getifaddrs returns one
+        // entry per address, so if the interface has multiple addresses, it returns multiple entries).
+        // If so, add the IP addresses from the current entry into the existing interface. Otherwise, add a new interface.
         let mut found: bool = false;
         for iface in &mut ifaces {
             if name == iface.name {
                 if let Some(mac) = mac.clone() {
                     iface.mac_addr = Some(mac);
                 }
-                if let Some(ip) = ip {
-                    match ip {
-                        IpAddr::V4(ipv4) => {
-                            let netmask: Ipv4Addr = match netmask {
-                                Some(netmask) => match netmask {
-                                    IpAddr::V4(netmask) => netmask,
-                                    IpAddr::V6(_) => Ipv4Addr::UNSPECIFIED,
-                                },
-                                None => Ipv4Addr::UNSPECIFIED,
-                            };
-                            match Ipv4Net::with_netmask(ipv4, netmask) {
-                                Ok(ipv4_net) => iface.ipv4.push(ipv4_net),
-                                Err(_) => {}
-                            }
-                        }
-                        IpAddr::V6(ipv6) => {
-                            let netmask: Ipv6Addr = match netmask {
-                                Some(netmask) => match netmask {
-                                    IpAddr::V4(_) => Ipv6Addr::UNSPECIFIED,
-                                    IpAddr::V6(netmask) => netmask,
-                                },
-                                None => Ipv6Addr::UNSPECIFIED,
-                            };
-                            match Ipv6Net::with_netmask(ipv6, netmask) {
-                                Ok(ipv6_net) => iface.ipv6.push(ipv6_net),
-                                Err(_) => {}
-                            }
-                        }
-                    }
+
+                if ini_ipv4.is_some() {
+                    iface.ipv4.push(ini_ipv4.unwrap());
+                }
+
+                if ini_ipv6.is_some() {
+                    iface.ipv6.push(ini_ipv6.unwrap());
+                    iface.ipv6_scope_ids.push(ipv6_scope_id.unwrap());
                 }
                 found = true;
             }
         }
         if !found {
+            let interface: Interface = Interface {
+                index: 0, // We will set these below
+                name: name.clone(),
+                friendly_name: None,
+                description: None,
+                if_type: if_type,
+                mac_addr: mac.clone(),
+                ipv4: match ini_ipv4 {
+                    Some(ipv4_addr) => vec![ipv4_addr],
+                    None => vec![],
+                },
+                ipv6: match ini_ipv6 {
+                    Some(ipv6_addr) => vec![ipv6_addr],
+                    None => vec![],
+                },
+                ipv6_scope_ids: match ini_ipv6 {
+                    Some(_) => vec![ipv6_scope_id.unwrap()],
+                    None => vec![],
+                },
+                flags: addr_ref.ifa_flags,
+                transmit_speed: None,
+                receive_speed: None,
+                gateway: None,
+                dns_servers: Vec::new(),
+                default: false,
+            };
             ifaces.push(interface);
         }
         addr = addr_ref.ifa_next;
@@ -400,16 +403,4 @@ fn unix_interfaces_inner(
         }
     }
     ifaces
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_unix_interfaces() {
-        let interfaces = interfaces();
-        for interface in interfaces {
-            println!("{:#?}", interface);
-        }
-    }
 }

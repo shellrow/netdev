@@ -24,7 +24,16 @@ fn main() {
             println!("\tMAC Address: (Failed to get mac address)");
         }
         println!("\tIPv4: {:?}", interface.ipv4);
-        println!("\tIPv6: {:?}", interface.ipv6);
+
+        // Print the IPv6 addresses with the scope ID after them as a suffix
+        let ipv6_strs: Vec<String> = interface
+            .ipv6
+            .iter()
+            .zip(interface.ipv6_scope_ids)
+            .map(|(ipv6, scope_id)| format!("{:?}%{}", ipv6, scope_id))
+            .collect();
+        println!("\tIPv6: [{}]", ipv6_strs.join(", "));
+
         println!("\tTransmit Speed: {:?}", interface.transmit_speed);
         println!("\tReceive Speed: {:?}", interface.receive_speed);
         if let Some(gateway) = interface.gateway {

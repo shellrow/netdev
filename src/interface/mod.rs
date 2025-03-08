@@ -52,33 +52,50 @@ use std::net::IpAddr;
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Interface {
-    /// Index of network interface
+    /// Index of network interface. This is an integer which uniquely identifies the interface
+    /// on this machine.
     pub index: u32,
-    /// Name of network interface
+    /// Machine-readable name of the network interface. On unix-like OSs, this is the interface
+    /// name, like 'eth0' or 'eno1'. On Windows, this is the interface's GUID as a string.
     pub name: String,
-    /// Friendly Name of network interface
+    /// Friendly name of network interface. On Windows, this is the network adapter configured
+    /// name, e.g. "Ethernet 5" or "Wi-Fi". On Mac, this is the interface display name,
+    /// such as "Ethernet" or "FireWire". If no friendly name is available, this is left as None.
     pub friendly_name: Option<String>,
-    /// Description of the network interface
+    /// Description of the network interface. On Windows, this is the network adapter model, such
+    /// as "Realtek USB GbE Family Controller #4" or "Software Loopback Interface 1". Currently
+    /// this is not available on platforms other than Windows.
     pub description: Option<String>,
     /// Interface Type
     pub if_type: InterfaceType,
     /// MAC address of network interface
     pub mac_addr: Option<MacAddr>,
-    /// List of Ipv4Net for the network interface
+    /// List of Ipv4Nets (IPv4 address + netmask) for the network interface
     pub ipv4: Vec<Ipv4Net>,
-    /// List of Ipv6Net for the network interface
+    /// List of Ipv6Nets (IPv6 address + netmask) for the network interface
     pub ipv6: Vec<Ipv6Net>,
+    /// List of IPv6 Scope IDs for each of the corresponding elements in the ipv6 address vector.
+    /// The Scope ID is an integer which uniquely identifies this interface address on the system,
+    /// and must be provided when using link-local addressing to specify which interface
+    /// you wish to use. The scope ID can be the same as the interface index, but is not
+    /// required to be by the standard.
+    /// The scope ID can also be referred to as the zone index.
+    pub ipv6_scope_ids: Vec<u32>,
     /// Flags for the network interface (OS Specific)
     pub flags: u32,
-    /// Speed in bits per second of the transmit for the network interface
+    /// Speed in bits per second of the transmit for the network interface, if known.
+    /// Currently only supported on Linux, Android, and Windows.
     pub transmit_speed: Option<u64>,
-    /// Speed in bits per second of the receive for the network interface
+    /// Speed in bits per second of the receive for the network interface.
+    /// Currently only supported on Linux, Android, and Windows.
     pub receive_speed: Option<u64>,
-    /// Default gateway for the network interface
+    /// Default gateway for the network interface. This is the address of the router to which
+    /// IP packets are forwarded when they need to be sent to a device outside
+    /// of the local network.
     pub gateway: Option<NetworkDevice>,
-    /// DNS servers for the network interface
+    /// DNS server addresses for the network interface
     pub dns_servers: Vec<IpAddr>,
-    /// is default interface
+    /// Whether this is the default interface for accessing the Internet.
     pub default: bool,
 }
 
@@ -122,6 +139,7 @@ impl Interface {
             mac_addr: None,
             ipv4: Vec::new(),
             ipv6: Vec::new(),
+            ipv6_scope_ids: Vec::new(),
             flags: 0,
             transmit_speed: None,
             receive_speed: None,
@@ -213,5 +231,74 @@ mod tests {
     #[test]
     fn test_default_interface() {
         println!("{:#?}", get_default_interface());
+    }
+
+    #[test]
+    fn sanity_check_loopback() {
+        let interfaces = get_interfaces();
+
+        assert!(interfaces.len() >= 2, "There should be at least 2 network interfaces on any machine, the loopback and one other one");
+
+        // Try and find the loopback interface
+        let loopback_interfaces: Vec<&Interface> = interfaces
+            .iter()
+            .filter(|iface| iface.if_type == InterfaceType::Loopback)
+            .collect();
+        assert_eq!(
+            loopback_interfaces.len(),
+            1,
+            "There should be exactly one loopback interface on the machine"
+        );
+        let loopback = loopback_interfaces[0];
+
+        // Make sure that 127.0.0.1 is one of loopback's IPv4 addresses
+        let loopback_expected_ipv4: std::net::Ipv4Addr = "127.0.0.1".parse().unwrap();
+        let matching_ipv4s: Vec<&Ipv4Net> = loopback
+            .ipv4
+            .iter()
+            .filter(|&ipv4_net| ipv4_net.addr() == loopback_expected_ipv4)
+            .collect();
+        assert_eq!(
+            matching_ipv4s.len(),
+            1,
+            "The loopback interface should have IP 127.0.0.1"
+        );
+        println!("Found IP {:?} on the loopback interface", matching_ipv4s[0]);
+
+        // Make sure that ::1 is one of loopback's IPv6 addresses
+        let loopback_expected_ipv6: std::net::Ipv6Addr = "::1".parse().unwrap();
+        let matching_ipv6s: Vec<&Ipv6Net> = loopback
+            .ipv6
+            .iter()
+            .filter(|&ipv6_net| ipv6_net.addr() == loopback_expected_ipv6)
+            .collect();
+        assert_eq!(
+            matching_ipv6s.len(),
+            1,
+            "The loopback interface should have IP ::1"
+        );
+        println!("Found IP {:?} on the loopback interface", matching_ipv6s[0]);
+
+        // Make sure that the loopback interface has the same number of scope IDs as it does IPv6 addresses
+        assert_eq!(loopback.ipv6.len(), loopback.ipv6_scope_ids.len());
+
+        // Check flags
+        assert!(
+            loopback.is_running(),
+            "Loopback interface should be running!"
+        );
+        assert!(
+            !loopback.is_physical(),
+            "Loopback interface should not be physical!"
+        );
+
+        // Make sure that, if the loopback interface has a MAC, it has a known loopback MAC
+        match loopback.mac_addr {
+            Some(mac) => assert!(
+                crate::db::oui::is_known_loopback_mac(&mac),
+                "Loopback interface MAC not a known loopback MAC"
+            ),
+            None => {}
+        }
     }
 }

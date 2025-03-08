@@ -12,7 +12,7 @@ jobs:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust Toolchain
         run: rustup toolchain install stable --profile minimal --no-self-update
@@ -36,8 +36,14 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
 
-      - name: Run cargo check
-        run: cargo check
+      - name: "Display network interfaces on machine (for test failure debugging)"
+        run: cargo run --example list_interfaces
+
+      - name: Run cargo build
+        run: cargo build
+
+      - name: Run cargo test
+        run: cargo test
 
   cross:
     name: Cross compile
@@ -64,5 +70,7 @@ jobs:
       - name: Install cross
         run: cargo install cross
 
-      - name: Rust check
-        run: cross check --target ${{ matrix.target }}
+      - name: Cross Compile Check
+        run: |
+          export CARGO_TARGET_DIR=target/build/${{ matrix.target }}
+          cross check --target ${{ matrix.target }}
