@@ -45,6 +45,7 @@ fn main() {
             println!("Gateway: (Not found)");
         }
         println!("DNS Servers: {:?}", interface.dns_servers);
+        println!("MTU: {:?}", interface.mtu);
         println!("Default: {}", interface.default);
         println!();
     }

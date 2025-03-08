@@ -279,6 +279,7 @@ pub fn interfaces() -> Vec<Interface> {
                     Some(default_gateway)
                 },
                 dns_servers,
+                mtu: Some(cur.Mtu),
                 default,
             };
             Some(interface)

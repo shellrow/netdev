@@ -107,6 +107,7 @@ pub mod netlink {
                 receive_speed: None,
                 gateway: None,
                 dns_servers: Vec::new(),
+                mtu: None,
                 default: false,
             };
 

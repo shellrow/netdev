@@ -267,6 +267,78 @@ pub fn is_physical_interface(interface: &Interface) -> bool {
         || (!interface.is_loopback() && !linux::is_virtual_interface(&interface.name))
 }
 
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "openbsd",
+    target_os = "freebsd",
+    target_os = "netbsd"
+))]
+fn get_mtu(ifa: &libc::ifaddrs, _name: &str) -> Option<u32> {
+    if !ifa.ifa_data.is_null() {
+        let data = unsafe { &*(ifa.ifa_data as *mut libc::if_data) };
+        Some(data.ifi_mtu as u32)
+    } else {
+        None
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn get_mtu(_ifa: &libc::ifaddrs, name: &str) -> Option<u32> {
+    use libc::{c_char, c_int, close, ifreq, ioctl, socket, AF_INET, SIOCGIFMTU, SOCK_DGRAM};
+    use std::os::unix::io::RawFd;
+    use std::ptr;
+
+    // Create a socket for ioctl operations
+    let sock: RawFd = unsafe { socket(AF_INET, SOCK_DGRAM, 0) };
+    if sock < 0 {
+        eprintln!(
+            "Failed to create socket: {:?}",
+            std::io::Error::last_os_error()
+        );
+        return None;
+    }
+
+    let mut ifr: ifreq = unsafe { mem::zeroed() };
+
+    // Set the interface name (must not exceed `IFNAMSIZ`)
+    let c_interface = CString::new(name).ok()?;
+    // Ensure null termination
+    let bytes = c_interface.to_bytes_with_nul();
+    if bytes.len() > ifr.ifr_name.len() {
+        eprintln!("Interface name too long: {}", name);
+        unsafe { close(sock) };
+        return None;
+    }
+
+    unsafe {
+        ptr::copy_nonoverlapping(
+            bytes.as_ptr() as *const c_char,
+            ifr.ifr_name.as_mut_ptr(),
+            bytes.len(),
+        );
+    }
+
+    // Retrieve the MTU using ioctl
+    let ret: c_int = unsafe { ioctl(sock, SIOCGIFMTU as _, &mut ifr) };
+    if ret < 0 {
+        eprintln!(
+            "ioctl(SIOCGIFMTU) failed for {}: {:?}",
+            name,
+            std::io::Error::last_os_error()
+        );
+        unsafe { close(sock) };
+        return None;
+    }
+
+    let mtu = unsafe { ifr.ifr_ifru.ifru_mtu } as u32;
+
+    // Close the socket
+    unsafe { close(sock) };
+
+    Some(mtu)
+}
+
 #[cfg(target_os = "android")]
 pub fn unix_interfaces() -> Vec<Interface> {
     use super::android;
@@ -387,6 +459,7 @@ fn unix_interfaces_inner(
                 receive_speed: None,
                 gateway: None,
                 dns_servers: Vec::new(),
+                mtu: get_mtu(addr_ref, &name),
                 default: false,
             };
             ifaces.push(interface);
