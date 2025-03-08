@@ -95,6 +95,8 @@ pub struct Interface {
     pub gateway: Option<NetworkDevice>,
     /// DNS server addresses for the network interface
     pub dns_servers: Vec<IpAddr>,
+    /// Maximum Transmission Unit (MTU) for the network interface
+    pub mtu: Option<u32>,
     /// Whether this is the default interface for accessing the Internet.
     pub default: bool,
 }
@@ -145,6 +147,7 @@ impl Interface {
             receive_speed: None,
             gateway: None,
             dns_servers: Vec::new(),
+            mtu: None,
             default: false,
         }
     }
