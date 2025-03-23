@@ -1,4 +1,6 @@
+#[cfg(feature = "gateway")]
 mod shared;
+#[cfg(feature = "gateway")]
 pub use self::shared::*;
 
 mod types;

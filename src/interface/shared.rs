@@ -1,3 +1,4 @@
+#[cfg(feature = "gateway")]
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 
 /// Retrieve the IP address of the default network interface.
