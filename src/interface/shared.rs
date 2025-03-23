@@ -16,6 +16,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 /// Returns:
 /// - `Some(IpAddr)`: IP address of the default network interface if successful.
 /// - `None`: If any error occurs during the operations.
+#[cfg(feature = "gateway")]
 pub fn get_local_ipaddr() -> Option<IpAddr> {
     // Attempt to bind a UDP socket to an unspecified address and port.
     let socket = match UdpSocket::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)) {

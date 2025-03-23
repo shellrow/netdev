@@ -36,6 +36,7 @@ fn main() {
 
         println!("\tTransmit Speed: {:?}", interface.transmit_speed);
         println!("\tReceive Speed: {:?}", interface.receive_speed);
+        #[cfg(feature = "gateway")]
         if let Some(gateway) = interface.gateway {
             println!("Gateway");
             println!("\tMAC Address: {}", gateway.mac_addr);
@@ -44,8 +45,10 @@ fn main() {
         } else {
             println!("Gateway: (Not found)");
         }
+        #[cfg(feature = "gateway")]
         println!("DNS Servers: {:?}", interface.dns_servers);
         println!("MTU: {:?}", interface.mtu);
+        #[cfg(feature = "gateway")]
         println!("Default: {}", interface.default);
         println!();
     }

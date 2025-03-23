@@ -105,9 +105,12 @@ pub mod netlink {
                 flags: link_msg.header.flags.bits(),
                 transmit_speed: None,
                 receive_speed: None,
+                #[cfg(feature = "gateway")]
                 gateway: None,
+                #[cfg(feature = "gateway")]
                 dns_servers: Vec::new(),
                 mtu: None,
+                #[cfg(feature = "gateway")]
                 default: false,
             };
 

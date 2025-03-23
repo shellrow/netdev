@@ -230,10 +230,13 @@ pub fn interfaces() -> Vec<Interface> {
                 }
             }
             // Gateway
+            #[cfg(feature = "gateway")]
             let gateway_ips: Vec<IpAddr> = unsafe { linked_list_iter!(&cur.FirstGatewayAddress) }
                 .filter_map(|cur_g| unsafe { socket_address_to_ipaddr(&cur_g.Address).0 })
                 .collect();
+            #[cfg(feature = "gateway")]
             let mut default_gateway: NetworkDevice = NetworkDevice::new();
+            #[cfg(feature = "gateway")]
             if flags & sys::IFF_UP != 0 {
                 for gateway_ip in gateway_ips {
                     match gateway_ip {
@@ -253,9 +256,11 @@ pub fn interfaces() -> Vec<Interface> {
                 }
             }
             // DNS Servers
+            #[cfg(feature = "gateway")]
             let dns_servers: Vec<IpAddr> = unsafe { linked_list_iter!(&cur.FirstDnsServerAddress) }
                 .filter_map(|cur_d| unsafe { socket_address_to_ipaddr(&cur_d.Address).0 })
                 .collect();
+            #[cfg(feature = "gateway")]
             let default: bool = match local_ip {
                 IpAddr::V4(local_ipv4) => ipv4_vec.iter().any(|x| x.addr() == local_ipv4),
                 IpAddr::V6(local_ipv6) => ipv6_vec.iter().any(|x| x.addr() == local_ipv6),
@@ -273,13 +278,16 @@ pub fn interfaces() -> Vec<Interface> {
                 flags,
                 transmit_speed: Some(cur.TransmitLinkSpeed),
                 receive_speed: Some(cur.ReceiveLinkSpeed),
+                #[cfg(feature = "gateway")]
                 gateway: if default_gateway.mac_addr == MacAddr::zero() {
                     None
                 } else {
                     Some(default_gateway)
                 },
+                #[cfg(feature = "gateway")]
                 dns_servers,
                 mtu: Some(cur.Mtu),
+                #[cfg(feature = "gateway")]
                 default,
             };
             Some(interface)

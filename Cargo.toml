@@ -37,7 +37,9 @@ system-configuration = "0.6"
 serde_json = "1.0"
 
 [features]
+default = ["gateway"]
 serde = ["dep:serde", "ipnet/serde"]
+gateway = []
 
 [[example]]
 name = "list_interfaces"
@@ -46,12 +48,14 @@ path = "examples/list_interfaces.rs"
 [[example]]
 name = "default_interface"
 path = "examples/default_interface.rs"
+required-features = ["gateway"]
 
 [[example]]
 name = "default_gateway"
 path = "examples/default_gateway.rs"
+required-features = ["gateway"]
 
 [[example]]
 name = "serialize"
 path = "examples/serialize.rs"
-required-features = ["serde"]
+required-features = ["serde", "gateway"]
