@@ -1,5 +1,6 @@
 use super::Interface;
 use super::MacAddr;
+#[cfg(feature = "gateway")]
 use crate::gateway;
 use crate::interface::InterfaceType;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
@@ -7,10 +8,13 @@ use crate::sys;
 use libc;
 use std::ffi::{CStr, CString};
 use std::mem::{self, MaybeUninit};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
 
+#[cfg(feature = "gateway")]
+use std::net::ToSocketAddrs;
+#[cfg(feature = "gateway")]
 pub fn get_system_dns_conf() -> Vec<IpAddr> {
     use std::fs::read_to_string;
     const PATH_RESOLV_CONF: &str = "/etc/resolv.conf";
@@ -48,31 +52,36 @@ pub fn interfaces() -> Vec<Interface> {
 
     let type_map = macos::get_if_type_map();
     let mut interfaces: Vec<Interface> = unix_interfaces();
+    #[cfg(feature = "gateway")]
     let local_ip: IpAddr = match super::get_local_ipaddr() {
         Some(local_ip) => local_ip,
         None => return interfaces,
     };
+    #[cfg(feature = "gateway")]
     let gateway_map = gateway::macos::get_gateway_map();
     for iface in &mut interfaces {
         if let Some(sc_interface) = type_map.get(&iface.name) {
             iface.if_type = sc_interface.interface_type;
             iface.friendly_name = sc_interface.friendly_name.clone();
         }
-        if let Some(gateway) = gateway_map.get(&iface.index) {
-            iface.gateway = Some(gateway.clone());
+        #[cfg(feature = "gateway")]
+        {
+            if let Some(gateway) = gateway_map.get(&iface.index) {
+                iface.gateway = Some(gateway.clone());
+            }
+            iface.ipv4.iter().for_each(|ipv4| {
+                if IpAddr::V4(ipv4.addr()) == local_ip {
+                    iface.dns_servers = get_system_dns_conf();
+                    iface.default = true;
+                }
+            });
+            iface.ipv6.iter().for_each(|ipv6| {
+                if IpAddr::V6(ipv6.addr()) == local_ip {
+                    iface.dns_servers = get_system_dns_conf();
+                    iface.default = true;
+                }
+            });
         }
-        iface.ipv4.iter().for_each(|ipv4| {
-            if IpAddr::V4(ipv4.addr()) == local_ip {
-                iface.dns_servers = get_system_dns_conf();
-                iface.default = true;
-            }
-        });
-        iface.ipv6.iter().for_each(|ipv6| {
-            if IpAddr::V6(ipv6.addr()) == local_ip {
-                iface.dns_servers = get_system_dns_conf();
-                iface.default = true;
-            }
-        });
     }
     interfaces
 }
@@ -82,19 +91,24 @@ pub fn interfaces() -> Vec<Interface> {
     use super::linux;
 
     let mut interfaces: Vec<Interface> = unix_interfaces();
+
+    #[cfg(feature = "gateway")]
     let local_ip: IpAddr = match super::get_local_ipaddr() {
         Some(local_ip) => local_ip,
         None => return interfaces,
     };
+    #[cfg(feature = "gateway")]
     let gateway_map = gateway::linux::get_gateway_map();
     for iface in &mut interfaces {
         iface.if_type = linux::get_interface_type(iface.name.clone());
         let if_speed: Option<u64> = linux::get_interface_speed(iface.name.clone());
         iface.transmit_speed = if_speed;
         iface.receive_speed = if_speed;
+        #[cfg(feature = "gateway")]
         if let Some(gateway) = gateway_map.get(&iface.name) {
             iface.gateway = Some(gateway.clone());
         }
+        #[cfg(feature = "gateway")]
         match local_ip {
             IpAddr::V4(local_ipv4) => {
                 if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
@@ -116,27 +130,31 @@ pub fn interfaces() -> Vec<Interface> {
 #[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 pub fn interfaces() -> Vec<Interface> {
     let mut interfaces: Vec<Interface> = unix_interfaces();
+    #[cfg(feature = "gateway")]
     let local_ip: IpAddr = match super::get_local_ipaddr() {
         Some(local_ip) => local_ip,
         None => return interfaces,
     };
-    let gateway_map = gateway::bsd::get_gateway_map();
-    for iface in &mut interfaces {
-        if let Some(gateway) = gateway_map.get(&iface.index) {
-            iface.gateway = Some(gateway.clone());
+    #[cfg(feature = "gateway")]
+    {
+        let gateway_map = gateway::bsd::get_gateway_map();
+        for iface in &mut interfaces {
+            if let Some(gateway) = gateway_map.get(&iface.index) {
+                iface.gateway = Some(gateway.clone());
+            }
+            iface.ipv4.iter().for_each(|ipv4| {
+                if IpAddr::V4(ipv4.addr()) == local_ip {
+                    iface.dns_servers = get_system_dns_conf();
+                    iface.default = true;
+                }
+            });
+            iface.ipv6.iter().for_each(|ipv6| {
+                if IpAddr::V6(ipv6.addr()) == local_ip {
+                    iface.dns_servers = get_system_dns_conf();
+                    iface.default = true;
+                }
+            });
         }
-        iface.ipv4.iter().for_each(|ipv4| {
-            if IpAddr::V4(ipv4.addr()) == local_ip {
-                iface.dns_servers = get_system_dns_conf();
-                iface.default = true;
-            }
-        });
-        iface.ipv6.iter().for_each(|ipv6| {
-            if IpAddr::V6(ipv6.addr()) == local_ip {
-                iface.dns_servers = get_system_dns_conf();
-                iface.default = true;
-            }
-        });
     }
     interfaces
 }
@@ -457,9 +475,12 @@ fn unix_interfaces_inner(
                 flags: addr_ref.ifa_flags,
                 transmit_speed: None,
                 receive_speed: None,
+                #[cfg(feature = "gateway")]
                 gateway: None,
+                #[cfg(feature = "gateway")]
                 dns_servers: Vec::new(),
                 mtu: get_mtu(addr_ref, &name),
+                #[cfg(feature = "gateway")]
                 default: false,
             };
             ifaces.push(interface);

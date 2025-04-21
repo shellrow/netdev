@@ -1,4 +1,6 @@
+#[cfg(feature = "gateway")]
 mod shared;
+#[cfg(feature = "gateway")]
 pub use self::shared::*;
 
 mod types;
@@ -41,11 +43,12 @@ mod android;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod macos;
-
+#[cfg(feature = "gateway")]
 use crate::device::NetworkDevice;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
 use crate::sys;
+#[cfg(feature = "gateway")]
 use std::net::IpAddr;
 
 /// Structure of Network Interface information
@@ -92,17 +95,21 @@ pub struct Interface {
     /// Default gateway for the network interface. This is the address of the router to which
     /// IP packets are forwarded when they need to be sent to a device outside
     /// of the local network.
+    #[cfg(feature = "gateway")]
     pub gateway: Option<NetworkDevice>,
     /// DNS server addresses for the network interface
+    #[cfg(feature = "gateway")]
     pub dns_servers: Vec<IpAddr>,
     /// Maximum Transmission Unit (MTU) for the network interface
     pub mtu: Option<u32>,
     /// Whether this is the default interface for accessing the Internet.
+    #[cfg(feature = "gateway")]
     pub default: bool,
 }
 
 impl Interface {
     /// Construct a new default Interface instance
+    #[cfg(feature = "gateway")]
     pub fn default() -> Result<Interface, String> {
         let interfaces: Vec<Interface> = interfaces();
         for iface in &interfaces {
@@ -145,9 +152,12 @@ impl Interface {
             flags: 0,
             transmit_speed: None,
             receive_speed: None,
+            #[cfg(feature = "gateway")]
             gateway: None,
+            #[cfg(feature = "gateway")]
             dns_servers: Vec::new(),
             mtu: None,
+            #[cfg(feature = "gateway")]
             default: false,
         }
     }
@@ -188,6 +198,7 @@ impl Interface {
 }
 
 /// Get default Network Interface
+#[cfg(feature = "gateway")]
 pub fn get_default_interface() -> Result<Interface, String> {
     let interfaces: Vec<Interface> = interfaces();
     for iface in &interfaces {
@@ -232,6 +243,7 @@ mod tests {
         }
     }
     #[test]
+    #[cfg(feature = "gateway")]
     fn test_default_interface() {
         println!("{:#?}", get_default_interface());
     }
