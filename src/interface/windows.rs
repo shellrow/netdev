@@ -276,8 +276,8 @@ pub fn interfaces() -> Vec<Interface> {
                 ipv6: ipv6_vec,
                 ipv6_scope_ids: ipv6_scope_id_vec,
                 flags,
-                transmit_speed: Some(cur.TransmitLinkSpeed),
-                receive_speed: Some(cur.ReceiveLinkSpeed),
+                transmit_speed: sys::sanitize_u64(cur.TransmitLinkSpeed),
+                receive_speed: sys::sanitize_u64(cur.ReceiveLinkSpeed),
                 #[cfg(feature = "gateway")]
                 gateway: if default_gateway.mac_addr == MacAddr::zero() {
                     None
