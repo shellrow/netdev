@@ -12,7 +12,7 @@ license = "MIT"
 
 [dependencies]
 serde = { version = "1", features = ["derive"], optional = true }
-ipnet = { version = "2.10" }
+ipnet = { version = "2.11" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
