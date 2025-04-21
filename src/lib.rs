@@ -13,5 +13,5 @@ pub use gateway::get_default_gateway;
 pub use interface::get_default_interface;
 pub use interface::get_interfaces;
 pub use interface::Interface;
-pub use mac::MacAddr;
 pub use ipnet;
+pub use mac::MacAddr;
