@@ -14,3 +14,4 @@ pub use interface::get_default_interface;
 pub use interface::get_interfaces;
 pub use interface::Interface;
 pub use ipnet;
+pub use mac::MacAddr;
