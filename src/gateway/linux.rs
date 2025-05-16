@@ -91,7 +91,7 @@ fn get_ipv6_gateway_map() -> HashMap<String, Ipv6Addr> {
     };
     let route_table: Vec<&str> = route_text.trim().split("\n").collect();
     for row in route_table {
-        let fields: Vec<&str> = row.split("\t").collect();
+        let fields: Vec<&str> = row.split_whitespace().collect();
         if fields.len() >= 10 {
             // fields[4]: IPv6 Address 32 hex chars without colons
             // fields[9]: Interface Name
