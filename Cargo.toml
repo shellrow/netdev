@@ -1,6 +1,6 @@
 [package]
 name = "netdev"
-version = "0.34.0"
+version = "0.34.1"
 authors = ["shellrow <shellrow@fortnium.com>"]
 edition = "2021"
 description = "Cross-platform library for network interface"
