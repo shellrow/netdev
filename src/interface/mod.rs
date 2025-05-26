@@ -45,10 +45,10 @@ mod android;
 mod macos;
 #[cfg(feature = "gateway")]
 use crate::device::NetworkDevice;
+use crate::ip::{is_global_ip, is_global_ipv4, is_global_ipv6};
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
 use crate::sys;
-use crate::ip::{is_global_ip, is_global_ipv4, is_global_ipv6};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 /// Structure of Network Interface information

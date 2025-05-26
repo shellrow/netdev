@@ -3,9 +3,9 @@ pub mod device;
 #[cfg(feature = "gateway")]
 pub mod gateway;
 pub mod interface;
+mod ip;
 pub mod mac;
 mod sys;
-mod ip;
 
 pub use device::NetworkDevice;
 #[cfg(feature = "gateway")]

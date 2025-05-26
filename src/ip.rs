@@ -84,7 +84,10 @@ fn is_reserved_ipv4(ipv4_addr: &Ipv4Addr) -> bool {
 /// Returns [`true`] if this is an address reserved for documentation
 /// (`2001:db8::/32` and `3fff::/20`).
 fn is_documentation_ipv6(ipv6_addr: &Ipv6Addr) -> bool {
-    matches!(ipv6_addr.segments(), [0x2001, 0xdb8, ..] | [0x3fff, 0..=0x0fff, ..])
+    matches!(
+        ipv6_addr.segments(),
+        [0x2001, 0xdb8, ..] | [0x3fff, 0..=0x0fff, ..]
+    )
 }
 
 #[cfg(test)]
