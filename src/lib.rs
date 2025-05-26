@@ -5,6 +5,7 @@ pub mod gateway;
 pub mod interface;
 pub mod mac;
 mod sys;
+mod ip;
 
 pub use device::NetworkDevice;
 #[cfg(feature = "gateway")]
