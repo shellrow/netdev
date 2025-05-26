@@ -45,11 +45,11 @@ mod android;
 mod macos;
 #[cfg(feature = "gateway")]
 use crate::device::NetworkDevice;
+use crate::ip::{is_global_ip, is_global_ipv4, is_global_ipv6};
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
 use crate::sys;
-#[cfg(feature = "gateway")]
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 /// Structure of Network Interface information
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -194,6 +194,63 @@ impl Interface {
         is_physical_interface(&self)
             && !crate::db::oui::is_virtual_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
             && !crate::db::oui::is_known_loopback_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
+    }
+    /// Returns a list of IPv4 addresses assigned to this interface.
+    pub fn ipv4_addrs(&self) -> Vec<Ipv4Addr> {
+        self.ipv4.iter().map(|net| net.addr()).collect()
+    }
+    /// Returns a list of IPv6 addresses assigned to this interface.
+    pub fn ipv6_addrs(&self) -> Vec<Ipv6Addr> {
+        self.ipv6.iter().map(|net| net.addr()).collect()
+    }
+    /// Returns a list of all IP addresses (both IPv4 and IPv6) assigned to this interface.
+    pub fn ip_addrs(&self) -> Vec<IpAddr> {
+        self.ipv4_addrs()
+            .into_iter()
+            .map(IpAddr::V4)
+            .chain(self.ipv6_addrs().into_iter().map(IpAddr::V6))
+            .collect()
+    }
+    /// Returns true if this interface has at least one IPv4 address.
+    pub fn has_ipv4(&self) -> bool {
+        !self.ipv4.is_empty()
+    }
+    /// Returns true if this interface has at least one IPv6 address.
+    pub fn has_ipv6(&self) -> bool {
+        !self.ipv6.is_empty()
+    }
+    /// Returns true if this interface has at least one globally routable IPv4 address.
+    pub fn has_global_ipv4(&self) -> bool {
+        self.ipv4_addrs().iter().any(|ip| is_global_ipv4(ip))
+    }
+    /// Returns true if this interface has at least one globally routable IPv6 address.
+    pub fn has_global_ipv6(&self) -> bool {
+        self.ipv6_addrs().iter().any(|ip| is_global_ipv6(ip))
+    }
+    /// Returns true if this interface has at least one globally routable IP address (v4 or v6).
+    pub fn has_global_ip(&self) -> bool {
+        self.ip_addrs().iter().any(|ip| is_global_ip(ip))
+    }
+    /// Returns a list of globally routable IPv4 addresses assigned to this interface.
+    pub fn global_ipv4_addrs(&self) -> Vec<Ipv4Addr> {
+        self.ipv4_addrs()
+            .into_iter()
+            .filter(|ip| is_global_ipv4(ip))
+            .collect()
+    }
+    /// Returns a list of globally routable IPv6 addresses assigned to this interface.
+    pub fn global_ipv6_addrs(&self) -> Vec<Ipv6Addr> {
+        self.ipv6_addrs()
+            .into_iter()
+            .filter(|ip| is_global_ipv6(ip))
+            .collect()
+    }
+    /// Returns a list of globally routable IP addresses (both IPv4 and IPv6).
+    pub fn global_ip_addrs(&self) -> Vec<IpAddr> {
+        self.ip_addrs()
+            .into_iter()
+            .filter(|ip| is_global_ip(ip))
+            .collect()
     }
 }
 
