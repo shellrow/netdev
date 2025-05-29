@@ -99,9 +99,9 @@ fn get_ipv6_gateway_map() -> HashMap<String, Ipv6Addr> {
             // fields[9]: Interface Name
 
             // default route has zero destination and zero prefix length
-            if fields[0] == "00000000000000000000000000000000" &&
-               fields[1] == "00" &&
-               fields[4] != "00000000000000000000000000000000"
+            if fields[0] == "00000000000000000000000000000000"
+                && fields[1] == "00"
+                && fields[4] != "00000000000000000000000000000000"
             {
                 ipv6_gateway_map.insert(fields[9].to_string(), convert_hex_ipv6(fields[4]));
             }
