@@ -52,7 +52,7 @@ For more details, see [examples][examples-url] or [doc][doc-url].
     - Arch 
         - 2024.05.01
 - macOS (Apple Silicon)
-    - 14.6.1
+    - 14.7.6
 - macOS (Intel)
     - 13.4.1
     - 11.6
