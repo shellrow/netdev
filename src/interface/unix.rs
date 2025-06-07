@@ -104,8 +104,8 @@ pub fn interfaces() -> Vec<Interface> {
     let gateway_map: HashMap<String, NetworkDevice> = gateway::linux::get_gateway_map();
 
     for iface in &mut interfaces {
-        iface.if_type = linux::get_interface_type(iface.name.clone());
-        let if_speed: Option<u64> = linux::get_interface_speed(iface.name.clone());
+        iface.if_type = linux::get_interface_type(&iface.name);
+        let if_speed: Option<u64> = linux::get_interface_speed(&iface.name);
         iface.transmit_speed = if_speed;
         iface.receive_speed = if_speed;
 
