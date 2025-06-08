@@ -88,42 +88,51 @@ pub fn interfaces() -> Vec<Interface> {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn interfaces() -> Vec<Interface> {
+    #[cfg(feature = "gateway")]
+    use crate::NetworkDevice;
+    #[cfg(feature = "gateway")]
+    use std::collections::HashMap;
+
     use super::linux;
 
     let mut interfaces: Vec<Interface> = unix_interfaces();
 
     #[cfg(feature = "gateway")]
-    let local_ip: IpAddr = match super::get_local_ipaddr() {
-        Some(local_ip) => local_ip,
-        None => return interfaces,
-    };
+    let local_ip_opt: Option<IpAddr> = super::get_local_ipaddr();
+
     #[cfg(feature = "gateway")]
-    let gateway_map = gateway::linux::get_gateway_map();
+    let gateway_map: HashMap<String, NetworkDevice> = gateway::linux::get_gateway_map();
+
     for iface in &mut interfaces {
-        iface.if_type = linux::get_interface_type(iface.name.clone());
-        let if_speed: Option<u64> = linux::get_interface_speed(iface.name.clone());
+        iface.if_type = linux::get_interface_type(&iface.name);
+        let if_speed: Option<u64> = linux::get_interface_speed(&iface.name);
         iface.transmit_speed = if_speed;
         iface.receive_speed = if_speed;
+
         #[cfg(feature = "gateway")]
         if let Some(gateway) = gateway_map.get(&iface.name) {
             iface.gateway = Some(gateway.clone());
         }
+
         #[cfg(feature = "gateway")]
-        match local_ip {
-            IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
-                    iface.default = true;
-                    iface.dns_servers = get_system_dns_conf();
+        if let Some(local_ip) = local_ip_opt {
+            match local_ip {
+                IpAddr::V4(local_ipv4) => {
+                    if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
+                        iface.default = true;
+                        iface.dns_servers = get_system_dns_conf();
+                    }
                 }
-            }
-            IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr() == local_ipv6) {
-                    iface.default = true;
-                    iface.dns_servers = get_system_dns_conf();
+                IpAddr::V6(local_ipv6) => {
+                    if iface.ipv6.iter().any(|x| x.addr() == local_ipv6) {
+                        iface.default = true;
+                        iface.dns_servers = get_system_dns_conf();
+                    }
                 }
             }
         }
     }
+
     interfaces
 }
 

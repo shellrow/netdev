@@ -19,7 +19,7 @@ pub fn is_virtual_interface(interface_name: &str) -> bool {
     }
 }
 
-pub fn get_interface_type(if_name: String) -> InterfaceType {
+pub fn get_interface_type(if_name: &str) -> InterfaceType {
     let if_type_path: String = format!("/sys/class/net/{}/type", if_name);
     let r = read_to_string(if_type_path);
     match r {
@@ -50,7 +50,7 @@ pub fn get_interface_type(if_name: String) -> InterfaceType {
     };
 }
 
-pub fn get_interface_speed(if_name: String) -> Option<u64> {
+pub fn get_interface_speed(if_name: &str) -> Option<u64> {
     let if_speed_path: String = format!("/sys/class/net/{}/speed", if_name);
     let r = read_to_string(if_speed_path);
     match r {
