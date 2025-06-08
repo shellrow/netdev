@@ -89,9 +89,9 @@ pub fn interfaces() -> Vec<Interface> {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn interfaces() -> Vec<Interface> {
     #[cfg(feature = "gateway")]
-    use std::collections::HashMap;
-    #[cfg(feature = "gateway")]
     use crate::NetworkDevice;
+    #[cfg(feature = "gateway")]
+    use std::collections::HashMap;
 
     use super::linux;
 
