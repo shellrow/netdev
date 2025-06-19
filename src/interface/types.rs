@@ -135,11 +135,10 @@ impl InterfaceType {
     }
     /// Returns OS-specific value of InterfaceType
     #[cfg(any(
-        target_os = "macos",
+        target_vendor = "apple",
         target_os = "openbsd",
         target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "ios"
+        target_os = "netbsd"
     ))]
     pub fn value(&self) -> u32 {
         match *self {

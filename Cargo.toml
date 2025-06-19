@@ -28,9 +28,14 @@ netlink-sys = "0.8"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.59"
-features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_NetworkManagement_Ndis"]
+features = [
+    "Win32_Foundation",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Networking_WinSock",
+    "Win32_NetworkManagement_Ndis",
+]
 
-[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+[target.'cfg(target_vendor = "apple")'.dependencies]
 system-configuration = "0.6"
 
 [dev-dependencies]

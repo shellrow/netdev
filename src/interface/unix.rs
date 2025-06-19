@@ -46,7 +46,7 @@ pub fn get_system_dns_conf() -> Vec<IpAddr> {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(target_vendor = "apple")]
 pub fn interfaces() -> Vec<Interface> {
     use super::macos;
 
@@ -214,11 +214,10 @@ pub(super) fn sockaddr_to_network_addr(
 }
 
 #[cfg(any(
+    target_vendor = "apple",
     target_os = "openbsd",
     target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "macos",
-    target_os = "ios"
+    target_os = "netbsd"
 ))]
 fn sockaddr_to_network_addr(
     sa: *mut libc::sockaddr,
@@ -261,8 +260,7 @@ fn sockaddr_to_network_addr(
 }
 
 #[cfg(any(
-    target_os = "macos",
-    target_os = "ios",
+    target_vendor = "apple",
     target_os = "openbsd",
     target_os = "freebsd",
     target_os = "netbsd"
@@ -286,8 +284,7 @@ pub fn is_running(interface: &Interface) -> bool {
 }
 
 #[cfg(any(
-    target_os = "macos",
-    target_os = "ios",
+    target_vendor = "apple",
     target_os = "openbsd",
     target_os = "freebsd",
     target_os = "netbsd"
@@ -304,8 +301,7 @@ pub fn is_physical_interface(interface: &Interface) -> bool {
 }
 
 #[cfg(any(
-    target_os = "macos",
-    target_os = "ios",
+    target_vendor = "apple",
     target_os = "openbsd",
     target_os = "freebsd",
     target_os = "netbsd"
