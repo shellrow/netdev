@@ -228,8 +228,8 @@ fn sockaddr_to_network_addr(
         if sa.is_null() {
             (None, None, None)
         } else if (*sa).sa_family as libc::c_int == libc::AF_LINK {
-            let nlen: i8 = (*sa).sa_data[3];
-            let alen: i8 = (*sa).sa_data[4];
+            let nlen: i8 = (*sa).sa_data[3] as i8;
+            let alen: i8 = (*sa).sa_data[4] as i8;
             if alen > 0 && alen as u8 + nlen as u8 + 8 <= (*sa).sa_len {
                 let ptr = (*sa).sa_data.as_mut_ptr();
                 let extended =
