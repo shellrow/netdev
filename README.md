@@ -24,7 +24,7 @@ This project was rebranded from [default-net][default-net-crates-io-url] by the 
 
 ## Supported platform
 - Linux
-- macOS
+- macOS and other Apple targets (iOS, watchOS, tvOS, etc.)
 - Windows
 
 ## Usage
