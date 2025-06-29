@@ -66,6 +66,8 @@ pub mod netlink {
         mac::MacAddr,
     };
 
+    use crate::stats::{InterfaceStats, get_stats};
+
     pub fn unix_interfaces() -> Vec<Interface> {
         let mut ifaces = Vec::new();
         if let Ok(socket) = Socket::new(NETLINK_ROUTE) {
@@ -86,6 +88,10 @@ pub mod netlink {
                 eprintln!("unable to list addresses: {:?}", err);
             }
         }
+        for iface in &mut ifaces {
+            let stats: Option<InterfaceStats> = get_stats(None, &iface.name);
+            iface.stats = stats;
+        }
         ifaces
     }
 
@@ -105,6 +111,7 @@ pub mod netlink {
                 flags: link_msg.header.flags.bits(),
                 transmit_speed: None,
                 receive_speed: None,
+                stats: None,
                 #[cfg(feature = "gateway")]
                 gateway: None,
                 #[cfg(feature = "gateway")]

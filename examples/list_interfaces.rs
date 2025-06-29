@@ -36,6 +36,7 @@ fn main() {
 
         println!("\tTransmit Speed: {:?}", interface.transmit_speed);
         println!("\tReceive Speed: {:?}", interface.receive_speed);
+        println!("\tStats: {:?}", interface.stats);
         #[cfg(feature = "gateway")]
         if let Some(gateway) = interface.gateway {
             println!("Gateway");

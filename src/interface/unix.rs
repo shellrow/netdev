@@ -4,6 +4,7 @@ use super::MacAddr;
 use crate::gateway;
 use crate::interface::InterfaceType;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
+use crate::stats::{InterfaceStats, get_stats};
 use crate::sys;
 use libc;
 use std::ffi::{CStr, CString};
@@ -407,6 +408,7 @@ fn unix_interfaces_inner(
         let (mac, ip, ipv6_scope_id) =
             sockaddr_to_network_addr(addr_ref.ifa_addr as *mut libc::sockaddr);
         let (_, netmask, _) = sockaddr_to_network_addr(addr_ref.ifa_netmask as *mut libc::sockaddr);
+        let stats: Option<InterfaceStats> = get_stats(Some(addr_ref), &name);
         let mut ini_ipv4: Option<Ipv4Net> = None;
         let mut ini_ipv6: Option<Ipv6Net> = None;
         if let Some(ip) = ip {
@@ -455,6 +457,10 @@ fn unix_interfaces_inner(
                     iface.mac_addr = Some(mac);
                 }
 
+                if iface.stats.is_none() {
+                    iface.stats = stats.clone();
+                }
+
                 if ini_ipv4.is_some() {
                     iface.ipv4.push(ini_ipv4.unwrap());
                 }
@@ -489,6 +495,7 @@ fn unix_interfaces_inner(
                 flags: addr_ref.ifa_flags,
                 transmit_speed: None,
                 receive_speed: None,
+                stats: stats,
                 #[cfg(feature = "gateway")]
                 gateway: None,
                 #[cfg(feature = "gateway")]

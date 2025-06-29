@@ -69,3 +69,7 @@ required-features = ["serde", "gateway"]
 name = "global_ips"
 path = "examples/global_ips.rs"
 required-features = ["gateway"]
+
+[[example]]
+name = "stats"
+path = "examples/stats.rs"

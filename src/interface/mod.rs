@@ -46,6 +46,7 @@ use crate::device::NetworkDevice;
 use crate::ip::{is_global_ip, is_global_ipv4, is_global_ipv6};
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
+use crate::stats::InterfaceStats;
 use crate::sys;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -90,6 +91,16 @@ pub struct Interface {
     /// Speed in bits per second of the receive for the network interface.
     /// Currently only supported on Linux, Android, and Windows.
     pub receive_speed: Option<u64>,
+    /// Statistics for this network interface, such as received and transmitted bytes.
+    ///
+    /// This field is populated at the time of interface discovery
+    /// (e.g., via [`get_interfaces()`] or [`get_default_interface()`]).
+    ///
+    /// The values represent a snapshot of total RX and TX bytes since system boot,
+    /// and include a timestamp (`SystemTime`) indicating when the snapshot was taken.
+    ///
+    /// If more up-to-date statistics are needed, use [`Interface::update_stats()`] to refresh this field.
+    pub stats: Option<InterfaceStats>,
     /// Default gateway for the network interface. This is the address of the router to which
     /// IP packets are forwarded when they need to be sent to a device outside
     /// of the local network.
@@ -150,6 +161,7 @@ impl Interface {
             flags: 0,
             transmit_speed: None,
             receive_speed: None,
+            stats: None,
             #[cfg(feature = "gateway")]
             gateway: None,
             #[cfg(feature = "gateway")]
@@ -249,6 +261,10 @@ impl Interface {
             .into_iter()
             .filter(|ip| is_global_ip(ip))
             .collect()
+    }
+    /// Updates the runtime traffic statistics for this interface (e.g., rx/tx byte counters).
+    pub fn update_stats(&mut self) -> std::io::Result<()> {
+        crate::stats::update_interface_stats(self)
     }
 }
 
