@@ -1,5 +1,4 @@
-# build-all.ps1
-
+# target platforms
 $targets = @(
     "x86_64-unknown-linux-gnu",
     "aarch64-unknown-linux-gnu",
@@ -8,6 +7,7 @@ $targets = @(
     "x86_64-linux-android"
 )
 
+# cross build
 foreach ($target in $targets) {
     Write-Host "==> Building for $target..."
     $result = & cross build --target $target
