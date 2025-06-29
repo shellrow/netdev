@@ -5,6 +5,7 @@ pub mod gateway;
 pub mod interface;
 mod ip;
 pub mod mac;
+pub mod stats;
 mod sys;
 
 pub use device::NetworkDevice;

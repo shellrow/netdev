@@ -14,6 +14,7 @@ use crate::device::NetworkDevice;
 use crate::interface::{Interface, InterfaceType};
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
+use crate::stats::InterfaceStats;
 use crate::sys;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -265,6 +266,7 @@ pub fn interfaces() -> Vec<Interface> {
                 IpAddr::V4(local_ipv4) => ipv4_vec.iter().any(|x| x.addr() == local_ipv4),
                 IpAddr::V6(local_ipv6) => ipv6_vec.iter().any(|x| x.addr() == local_ipv6),
             };
+            let stats: Option<InterfaceStats> = crate::stats::get_stats_from_index(index);
             let interface: Interface = Interface {
                 index,
                 name: adapter_name,
@@ -278,6 +280,7 @@ pub fn interfaces() -> Vec<Interface> {
                 flags,
                 transmit_speed: sys::sanitize_u64(cur.TransmitLinkSpeed),
                 receive_speed: sys::sanitize_u64(cur.ReceiveLinkSpeed),
+                stats,
                 #[cfg(feature = "gateway")]
                 gateway: if default_gateway.mac_addr == MacAddr::zero() {
                     None

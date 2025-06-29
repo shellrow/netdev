@@ -27,6 +27,7 @@ fn main() {
             println!("\tIPv6: {:?}", interface.ipv6);
             println!("\tTransmit Speed: {:?}", interface.transmit_speed);
             println!("\tReceive Speed: {:?}", interface.receive_speed);
+            println!("\tStats: {:?}", interface.stats);
             if let Some(gateway) = interface.gateway {
                 println!("Default Gateway");
                 println!("\tMAC Address: {}", gateway.mac_addr);
