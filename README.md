@@ -16,6 +16,7 @@
 - Get list of available network interfaces
 - Get default network interface
 - Access additional information related to network interface
+- Get traffic statistics (RX/TX bytes) for each interface
 
 Please refer to the [Interface][doc-interface-url] struct documentation for detail.
 
@@ -31,7 +32,7 @@ This project was rebranded from [default-net][default-net-crates-io-url] by the 
 Add `netdev` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netdev = "0.35"
+netdev = "0.36"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
