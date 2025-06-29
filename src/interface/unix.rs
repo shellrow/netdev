@@ -4,7 +4,7 @@ use super::MacAddr;
 use crate::gateway;
 use crate::interface::InterfaceType;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
-use crate::stats::{InterfaceStats, get_stats};
+use crate::stats::{get_stats, InterfaceStats};
 use crate::sys;
 use libc;
 use std::ffi::{CStr, CString};

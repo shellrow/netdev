@@ -28,10 +28,10 @@ pub(crate) fn get_stats(ifa: Option<&libc::ifaddrs>, _name: &str) -> Option<Inte
     if let Some(ifa) = ifa {
         if !ifa.ifa_data.is_null() {
             let data = unsafe { &*(ifa.ifa_data as *const libc::if_data) };
-            Some(InterfaceStats { 
-                rx_bytes: data.ifi_ibytes as u64, 
-                tx_bytes: data.ifi_obytes as u64, 
-                timestamp: Some(SystemTime::now())
+            Some(InterfaceStats {
+                rx_bytes: data.ifi_ibytes as u64,
+                tx_bytes: data.ifi_obytes as u64,
+                timestamp: Some(SystemTime::now()),
             })
         } else {
             None
@@ -59,7 +59,11 @@ fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
         Ok(s) => s.trim().parse::<u64>().unwrap_or(0),
         Err(_) => 0,
     };
-    Some(InterfaceStats { rx_bytes, tx_bytes, timestamp: Some(SystemTime::now()) })
+    Some(InterfaceStats {
+        rx_bytes,
+        tx_bytes,
+        timestamp: Some(SystemTime::now()),
+    })
 }
 
 #[cfg(any(
@@ -118,9 +122,9 @@ fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
 
 #[cfg(target_os = "windows")]
 pub(crate) fn get_stats_from_index(index: u32) -> Option<InterfaceStats> {
-    use windows_sys::Win32::NetworkManagement::IpHelper::{GetIfEntry2, MIB_IF_ROW2};
     use std::mem::zeroed;
     use std::time::SystemTime;
+    use windows_sys::Win32::NetworkManagement::IpHelper::{GetIfEntry2, MIB_IF_ROW2};
 
     let mut row: MIB_IF_ROW2 = unsafe { zeroed() };
     row.InterfaceIndex = index;

@@ -66,7 +66,7 @@ pub mod netlink {
         mac::MacAddr,
     };
 
-    use crate::stats::{InterfaceStats, get_stats};
+    use crate::stats::{get_stats, InterfaceStats};
 
     pub fn unix_interfaces() -> Vec<Interface> {
         let mut ifaces = Vec::new();
