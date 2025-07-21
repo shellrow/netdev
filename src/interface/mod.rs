@@ -39,7 +39,7 @@ mod linux;
 #[cfg(target_os = "android")]
 mod android;
 
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 mod macos;
 #[cfg(feature = "gateway")]
 use crate::device::NetworkDevice;
