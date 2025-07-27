@@ -47,7 +47,7 @@ pub fn get_system_dns_conf() -> Vec<IpAddr> {
     }
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(all(target_vendor = "apple", target_os = "macos"))]
 pub fn interfaces() -> Vec<Interface> {
     use super::macos;
 
@@ -90,6 +90,11 @@ pub fn interfaces() -> Vec<Interface> {
     }
 
     interfaces
+}
+
+#[cfg(all(target_vendor = "apple", not(target_os = "macos")))]
+pub fn interfaces() -> Vec<Interface> {
+    unix_interfaces()
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
