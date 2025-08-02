@@ -28,6 +28,25 @@ const IFF_CONNECTOR_PRESENT: u8 = 0b0000_0100;
 //const IFF_LOW_POWER: u8 = 0b0100_0000;
 //const IFF_END_POINT_INTERFACE: u8 = 0b1000_0000;
 
+// Note: We take `&*mut T` instead of just `*mut T` to tie the lifetime of all the returned items
+// to the lifetime of the pointer for some extra safety.
+unsafe fn linked_list_iter<T>(ptr: &*mut T, next: fn(&T) -> *mut T) -> impl Iterator<Item = &T> {
+    let mut ptr = ptr.cast_const();
+
+    std::iter::from_fn(move || {
+        let cur = ptr.as_ref()?;
+        ptr = next(cur);
+        Some(cur)
+    })
+}
+
+// The `Next` element is always the same, so use a macro to avoid the repetition.
+macro_rules! linked_list_iter {
+    ($ptr:expr) => {
+        linked_list_iter($ptr, |cur| cur.Next)
+    };
+}
+
 fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
     let src_ip_int = u32::from_ne_bytes(src_ip.octets());
     let dst_ip_int = u32::from_ne_bytes(dst_ip.octets());
@@ -106,7 +125,7 @@ pub fn operstate(if_name: &str) -> OperState {
     }
 
     let ptr = mem.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
-    for cur in unsafe { crate::sys::linked_list_iter!(&ptr) } {
+    for cur in unsafe { linked_list_iter!(&ptr) } {
         let adapter_name = unsafe {
             CStr::from_ptr(cur.AdapterName.cast()).to_string_lossy().to_string()
         };
@@ -158,25 +177,6 @@ unsafe fn from_wide_string(ptr: *const u16) -> String {
         len += 1;
     }
     String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len))
-}
-
-// Note: We take `&*mut T` instead of just `*mut T` to tie the lifetime of all the returned items
-// to the lifetime of the pointer for some extra safety.
-unsafe fn linked_list_iter<T>(ptr: &*mut T, next: fn(&T) -> *mut T) -> impl Iterator<Item = &T> {
-    let mut ptr = ptr.cast_const();
-
-    std::iter::from_fn(move || {
-        let cur = ptr.as_ref()?;
-        ptr = next(cur);
-        Some(cur)
-    })
-}
-
-// The `Next` element is always the same, so use a macro to avoid the repetition.
-macro_rules! linked_list_iter {
-    ($ptr:expr) => {
-        linked_list_iter($ptr, |cur| cur.Next)
-    };
 }
 
 // Get network interfaces using the IP Helper API
