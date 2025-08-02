@@ -12,6 +12,14 @@ pub const AF_INET6: libc::c_int = libc::AF_INET6;
 
 pub use libc::{IFF_BROADCAST, IFF_LOOPBACK, IFF_MULTICAST, IFF_POINTOPOINT, IFF_RUNNING, IFF_UP};
 
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd"
+))]
+pub const SIOCGIFFLAGS: libc::c_ulong = 0xc0206911;
+
 fn ntohs(u: u16) -> u16 {
     u16::from_be(u)
 }

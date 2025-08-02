@@ -6,6 +6,9 @@ pub use self::shared::*;
 mod types;
 pub use self::types::*;
 
+mod state;
+pub use self::state::*;
+
 #[cfg(any(
     target_os = "linux",
     target_vendor = "apple",
@@ -204,6 +207,14 @@ impl Interface {
         is_physical_interface(&self)
             && !crate::db::oui::is_virtual_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
             && !crate::db::oui::is_known_loopback_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
+    }
+    /// Get the operational state of the network interface
+    pub fn oper_state(&self) -> OperState {
+        operstate(&self.name)
+    }
+    /// Check if the operational state of the interface is up
+    pub fn is_oper_up(&self) -> bool {
+        self.oper_state() == OperState::Up
     }
     /// Returns a list of IPv4 addresses assigned to this interface.
     pub fn ipv4_addrs(&self) -> Vec<Ipv4Addr> {

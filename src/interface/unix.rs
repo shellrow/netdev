@@ -13,6 +13,9 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
 
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+use super::OperState;
+
 #[cfg(feature = "gateway")]
 use std::net::ToSocketAddrs;
 #[cfg(feature = "gateway")]
@@ -304,6 +307,76 @@ pub fn is_physical_interface(interface: &Interface) -> bool {
     use super::linux;
     (interface.flags & (crate::sys::IFF_LOWER_UP as u32) != 0)
         || (!interface.is_loopback() && !linux::is_virtual_interface(&interface.name))
+}
+
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd"
+))]
+pub fn get_interface_flags(if_name: &str) -> std::io::Result<u32> {
+    use libc::{c_char, ifreq, ioctl, socket, AF_INET, SOCK_DGRAM};
+    use std::mem;
+    use std::os::unix::io::RawFd;
+    use std::ptr;
+    use sys::SIOCGIFFLAGS;
+
+    let sock: RawFd = unsafe { socket(AF_INET, SOCK_DGRAM, 0) };
+    if sock < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let mut ifr: ifreq = unsafe { mem::zeroed() };
+    let ifname_c = std::ffi::CString::new(if_name).map_err(|_| std::io::ErrorKind::InvalidInput)?;
+    let bytes = ifname_c.as_bytes_with_nul();
+
+    if bytes.len() > ifr.ifr_name.len() {
+        unsafe { libc::close(sock) };
+        return Err(std::io::ErrorKind::InvalidInput.into());
+    }
+
+    unsafe {
+        ptr::copy_nonoverlapping(
+            bytes.as_ptr() as *const c_char,
+            ifr.ifr_name.as_mut_ptr(),
+            bytes.len(),
+        );
+    }
+
+    let res = unsafe { ioctl(sock, SIOCGIFFLAGS, &mut ifr) };
+    unsafe { libc::close(sock) };
+
+    if res < 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        #[cfg(target_vendor = "apple")]
+        {
+            Ok(unsafe { ifr.ifr_ifru.ifru_flags as u32 })
+        }
+
+        #[cfg(not(target_vendor = "apple"))]
+        {
+            Ok(unsafe { ifr.ifr_ifru.ifru_flags[0] as u32 })
+        }
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub use super::linux::operstate;
+
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+pub fn operstate(if_name: &str) -> OperState {
+    match get_interface_flags(if_name) {
+        Ok(flags) => {
+            if (flags & sys::IFF_UP as u32) != 0 && (flags & sys::IFF_RUNNING as u32) != 0 {
+                OperState::Up
+            } else {
+                OperState::Down
+            }
+        }
+        Err(_) => OperState::Unknown,
+    }
 }
 
 #[cfg(any(
