@@ -127,7 +127,9 @@ pub fn operstate(if_name: &str) -> OperState {
     let ptr = mem.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
     for cur in unsafe { linked_list_iter!(&ptr) } {
         let adapter_name = unsafe {
-            CStr::from_ptr(cur.AdapterName.cast()).to_string_lossy().to_string()
+            CStr::from_ptr(cur.AdapterName.cast())
+                .to_string_lossy()
+                .to_string()
         };
         if adapter_name == if_name {
             return match cur.OperStatus {

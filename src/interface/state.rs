@@ -5,7 +5,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 /// Operational state of a network interface.
-/// 
+///
 /// See also:
 /// https://www.kernel.org/doc/Documentation/networking/operstates.txt
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
