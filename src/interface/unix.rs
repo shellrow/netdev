@@ -374,10 +374,7 @@ pub fn get_interface_flags(if_name: &str) -> std::io::Result<u32> {
             Ok(unsafe { ifr.ifru_flags[0] as u32 })
         }
 
-        #[cfg(all(
-            not(target_vendor = "apple"),
-            not(target_os = "netbsd")
-        ))]
+        #[cfg(all(not(target_vendor = "apple"), not(target_os = "netbsd")))]
         {
             Ok(unsafe { ifr.ifr_ifru.ifru_flags[0] as u32 })
         }
