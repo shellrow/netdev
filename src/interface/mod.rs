@@ -6,6 +6,9 @@ pub use self::shared::*;
 mod types;
 pub use self::types::*;
 
+mod state;
+pub use self::state::*;
+
 #[cfg(any(
     target_os = "linux",
     target_vendor = "apple",
@@ -85,6 +88,8 @@ pub struct Interface {
     pub ipv6_scope_ids: Vec<u32>,
     /// Flags for the network interface (OS Specific)
     pub flags: u32,
+    /// Operational state at the time of interface discovery
+    pub oper_state: OperState,
     /// Speed in bits per second of the transmit for the network interface, if known.
     /// Currently only supported on Linux, Android, and Windows.
     pub transmit_speed: Option<u64>,
@@ -159,6 +164,7 @@ impl Interface {
             ipv6: Vec::new(),
             ipv6_scope_ids: Vec::new(),
             flags: 0,
+            oper_state: OperState::Unknown,
             transmit_speed: None,
             receive_speed: None,
             stats: None,
@@ -204,6 +210,18 @@ impl Interface {
         is_physical_interface(&self)
             && !crate::db::oui::is_virtual_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
             && !crate::db::oui::is_known_loopback_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
+    }
+    /// Get the operational state of the network interface
+    pub fn oper_state(&self) -> OperState {
+        self.oper_state
+    }
+    /// Check if the operational state of the interface is up
+    pub fn is_oper_up(&self) -> bool {
+        self.oper_state == OperState::Up
+    }
+    /// Update the `oper_state` field by re-reading the current operstate from the system
+    pub fn update_oper_state(&mut self) {
+        self.oper_state = operstate(&self.name);
     }
     /// Returns a list of IPv4 addresses assigned to this interface.
     pub fn ipv4_addrs(&self) -> Vec<Ipv4Addr> {

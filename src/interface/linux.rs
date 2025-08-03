@@ -1,4 +1,4 @@
-use crate::interface::InterfaceType;
+use crate::interface::{InterfaceType, OperState};
 use std::convert::TryFrom;
 use std::fs::{read_link, read_to_string};
 
@@ -70,4 +70,12 @@ pub fn get_interface_speed(if_name: &str) -> Option<u64> {
             return None;
         }
     };
+}
+
+pub fn operstate(if_name: &str) -> OperState {
+    let path = format!("/sys/class/net/{}/operstate", if_name);
+    match read_to_string(path) {
+        Ok(content) => content.trim().parse().unwrap_or(OperState::Unknown),
+        Err(_) => OperState::Unknown,
+    }
 }

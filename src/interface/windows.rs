@@ -11,7 +11,7 @@ use windows_sys::Win32::Networking::WinSock::{
 };
 
 use crate::device::NetworkDevice;
-use crate::interface::{Interface, InterfaceType};
+use crate::interface::{Interface, InterfaceType, OperState};
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::mac::MacAddr;
 use crate::stats::InterfaceStats;
@@ -27,6 +27,25 @@ const IFF_CONNECTOR_PRESENT: u8 = 0b0000_0100;
 //const IFF_PAUSED: u8 = 0b0010_0000;
 //const IFF_LOW_POWER: u8 = 0b0100_0000;
 //const IFF_END_POINT_INTERFACE: u8 = 0b1000_0000;
+
+// Note: We take `&*mut T` instead of just `*mut T` to tie the lifetime of all the returned items
+// to the lifetime of the pointer for some extra safety.
+unsafe fn linked_list_iter<T>(ptr: &*mut T, next: fn(&T) -> *mut T) -> impl Iterator<Item = &T> {
+    let mut ptr = ptr.cast_const();
+
+    std::iter::from_fn(move || {
+        let cur = ptr.as_ref()?;
+        ptr = next(cur);
+        Some(cur)
+    })
+}
+
+// The `Next` element is always the same, so use a macro to avoid the repetition.
+macro_rules! linked_list_iter {
+    ($ptr:expr) => {
+        linked_list_iter($ptr, |cur| cur.Next)
+    };
+}
 
 fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
     let src_ip_int = u32::from_ne_bytes(src_ip.octets());
@@ -75,6 +94,60 @@ pub fn is_running(interface: &Interface) -> bool {
     interface.is_up()
 }
 
+/// Return the operational state of a given Windows interface by its adapter name (GUID string)
+pub fn operstate(if_name: &str) -> OperState {
+    let mut mem = Vec::<u8>::with_capacity(15000);
+    let mut retries = 3;
+    loop {
+        let mut dwsize = mem.capacity() as u32;
+        let ret = unsafe {
+            GetAdaptersAddresses(
+                AF_UNSPEC as u32,
+                GAA_FLAG_INCLUDE_GATEWAYS,
+                std::ptr::null_mut(),
+                mem.as_mut_ptr().cast(),
+                &mut dwsize,
+            )
+        };
+        match ret {
+            0 => {
+                unsafe {
+                    mem.set_len(dwsize as usize);
+                }
+                break;
+            }
+            111 if retries > 0 => {
+                mem.reserve(dwsize as usize);
+                retries -= 1;
+            }
+            _ => return OperState::Unknown,
+        }
+    }
+
+    let ptr = mem.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
+    for cur in unsafe { linked_list_iter!(&ptr) } {
+        let adapter_name = unsafe {
+            CStr::from_ptr(cur.AdapterName.cast())
+                .to_string_lossy()
+                .to_string()
+        };
+        if adapter_name == if_name {
+            return match cur.OperStatus {
+                1 => OperState::Up,
+                2 => OperState::Down,
+                3 => OperState::Testing,
+                4 => OperState::Unknown,
+                5 => OperState::Dormant,
+                6 => OperState::NotPresent,
+                7 => OperState::LowerLayerDown,
+                _ => OperState::Unknown,
+            };
+        }
+    }
+
+    OperState::Unknown
+}
+
 /// Check if a network interface has a connector present, indicating it is a physical interface.
 fn is_connector_present(if_index: u32) -> bool {
     // Initialize MIB_IF_ROW2
@@ -106,25 +179,6 @@ unsafe fn from_wide_string(ptr: *const u16) -> String {
         len += 1;
     }
     String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len))
-}
-
-// Note: We take `&*mut T` instead of just `*mut T` to tie the lifetime of all the returned items
-// to the lifetime of the pointer for some extra safety.
-unsafe fn linked_list_iter<T>(ptr: &*mut T, next: fn(&T) -> *mut T) -> impl Iterator<Item = &T> {
-    let mut ptr = ptr.cast_const();
-
-    std::iter::from_fn(move || {
-        let cur = ptr.as_ref()?;
-        ptr = next(cur);
-        Some(cur)
-    })
-}
-
-// The `Next` element is always the same, so use a macro to avoid the repetition.
-macro_rules! linked_list_iter {
-    ($ptr:expr) => {
-        linked_list_iter($ptr, |cur| cur.Next)
-    };
 }
 
 // Get network interfaces using the IP Helper API
@@ -200,6 +254,18 @@ pub fn interfaces() -> Vec<Interface> {
                 }
                 _ => {}
             }
+
+            let oper_state: OperState = match cur.OperStatus {
+                1 => OperState::Up,
+                2 => OperState::Down,
+                3 => OperState::Testing,
+                4 => OperState::Unknown,
+                5 => OperState::Dormant,
+                6 => OperState::NotPresent,
+                7 => OperState::LowerLayerDown,
+                _ => OperState::Unknown,
+            };
+
             // Name
             let adapter_name = unsafe { CStr::from_ptr(cur.AdapterName.cast()) }
                 .to_string_lossy()
@@ -278,6 +344,7 @@ pub fn interfaces() -> Vec<Interface> {
                 ipv6: ipv6_vec,
                 ipv6_scope_ids: ipv6_scope_id_vec,
                 flags,
+                oper_state,
                 transmit_speed: sys::sanitize_u64(cur.TransmitLinkSpeed),
                 receive_speed: sys::sanitize_u64(cur.ReceiveLinkSpeed),
                 stats,

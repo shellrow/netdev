@@ -1,7 +1,10 @@
 use super::Interface;
 use super::MacAddr;
+use super::OperState;
+
 #[cfg(feature = "gateway")]
 use crate::gateway;
+
 use crate::interface::InterfaceType;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::stats::{get_stats, InterfaceStats};
@@ -119,6 +122,8 @@ pub fn interfaces() -> Vec<Interface> {
         let if_speed: Option<u64> = linux::get_interface_speed(&iface.name);
         iface.transmit_speed = if_speed;
         iface.receive_speed = if_speed;
+
+        iface.oper_state = linux::operstate(&iface.name);
 
         #[cfg(feature = "gateway")]
         if let Some(gateway) = gateway_map.get(&iface.name) {
@@ -304,6 +309,87 @@ pub fn is_physical_interface(interface: &Interface) -> bool {
     use super::linux;
     (interface.flags & (crate::sys::IFF_LOWER_UP as u32) != 0)
         || (!interface.is_loopback() && !linux::is_virtual_interface(&interface.name))
+}
+
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd"
+))]
+pub fn get_interface_flags(if_name: &str) -> std::io::Result<u32> {
+    use libc::{c_char, ioctl, socket, AF_INET, SOCK_DGRAM};
+    use std::mem;
+    use std::os::unix::io::RawFd;
+    use std::ptr;
+    use sys::SIOCGIFFLAGS;
+
+    #[cfg(target_os = "netbsd")]
+    #[repr(C)]
+    #[derive(Copy, Clone)]
+    struct IfReq {
+        ifr_name: [c_char; libc::IFNAMSIZ],
+        ifru_flags: [libc::c_short; 2],
+    }
+
+    #[cfg(not(target_os = "netbsd"))]
+    use libc::ifreq as IfReq;
+
+    let sock: RawFd = unsafe { socket(AF_INET, SOCK_DGRAM, 0) };
+    if sock < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let mut ifr: IfReq = unsafe { mem::zeroed() };
+
+    let ifname_c = std::ffi::CString::new(if_name).map_err(|_| std::io::ErrorKind::InvalidInput)?;
+    let bytes = ifname_c.as_bytes_with_nul();
+
+    if bytes.len() > ifr.ifr_name.len() {
+        unsafe { libc::close(sock) };
+        return Err(std::io::ErrorKind::InvalidInput.into());
+    }
+
+    unsafe {
+        ptr::copy_nonoverlapping(
+            bytes.as_ptr() as *const c_char,
+            ifr.ifr_name.as_mut_ptr(),
+            bytes.len(),
+        );
+    }
+
+    let res = unsafe { ioctl(sock, SIOCGIFFLAGS, &mut ifr) };
+    unsafe { libc::close(sock) };
+
+    if res < 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        #[cfg(target_vendor = "apple")]
+        {
+            Ok(unsafe { ifr.ifr_ifru.ifru_flags as u32 })
+        }
+
+        #[cfg(target_os = "netbsd")]
+        {
+            Ok(unsafe { ifr.ifru_flags[0] as u32 })
+        }
+
+        #[cfg(all(not(target_vendor = "apple"), not(target_os = "netbsd")))]
+        {
+            Ok(unsafe { ifr.ifr_ifru.ifru_flags[0] as u32 })
+        }
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub use super::linux::operstate;
+
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+pub fn operstate(if_name: &str) -> OperState {
+    match get_interface_flags(if_name) {
+        Ok(flags) => OperState::from_if_flags(flags),
+        Err(_) => OperState::Unknown,
+    }
 }
 
 #[cfg(any(
@@ -498,6 +584,7 @@ fn unix_interfaces_inner(
                     None => vec![],
                 },
                 flags: addr_ref.ifa_flags,
+                oper_state: OperState::from_if_flags(addr_ref.ifa_flags),
                 transmit_speed: None,
                 receive_speed: None,
                 stats: stats,
