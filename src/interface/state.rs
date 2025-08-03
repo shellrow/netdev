@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Operational state of a network interface.
 ///
 /// See also:
-/// https://www.kernel.org/doc/Documentation/networking/operstates.txt
+/// <https://www.kernel.org/doc/Documentation/networking/operstates.txt>
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum OperState {
