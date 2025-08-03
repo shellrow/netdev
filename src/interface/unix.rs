@@ -1,7 +1,10 @@
 use super::Interface;
 use super::MacAddr;
+use super::OperState;
+
 #[cfg(feature = "gateway")]
 use crate::gateway;
+
 use crate::interface::InterfaceType;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::stats::{get_stats, InterfaceStats};
@@ -12,9 +15,6 @@ use std::mem::{self, MaybeUninit};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
-
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-use super::OperState;
 
 #[cfg(feature = "gateway")]
 use std::net::ToSocketAddrs;
@@ -122,6 +122,8 @@ pub fn interfaces() -> Vec<Interface> {
         let if_speed: Option<u64> = linux::get_interface_speed(&iface.name);
         iface.transmit_speed = if_speed;
         iface.receive_speed = if_speed;
+
+        iface.oper_state = linux::operstate(&iface.name);
 
         #[cfg(feature = "gateway")]
         if let Some(gateway) = gateway_map.get(&iface.name) {
@@ -369,11 +371,7 @@ pub use super::linux::operstate;
 pub fn operstate(if_name: &str) -> OperState {
     match get_interface_flags(if_name) {
         Ok(flags) => {
-            if (flags & sys::IFF_UP as u32) != 0 && (flags & sys::IFF_RUNNING as u32) != 0 {
-                OperState::Up
-            } else {
-                OperState::Down
-            }
+            OperState::from_if_flags(flags)
         }
         Err(_) => OperState::Unknown,
     }
@@ -571,6 +569,7 @@ fn unix_interfaces_inner(
                     None => vec![],
                 },
                 flags: addr_ref.ifa_flags,
+                oper_state: OperState::from_if_flags(addr_ref.ifa_flags),
                 transmit_speed: None,
                 receive_speed: None,
                 stats: stats,

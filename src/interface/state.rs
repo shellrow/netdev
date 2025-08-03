@@ -1,5 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
+use crate::sys;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,19 @@ impl OperState {
             OperState::Testing => "testing",
             OperState::Dormant => "dormant",
             OperState::Up => "up",
+        }
+    }
+    pub fn from_if_flags(if_flags: u32) -> Self {
+        // Determine the operational state based on interface flags.
+        // This is a fallback for when the operstate not available.
+        if if_flags & sys::IFF_UP as u32 != 0 {
+            if if_flags & sys::IFF_RUNNING as u32 != 0 {
+                OperState::Up
+            } else {
+                OperState::Dormant
+            }
+        } else {
+            OperState::Down
         }
     }
 }

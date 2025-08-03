@@ -254,6 +254,18 @@ pub fn interfaces() -> Vec<Interface> {
                 }
                 _ => {}
             }
+
+            let oper_state: OperState = match cur.OperStatus {
+                1 => OperState::Up,
+                2 => OperState::Down,
+                3 => OperState::Testing,
+                4 => OperState::Unknown,
+                5 => OperState::Dormant,
+                6 => OperState::NotPresent,
+                7 => OperState::LowerLayerDown,
+                _ => OperState::Unknown,
+            };
+
             // Name
             let adapter_name = unsafe { CStr::from_ptr(cur.AdapterName.cast()) }
                 .to_string_lossy()
@@ -332,6 +344,7 @@ pub fn interfaces() -> Vec<Interface> {
                 ipv6: ipv6_vec,
                 ipv6_scope_ids: ipv6_scope_id_vec,
                 flags,
+                oper_state,
                 transmit_speed: sys::sanitize_u64(cur.TransmitLinkSpeed),
                 receive_speed: sys::sanitize_u64(cur.ReceiveLinkSpeed),
                 stats,

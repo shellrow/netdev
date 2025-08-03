@@ -62,7 +62,7 @@ pub mod netlink {
     };
 
     use crate::{
-        interface::{Interface, InterfaceType, Ipv4Net, Ipv6Net},
+        interface::{Interface, InterfaceType, OperState, Ipv4Net, Ipv6Net},
         mac::MacAddr,
     };
 
@@ -109,6 +109,7 @@ pub mod netlink {
                 ipv6: Vec::new(),
                 ipv6_scope_ids: Vec::new(),
                 flags: link_msg.header.flags.bits(),
+                oper_state: OperState::from_if_flags(link_msg.header.flags.bits()),
                 transmit_speed: None,
                 receive_speed: None,
                 stats: None,

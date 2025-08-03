@@ -18,7 +18,7 @@ fn main() {
             println!("\t\tis TUN {}", interface.is_tun());
             println!("\t\tis RUNNING {}", interface.is_running());
             println!("\t\tis PHYSICAL {}", interface.is_physical());
-            println!("\tOperational state: {:?}", interface.oper_state());
+            println!("\tOperational state: {:?}", interface.oper_state);
             if let Some(mac_addr) = interface.mac_addr {
                 println!("\tMAC Address: {}", mac_addr);
             } else {
