@@ -318,18 +318,30 @@ pub fn is_physical_interface(interface: &Interface) -> bool {
     target_os = "netbsd"
 ))]
 pub fn get_interface_flags(if_name: &str) -> std::io::Result<u32> {
-    use libc::{c_char, ifreq, ioctl, socket, AF_INET, SOCK_DGRAM};
+    use libc::{c_char, ioctl, socket, AF_INET, SOCK_DGRAM};
     use std::mem;
     use std::os::unix::io::RawFd;
     use std::ptr;
     use sys::SIOCGIFFLAGS;
+
+    #[cfg(target_os = "netbsd")]
+    #[repr(C)]
+    #[derive(Copy, Clone)]
+    struct IfReq {
+        ifr_name: [c_char; libc::IFNAMSIZ],
+        ifru_flags: [libc::c_short; 2],
+    }
+
+    #[cfg(not(target_os = "netbsd"))]
+    use libc::ifreq as IfReq;
 
     let sock: RawFd = unsafe { socket(AF_INET, SOCK_DGRAM, 0) };
     if sock < 0 {
         return Err(std::io::Error::last_os_error());
     }
 
-    let mut ifr: ifreq = unsafe { mem::zeroed() };
+    let mut ifr: IfReq = unsafe { mem::zeroed() };
+
     let ifname_c = std::ffi::CString::new(if_name).map_err(|_| std::io::ErrorKind::InvalidInput)?;
     let bytes = ifname_c.as_bytes_with_nul();
 
