@@ -1,6 +1,6 @@
+use crate::sys;
 use std::fmt;
 use std::str::FromStr;
-use crate::sys;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -50,8 +50,7 @@ impl OperState {
     /// On Windows, this method is **not used** in practice, as the `OperState` is
     /// obtained through native API calls.
     pub fn from_if_flags(if_flags: u32) -> Self {
-        
-        #[cfg(not(target_os = "windows"))] 
+        #[cfg(not(target_os = "windows"))]
         {
             if if_flags & sys::IFF_UP as u32 != 0 {
                 if if_flags & sys::IFF_RUNNING as u32 != 0 {
@@ -64,7 +63,7 @@ impl OperState {
             }
         }
 
-        #[cfg(target_os = "windows")] 
+        #[cfg(target_os = "windows")]
         {
             if if_flags & sys::IFF_UP as u32 != 0 {
                 OperState::Up

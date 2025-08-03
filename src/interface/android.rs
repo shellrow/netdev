@@ -62,7 +62,7 @@ pub mod netlink {
     };
 
     use crate::{
-        interface::{Interface, InterfaceType, OperState, Ipv4Net, Ipv6Net},
+        interface::{Interface, InterfaceType, Ipv4Net, Ipv6Net, OperState},
         mac::MacAddr,
     };
 

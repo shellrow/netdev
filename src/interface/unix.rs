@@ -370,9 +370,7 @@ pub use super::linux::operstate;
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 pub fn operstate(if_name: &str) -> OperState {
     match get_interface_flags(if_name) {
-        Ok(flags) => {
-            OperState::from_if_flags(flags)
-        }
+        Ok(flags) => OperState::from_if_flags(flags),
         Err(_) => OperState::Unknown,
     }
 }
