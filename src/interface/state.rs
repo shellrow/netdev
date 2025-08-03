@@ -41,17 +41,36 @@ impl OperState {
             OperState::Up => "up",
         }
     }
+
+    /// Determine the operational state based on interface flags.
+    ///
+    /// This is primarily a fallback mechanism for platforms where
+    /// `/sys/class/net/*/operstate` or native operstate APIs are not available.
+    ///
+    /// On Windows, this method is **not used** in practice, as the `OperState` is
+    /// obtained through native API calls.
     pub fn from_if_flags(if_flags: u32) -> Self {
-        // Determine the operational state based on interface flags.
-        // This is a fallback for when the operstate not available.
-        if if_flags & sys::IFF_UP as u32 != 0 {
-            if if_flags & sys::IFF_RUNNING as u32 != 0 {
+        
+        #[cfg(not(target_os = "windows"))] 
+        {
+            if if_flags & sys::IFF_UP as u32 != 0 {
+                if if_flags & sys::IFF_RUNNING as u32 != 0 {
+                    OperState::Up
+                } else {
+                    OperState::Dormant
+                }
+            } else {
+                OperState::Down
+            }
+        }
+
+        #[cfg(target_os = "windows")] 
+        {
+            if if_flags & sys::IFF_UP as u32 != 0 {
                 OperState::Up
             } else {
-                OperState::Dormant
+                OperState::Down
             }
-        } else {
-            OperState::Down
         }
     }
 }
