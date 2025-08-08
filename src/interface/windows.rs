@@ -184,6 +184,7 @@ unsafe fn from_wide_string(ptr: *const u16) -> String {
 // Get network interfaces using the IP Helper API
 // Reference: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
 pub fn interfaces() -> Vec<Interface> {
+    #[cfg(feature = "gateway")]
     let local_ip: IpAddr = match super::get_local_ipaddr() {
         Some(local_ip) => local_ip,
         None => IpAddr::V4(Ipv4Addr::LOCALHOST),
