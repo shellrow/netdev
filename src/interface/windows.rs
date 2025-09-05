@@ -60,8 +60,7 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
             &mut out_buf_len,
         )
     };
-    if res == NO_ERROR {
-        assert_eq!(out_buf_len, 6);
+    if res == NO_ERROR && out_buf_len == 6 {
         MacAddr::from_octets(unsafe { target_mac_addr.assume_init() })
     } else {
         MacAddr::zero()
