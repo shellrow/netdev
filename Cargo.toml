@@ -1,6 +1,6 @@
 [package]
 name = "netdev"
-version = "0.37.1"
+version = "0.37.2"
 authors = ["shellrow <shellrow@foctal.com>"]
 edition = "2021"
 description = "Cross-platform library for network interface"
