@@ -1,4 +1,3 @@
-use crate::sys;
 use std::fmt;
 use std::str::FromStr;
 
@@ -52,8 +51,8 @@ impl OperState {
     pub fn from_if_flags(if_flags: u32) -> Self {
         #[cfg(not(target_os = "windows"))]
         {
-            if if_flags & sys::IFF_UP as u32 != 0 {
-                if if_flags & sys::IFF_RUNNING as u32 != 0 {
+            if if_flags & super::flags::IFF_UP as u32 != 0 {
+                if if_flags & super::flags::IFF_RUNNING as u32 != 0 {
                     OperState::Up
                 } else {
                     OperState::Dormant
@@ -65,7 +64,7 @@ impl OperState {
 
         #[cfg(target_os = "windows")]
         {
-            if if_flags & sys::IFF_UP as u32 != 0 {
+            if if_flags & super::flags::IFF_UP as u32 != 0 {
                 OperState::Up
             } else {
                 OperState::Down
@@ -94,5 +93,28 @@ impl FromStr for OperState {
             "up" => Ok(OperState::Up),
             _ => Err(()),
         }
+    }
+}
+
+pub fn operstate(if_name: &str) -> OperState {
+    #[cfg(target_os = "linux")]
+    {
+        crate::os::linux::state::operstate(if_name)
+    }
+    #[cfg(target_os = "android")]
+    {
+        crate::os::android::state::operstate(if_name)
+    }
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::os::darwin::state::operstate(if_name)
+    }
+    #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
+    {
+        crate::os::bsd::state::operstate(if_name)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        crate::os::windows::state::operstate(if_name)
     }
 }

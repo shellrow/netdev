@@ -114,21 +114,25 @@ impl InterfaceType {
     /// Returns OS-specific value of InterfaceType
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn value(&self) -> u32 {
-        use crate::sys;
+        #[cfg(target_os = "android")]
+        use crate::os::android::arp;
+        #[cfg(target_os = "linux")]
+        use crate::os::linux::arp;
+
         match *self {
-            InterfaceType::Ethernet => sys::if_arp::ARPHRD_ETHER,
-            InterfaceType::TokenRing => sys::if_arp::ARPHRD_IEEE802,
-            InterfaceType::Fddi => sys::if_arp::ARPHRD_FDDI,
-            InterfaceType::Ppp => sys::if_arp::ARPHRD_PPP,
-            InterfaceType::Loopback => sys::if_arp::ARPHRD_LOOPBACK,
-            InterfaceType::Ethernet3Megabit => sys::if_arp::ARPHRD_EETHER,
-            InterfaceType::Slip => sys::if_arp::ARPHRD_SLIP,
-            InterfaceType::Atm => sys::if_arp::ARPHRD_ATM,
-            InterfaceType::Wireless80211 => sys::if_arp::ARPHRD_IEEE80211,
-            InterfaceType::Tunnel => sys::if_arp::ARPHRD_TUNNEL,
-            InterfaceType::Isdn => sys::if_arp::ARPHRD_X25,
-            InterfaceType::HighPerformanceSerialBus => sys::if_arp::ARPHRD_IEEE1394,
-            InterfaceType::Can => sys::if_arp::ARPHRD_CAN,
+            InterfaceType::Ethernet => arp::ARPHRD_ETHER,
+            InterfaceType::TokenRing => arp::ARPHRD_IEEE802,
+            InterfaceType::Fddi => arp::ARPHRD_FDDI,
+            InterfaceType::Ppp => arp::ARPHRD_PPP,
+            InterfaceType::Loopback => arp::ARPHRD_LOOPBACK,
+            InterfaceType::Ethernet3Megabit => arp::ARPHRD_EETHER,
+            InterfaceType::Slip => arp::ARPHRD_SLIP,
+            InterfaceType::Atm => arp::ARPHRD_ATM,
+            InterfaceType::Wireless80211 => arp::ARPHRD_IEEE80211,
+            InterfaceType::Tunnel => arp::ARPHRD_TUNNEL,
+            InterfaceType::Isdn => arp::ARPHRD_X25,
+            InterfaceType::HighPerformanceSerialBus => arp::ARPHRD_IEEE1394,
+            InterfaceType::Can => arp::ARPHRD_CAN,
             InterfaceType::UnknownWithValue(v) => v,
             _ => u32::MAX,
         }
