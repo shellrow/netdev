@@ -58,6 +58,7 @@ For more details, see [examples][examples-url] or [doc][doc-url].
     - 13.4.1
     - 11.6
 - Windows 
+    - 11 24H2 26100.6584
     - 11 23H2 22631.4602
     - 11 Pro 22H2 22621.3155
     - 11 22H2 22621.3155
