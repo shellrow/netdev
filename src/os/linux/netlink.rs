@@ -1,10 +1,8 @@
 use netlink_packet_core::{NLM_F_DUMP, NLM_F_REQUEST, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::{
-    AddressFamily, RouteNetlinkMessage,
+    RouteNetlinkMessage,
     address::{AddressAttribute, AddressMessage},
     link::{LinkAttribute, LinkMessage},
-    neighbour::{NeighbourAddress, NeighbourAttribute, NeighbourMessage},
-    route::{RouteAddress, RouteAttribute, RouteMessage},
 };
 use netlink_sys::{Socket, SocketAddr, protocols::NETLINK_ROUTE};
 use std::io::ErrorKind;
@@ -14,6 +12,13 @@ use std::{
     io, thread,
     time::{Duration, Instant},
 };
+
+#[cfg(feature = "gateway")]
+use netlink_packet_route::AddressFamily;
+#[cfg(feature = "gateway")]
+use netlink_packet_route::neighbour::{NeighbourAddress, NeighbourAttribute, NeighbourMessage};
+#[cfg(feature = "gateway")]
+use netlink_packet_route::route::{RouteAddress, RouteAttribute, RouteMessage};
 
 const SEQ_BASE: u32 = 0x6E_64_65_76; // "ndev"
 const RECV_BUFSZ: usize = 1 << 20; // 1MB
@@ -174,6 +179,7 @@ pub fn dump_addrs() -> io::Result<Vec<AddressMessage>> {
     Ok(out)
 }
 
+#[cfg(feature = "gateway")]
 pub fn dump_routes() -> io::Result<Vec<RouteMessage>> {
     let mut sock = open_route_socket()?;
     let seq = SEQ_BASE ^ 0x03;
@@ -192,6 +198,7 @@ pub fn dump_routes() -> io::Result<Vec<RouteMessage>> {
     Ok(out)
 }
 
+#[cfg(feature = "gateway")]
 pub fn dump_neigh() -> io::Result<Vec<NeighbourMessage>> {
     let mut sock = open_route_socket()?;
     let seq = SEQ_BASE ^ 0x04;
@@ -245,6 +252,7 @@ fn ip_from_addr(addr: &AddressMessage) -> Option<(IpAddr, u8)> {
     None
 }
 
+#[cfg(feature = "gateway")]
 fn route_addr_to_ip(a: &RouteAddress) -> Option<IpAddr> {
     match a {
         RouteAddress::Inet(v4) => Some(IpAddr::V4(*v4)),
@@ -253,6 +261,7 @@ fn route_addr_to_ip(a: &RouteAddress) -> Option<IpAddr> {
     }
 }
 
+#[cfg(feature = "gateway")]
 fn route_extract(rt: &RouteMessage) -> (Option<IpAddr>, Option<u8>, Option<IpAddr>, Option<u32>) {
     // (dst, prefix, gateway, oif)
     let mut dst: Option<IpAddr> = None;
@@ -281,6 +290,7 @@ fn route_extract(rt: &RouteMessage) -> (Option<IpAddr>, Option<u8>, Option<IpAdd
     (dst, pfx, gw, oif)
 }
 
+#[cfg(feature = "gateway")]
 fn neigh_addr_to_ip(a: &NeighbourAddress) -> Option<IpAddr> {
     match a {
         NeighbourAddress::Inet(v4) => Some(IpAddr::V4(*v4)),
@@ -290,6 +300,7 @@ fn neigh_addr_to_ip(a: &NeighbourAddress) -> Option<IpAddr> {
     }
 }
 
+#[cfg(feature = "gateway")]
 fn neigh_extract(n: &NeighbourMessage) -> (Option<IpAddr>, Option<[u8; 6]>, Option<u32>) {
     let mut ip = None;
     let mut mac = None;
@@ -375,6 +386,7 @@ pub fn collect_interfaces() -> io::Result<Vec<IfRow>> {
     Ok(base.into_values().collect())
 }
 
+#[cfg(feature = "gateway")]
 #[derive(Debug, Clone)]
 pub struct GwRow {
     #[allow(dead_code)]
@@ -384,6 +396,7 @@ pub struct GwRow {
     pub mac: Option<[u8; 6]>,
 }
 
+#[cfg(feature = "gateway")]
 pub fn collect_routes() -> io::Result<HashMap<u32, GwRow>> {
     let routes = dump_routes()?;
     let neighs = dump_neigh().unwrap_or_default();

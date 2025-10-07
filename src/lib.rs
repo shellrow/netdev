@@ -3,7 +3,8 @@ pub mod interface;
 pub mod net;
 mod os;
 pub mod prelude;
-mod route;
+#[cfg(feature = "gateway")]
+pub mod route;
 pub mod stats;
 
 pub use ipnet;

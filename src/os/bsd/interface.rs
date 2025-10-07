@@ -4,14 +4,16 @@ use std::net::IpAddr;
 use crate::{interface::interface::Interface, os::unix::interface::unix_interfaces};
 
 pub fn interfaces() -> Vec<Interface> {
-    let mut interfaces: Vec<Interface> = unix_interfaces();
-
-    #[cfg(feature = "gateway")]
-    let local_ip_opt: Option<IpAddr> = crate::net::ip::get_local_ipaddr();
-
+    #[cfg(not(feature = "gateway"))]
+    {
+        unix_interfaces()
+    }
     #[cfg(feature = "gateway")]
     {
         use crate::os::unix::dns::get_system_dns_conf;
+
+        let mut interfaces: Vec<Interface> = unix_interfaces();
+        let local_ip_opt: Option<IpAddr> = crate::net::ip::get_local_ipaddr();
 
         let gateway_map = super::route::get_gateway_map();
 
@@ -35,7 +37,6 @@ pub fn interfaces() -> Vec<Interface> {
                 });
             }
         }
+        interfaces
     }
-
-    interfaces
 }

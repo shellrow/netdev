@@ -3,6 +3,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 #[cfg(feature = "gateway")]
 use std::net::{SocketAddr, UdpSocket};
 
+#[cfg(feature = "gateway")]
 fn try_ipv4() -> Option<IpAddr> {
     // Attempt to bind a UDP socket to an unspecified address and port.
     let socket = match UdpSocket::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)) {
@@ -25,6 +26,7 @@ fn try_ipv4() -> Option<IpAddr> {
     };
 }
 
+#[cfg(feature = "gateway")]
 fn try_ipv6() -> Option<IpAddr> {
     // same thing but for IPv6
     let socket = match UdpSocket::bind(SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)) {

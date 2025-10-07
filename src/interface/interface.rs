@@ -1,13 +1,9 @@
-use super::interfaces;
 use crate::interface::state::OperState;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::net::ip::{is_global_ip, is_global_ipv4, is_global_ipv6};
 use crate::stats::counters::InterfaceStats;
 use crate::{interface::types::InterfaceType, net::mac::MacAddr};
-use std::net::{Ipv4Addr, Ipv6Addr};
-
-#[cfg(feature = "gateway")]
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 #[cfg(feature = "gateway")]
 use crate::net::device::NetworkDevice;
@@ -89,7 +85,7 @@ impl Interface {
     pub fn default() -> Result<Interface, String> {
         use crate::net::ip::get_local_ipaddr;
 
-        let interfaces: Vec<Interface> = interfaces();
+        let interfaces: Vec<Interface> = super::interfaces();
         for iface in &interfaces {
             if iface.default {
                 return Ok(iface.clone());
