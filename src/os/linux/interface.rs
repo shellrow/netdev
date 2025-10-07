@@ -7,15 +7,15 @@ use crate::os::unix::interface::unix_interfaces;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 #[cfg(feature = "gateway")]
-use std::net::IpAddr;
+use crate::net::device::NetworkDevice;
+#[cfg(feature = "gateway")]
+use crate::net::ip::get_local_ipaddr;
 #[cfg(feature = "gateway")]
 use crate::os::unix::dns::get_system_dns_conf;
 #[cfg(feature = "gateway")]
 use std::collections::HashMap;
 #[cfg(feature = "gateway")]
-use crate::net::device::NetworkDevice;
-#[cfg(feature = "gateway")]
-use crate::net::ip::get_local_ipaddr;
+use std::net::IpAddr;
 
 fn push_ipv4(v: &mut Vec<Ipv4Net>, add: (Ipv4Addr, u8)) {
     if v.iter()

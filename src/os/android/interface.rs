@@ -3,19 +3,19 @@ use crate::interface::interface::Interface;
 use crate::interface::state::OperState;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::net::mac::MacAddr;
+use crate::os::linux::mtu;
+use crate::os::linux::sysfs;
 use crate::os::unix::interface::unix_interfaces;
 use std::net::{Ipv4Addr, Ipv6Addr};
-use crate::os::linux::sysfs;
-use crate::os::linux::mtu;
 
 #[cfg(feature = "gateway")]
-use crate::os::linux::procfs;
+use crate::net::device::NetworkDevice;
 #[cfg(feature = "gateway")]
 use crate::net::ip::get_local_ipaddr;
 #[cfg(feature = "gateway")]
-use crate::os::unix::dns::get_system_dns_conf;
+use crate::os::linux::procfs;
 #[cfg(feature = "gateway")]
-use crate::net::device::NetworkDevice;
+use crate::os::unix::dns::get_system_dns_conf;
 #[cfg(feature = "gateway")]
 use std::collections::HashMap;
 #[cfg(feature = "gateway")]

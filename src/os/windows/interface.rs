@@ -1,6 +1,8 @@
 use std::net::IpAddr;
 use windows_sys::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
-use windows_sys::Win32::NetworkManagement::IpHelper::{GAA_FLAG_INCLUDE_GATEWAYS, GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH};
+use windows_sys::Win32::NetworkManagement::IpHelper::{
+    GAA_FLAG_INCLUDE_GATEWAYS, GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH,
+};
 use windows_sys::Win32::NetworkManagement::Ndis::NET_IF_OPER_STATUS_UP;
 use windows_sys::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_INET, SOCKET_ADDRESS,
