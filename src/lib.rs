@@ -1,4 +1,3 @@
-mod error;
 pub mod interface;
 pub mod net;
 mod os;
