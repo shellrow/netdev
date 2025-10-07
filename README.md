@@ -69,3 +69,6 @@ For more details, see [examples][examples-url] or [doc][doc-url].
     - 16.0
 - Android (x86_64)
     - 16.0
+- iOS
+    - 18.6.2
+    - 18.1.1
