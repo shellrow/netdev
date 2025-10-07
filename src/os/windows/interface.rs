@@ -1,8 +1,6 @@
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use windows_sys::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
-use windows_sys::Win32::NetworkManagement::IpHelper::{
-    GAA_FLAG_INCLUDE_GATEWAYS, GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH, SendARP,
-};
+use windows_sys::Win32::NetworkManagement::IpHelper::{GAA_FLAG_INCLUDE_GATEWAYS, GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH};
 use windows_sys::Win32::NetworkManagement::Ndis::NET_IF_OPER_STATUS_UP;
 use windows_sys::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_INET, SOCKET_ADDRESS,
@@ -14,17 +12,26 @@ use crate::interface::interface::Interface;
 use crate::interface::state::OperState;
 use crate::interface::types::InterfaceType;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
-use crate::net::device::NetworkDevice;
-use crate::net::ip::get_local_ipaddr;
 use crate::net::mac::MacAddr;
 use crate::stats::counters::InterfaceStats;
 use std::ffi::CStr;
+
+#[cfg(feature = "gateway")]
+use crate::net::device::NetworkDevice;
+#[cfg(feature = "gateway")]
+use crate::net::ip::get_local_ipaddr;
+#[cfg(feature = "gateway")]
 use std::mem::MaybeUninit;
+#[cfg(feature = "gateway")]
+use std::net::Ipv4Addr;
+#[cfg(feature = "gateway")]
+use windows_sys::Win32::NetworkManagement::IpHelper::SendARP;
 
 fn sanitize_u64(val: u64) -> Option<u64> {
     if val == u64::MAX { None } else { Some(val) }
 }
 
+#[cfg(feature = "gateway")]
 fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
     let src_ip_int = u32::from_ne_bytes(src_ip.octets());
     let dst_ip_int = u32::from_ne_bytes(dst_ip.octets());
