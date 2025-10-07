@@ -15,6 +15,7 @@ const CTL_NET: c_int = libc::CTL_NET;
 const NET_RT_DUMP: c_int = 1;
 const NET_RT_FLAGS: c_int = 2;
 
+const RTF_LLINFO: u32 = 1024;
 #[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
 const RTM_VERSION: u8 = 5;
 #[cfg(target_os = "netbsd")]
@@ -411,7 +412,7 @@ fn get_arp_table() -> io::Result<HashMap<IpAddr, MacAddr>> {
         0,
         libc::AF_INET,
         NET_RT_FLAGS,
-        libc::RTF_LLINFO, // ARP/neighbor entries
+        RTF_LLINFO as i32, // ARP/neighbor entries
     ];
     let buf = sysctl_vec(&mut mib)?;
 
