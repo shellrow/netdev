@@ -31,8 +31,6 @@ fn nlmsg_align(n: usize) -> usize {
     (n + NLMSG_ALIGNTO - 1) & !(NLMSG_ALIGNTO - 1)
 }
 
-// ===== socket utils =====
-
 fn open_route_socket() -> io::Result<Socket> {
     let mut sock = Socket::new(NETLINK_ROUTE)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("netlink open: {e}")))?;
@@ -141,8 +139,6 @@ fn recv_multi(
     }
 }
 
-// ===== dumps =====
-
 pub fn dump_links() -> io::Result<Vec<LinkMessage>> {
     let mut sock = open_route_socket()?;
     let seq = SEQ_BASE ^ 0x01;
@@ -216,8 +212,6 @@ pub fn dump_neigh() -> io::Result<Vec<NeighbourMessage>> {
     }
     Ok(out)
 }
-
-// ===== helpers: parse attributes =====
 
 fn mac_from_link(link: &LinkMessage) -> Option<[u8; 6]> {
     for nla in &link.attributes {
@@ -332,8 +326,6 @@ fn mtu_from_link(link: &LinkMessage) -> Option<u32> {
     }
     None
 }
-
-// ====== Public: collect & shape ======
 
 #[derive(Debug, Clone)]
 pub struct IfRow {
