@@ -57,7 +57,7 @@ pub struct Interface {
     /// Statistics for this network interface, such as received and transmitted bytes.
     ///
     /// This field is populated at the time of interface discovery
-    /// (e.g., via [`get_interfaces()`] or [`get_default_interface()`]).
+    /// (e.g., via [`crate::interface::get_interfaces()`] or [`crate::interface::get_default_interface()`]).
     ///
     /// The values represent a snapshot of total RX and TX bytes since system boot,
     /// and include a timestamp (`SystemTime`) indicating when the snapshot was taken.
