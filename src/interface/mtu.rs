@@ -1,11 +1,6 @@
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub(crate) fn get_mtu(_ifa: &libc::ifaddrs, name: &str) -> Option<u32> {
     crate::os::linux::mtu::get_mtu(name)
-}
-
-#[cfg(target_os = "android")]
-pub(crate) fn get_mtu(_ifa: &libc::ifaddrs, name: &str) -> Option<u32> {
-    crate::os::android::mtu::get_mtu(name)
 }
 
 #[cfg(target_vendor = "apple")]

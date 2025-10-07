@@ -114,9 +114,6 @@ impl InterfaceType {
     /// Returns OS-specific value of InterfaceType
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn value(&self) -> u32 {
-        #[cfg(target_os = "android")]
-        use crate::os::android::arp;
-        #[cfg(target_os = "linux")]
         use crate::os::linux::arp;
 
         match *self {

@@ -5,7 +5,11 @@ use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::net::mac::MacAddr;
 use crate::os::unix::interface::unix_interfaces;
 use std::net::{Ipv4Addr, Ipv6Addr};
+use crate::os::linux::sysfs;
+use crate::os::linux::mtu;
 
+#[cfg(feature = "gateway")]
+use crate::os::linux::procfs;
 #[cfg(feature = "gateway")]
 use crate::net::ip::get_local_ipaddr;
 #[cfg(feature = "gateway")]
@@ -66,7 +70,7 @@ pub fn interfaces() -> Vec<Interface> {
                     name: name.clone(),
                     friendly_name: None,
                     description: None,
-                    if_type: super::sysfs::get_interface_type(&name),
+                    if_type: sysfs::get_interface_type(&name),
                     mac_addr: r.mac.map(MacAddr::from_octets),
                     ipv4: Vec::new(),
                     ipv6: Vec::new(),
@@ -127,7 +131,7 @@ pub fn interfaces() -> Vec<Interface> {
         }
         Err(_) => {
             // Fallback: procfs
-            let gateway_map: HashMap<String, NetworkDevice> = super::procfs::get_gateway_map();
+            let gateway_map: HashMap<String, NetworkDevice> = procfs::get_gateway_map();
             for iface in &mut ifaces {
                 if let Some(gateway) = gateway_map.get(&iface.name) {
                     iface.gateway = Some(gateway.clone());
@@ -138,18 +142,18 @@ pub fn interfaces() -> Vec<Interface> {
 
     // Fill other info
     for iface in &mut ifaces {
-        iface.if_type = super::sysfs::get_interface_type(&iface.name);
-        let if_speed = super::sysfs::get_interface_speed(&iface.name);
+        iface.if_type = sysfs::get_interface_type(&iface.name);
+        let if_speed = sysfs::get_interface_speed(&iface.name);
         iface.transmit_speed = if_speed;
         iface.receive_speed = if_speed;
-        iface.oper_state = super::sysfs::operstate(&iface.name);
+        iface.oper_state = sysfs::operstate(&iface.name);
 
         if iface.stats.is_none() {
             iface.stats = crate::stats::counters::get_stats_from_name(&iface.name);
         }
 
         if iface.mtu.is_none() {
-            iface.mtu = super::mtu::get_mtu(&iface.name);
+            iface.mtu = mtu::get_mtu(&iface.name);
         }
 
         #[cfg(feature = "gateway")]

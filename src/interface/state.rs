@@ -97,13 +97,9 @@ impl FromStr for OperState {
 }
 
 pub fn operstate(if_name: &str) -> OperState {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     {
         crate::os::linux::state::operstate(if_name)
-    }
-    #[cfg(target_os = "android")]
-    {
-        crate::os::android::state::operstate(if_name)
     }
     #[cfg(target_vendor = "apple")]
     {
