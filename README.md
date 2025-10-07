@@ -65,3 +65,7 @@ For more details, see [examples][examples-url] or [doc][doc-url].
     - 10 21H2 19044.1586
 - FreeBSD
     - 14
+- Android (arm64)
+    - 16.0
+- Android (x86_64)
+    - 16.0
