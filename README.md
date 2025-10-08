@@ -3,7 +3,7 @@
 [license-badge]: https://img.shields.io/crates/l/netdev.svg
 [examples-url]: https://github.com/shellrow/netdev/tree/main/examples
 [doc-url]: https://docs.rs/netdev/latest/netdev
-[doc-interface-url]: https://docs.rs/netdev/latest/netdev/interface/struct.Interface.html
+[doc-interface-url]: https://docs.rs/netdev/latest/netdev/interface/interface/struct.Interface.html
 [netdev-github-url]: https://github.com/shellrow/netdev
 [default-net-github-url]: https://github.com/shellrow/default-net
 [default-net-crates-io-url]: https://crates.io/crates/default-net
