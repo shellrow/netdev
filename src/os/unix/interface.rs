@@ -1,5 +1,5 @@
 use std::ffi::{CStr, CString};
-use std::mem::{self, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_char;
 use std::str::from_utf8_unchecked;
@@ -44,7 +44,7 @@ fn unix_interfaces_inner(
         let c_str = addr_ref.ifa_name as *const c_char;
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name: String = unsafe { from_utf8_unchecked(bytes).to_owned() };
-        let cap: u32 = mem::size_of::<libc::sockaddr_storage>() as libc::socklen_t;
+        let cap: libc::socklen_t = super::sockaddr::sockaddr_storage_cap();
         let addr_len_opt = unsafe { compute_sockaddr_len(addr_ref.ifa_addr, None, Some(cap)) };
         let (mac, ip, ipv6_scope_id) = match addr_len_opt {
             Some(addr_len) => {

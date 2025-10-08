@@ -651,3 +651,8 @@ pub(crate) unsafe fn netmask_prefix_autolen(sa: *const libc::sockaddr) -> Option
         _ => None,
     }
 }
+
+#[inline]
+pub(crate) fn sockaddr_storage_cap() -> libc::socklen_t {
+    mem::size_of::<libc::sockaddr_storage>().try_into().unwrap()
+}
