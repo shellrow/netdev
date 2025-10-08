@@ -3,7 +3,7 @@
 [license-badge]: https://img.shields.io/crates/l/netdev.svg
 [examples-url]: https://github.com/shellrow/netdev/tree/main/examples
 [doc-url]: https://docs.rs/netdev/latest/netdev
-[doc-interface-url]: https://docs.rs/netdev/latest/netdev/interface/struct.Interface.html
+[doc-interface-url]: https://docs.rs/netdev/latest/netdev/interface/interface/struct.Interface.html
 [netdev-github-url]: https://github.com/shellrow/netdev
 [default-net-github-url]: https://github.com/shellrow/default-net
 [default-net-crates-io-url]: https://crates.io/crates/default-net
@@ -32,7 +32,7 @@ This project was rebranded from [default-net][default-net-crates-io-url] by the 
 Add `netdev` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netdev = "0.37"
+netdev = "0.38"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
@@ -58,9 +58,17 @@ For more details, see [examples][examples-url] or [doc][doc-url].
     - 13.4.1
     - 11.6
 - Windows 
+    - 11 24H2 26100.6584
     - 11 23H2 22631.4602
     - 11 Pro 22H2 22621.3155
     - 11 22H2 22621.3155
     - 10 21H2 19044.1586
 - FreeBSD
     - 14
+- Android (arm64)
+    - 16.0
+- Android (x86_64)
+    - 16.0
+- iOS
+    - 18.6.2
+    - 18.1.1

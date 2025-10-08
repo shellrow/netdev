@@ -1,19 +1,19 @@
-mod db;
-pub mod device;
-#[cfg(feature = "gateway")]
-pub mod gateway;
 pub mod interface;
-mod ip;
-pub mod mac;
-pub mod stats;
-mod sys;
-
-pub use device::NetworkDevice;
+pub mod net;
+mod os;
+pub mod prelude;
 #[cfg(feature = "gateway")]
-pub use gateway::get_default_gateway;
+pub mod route;
+pub mod stats;
+
+pub use ipnet;
+
+pub use interface::get_interfaces;
+pub use interface::interface::Interface;
+pub use net::device::NetworkDevice;
+pub use net::mac::MacAddr;
+
 #[cfg(feature = "gateway")]
 pub use interface::get_default_interface;
-pub use interface::get_interfaces;
-pub use interface::Interface;
-pub use ipnet;
-pub use mac::MacAddr;
+#[cfg(feature = "gateway")]
+pub use route::get_default_gateway;
