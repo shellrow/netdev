@@ -141,7 +141,6 @@ impl<'a> SockaddrRef<'a> {
     }
 }
 
-
 #[inline]
 fn mask_to_prefix_u32(m: u32) -> Option<u8> {
     if m == 0 {
