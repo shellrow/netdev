@@ -141,29 +141,6 @@ impl<'a> SockaddrRef<'a> {
     }
 }
 
-#[allow(dead_code)]
-pub(crate) unsafe fn storage_to_socketaddr(
-    storage: &libc::sockaddr_storage,
-    len: libc::socklen_t,
-) -> Option<SocketAddr> {
-    let sa = storage as *const _ as *const libc::sockaddr;
-    let opt_sa = unsafe { SockaddrRef::from_raw(sa, len) };
-    opt_sa.map(|s| s.to_socket_addr())
-}
-
-#[allow(dead_code)]
-pub(crate) fn prefix_from_netmask(netmask: SockaddrRef<'_>) -> Option<u8> {
-    match netmask {
-        SockaddrRef::V4(sin) => {
-            let m = u32::from_be((*sin).sin_addr.s_addr as u32);
-            mask_to_prefix_u32(m)
-        }
-        SockaddrRef::V6(sin6) => {
-            let bytes = (*sin6).sin6_addr.s6_addr;
-            mask_to_prefix_128(&bytes)
-        }
-    }
-}
 
 #[inline]
 fn mask_to_prefix_u32(m: u32) -> Option<u8> {
@@ -203,98 +180,6 @@ fn mask_to_prefix_128(b: &[u8; 16]) -> Option<u8> {
         }
     }
     Some(count)
-}
-
-#[allow(dead_code)]
-pub(crate) fn ip_and_prefix_from_pair(
-    addr: SockaddrRef<'_>,
-    netmask: Option<SockaddrRef<'_>>,
-) -> Option<(IpAddr, u8, u32)> {
-    let ip = addr.to_ip();
-    let scope = addr.to_ipv6_scope().unwrap_or(0);
-    let prefix = match netmask {
-        Some(m) => prefix_from_netmask(m)?,
-        None => match ip {
-            IpAddr::V4(_) => 32,
-            IpAddr::V6(_) => 128,
-        },
-    };
-    Some((ip, prefix, scope))
-}
-
-#[allow(dead_code)]
-#[inline]
-pub(crate) fn to_sockaddr_storage(
-    ip: IpAddr,
-    port: u16,
-) -> (libc::sockaddr_storage, libc::socklen_t) {
-    to_sockaddr_storage_with(ip, port, 0, 0)
-}
-
-pub(crate) fn to_sockaddr_storage_with(
-    ip: IpAddr,
-    port: u16,
-    flowinfo: u32,
-    scope_id: u32,
-) -> (libc::sockaddr_storage, libc::socklen_t) {
-    unsafe {
-        let mut storage: libc::sockaddr_storage = core::mem::zeroed();
-        match ip {
-            IpAddr::V4(v4) => {
-                let sin = &mut *(&mut storage as *mut _ as *mut libc::sockaddr_in);
-                sin.sin_family = libc::AF_INET as libc::sa_family_t;
-                sin.sin_port = port.to_be();
-                sin.sin_addr = libc::in_addr {
-                    s_addr: u32::from(v4).to_be(),
-                };
-                (
-                    storage,
-                    core::mem::size_of::<libc::sockaddr_in>() as libc::socklen_t,
-                )
-            }
-            IpAddr::V6(v6) => {
-                let sin6 = &mut *(&mut storage as *mut _ as *mut libc::sockaddr_in6);
-                sin6.sin6_family = libc::AF_INET6 as libc::sa_family_t;
-                sin6.sin6_port = port.to_be();
-                sin6.sin6_flowinfo = flowinfo;
-                sin6.sin6_addr = libc::in6_addr {
-                    s6_addr: v6.octets(),
-                };
-                sin6.sin6_scope_id = scope_id;
-                (
-                    storage,
-                    core::mem::size_of::<libc::sockaddr_in6>() as libc::socklen_t,
-                )
-            }
-        }
-    }
-}
-
-#[allow(dead_code)]
-#[inline]
-pub(crate) fn socketaddr_to_storage(sa: &SocketAddr) -> (libc::sockaddr_storage, libc::socklen_t) {
-    match sa {
-        SocketAddr::V4(v4) => to_sockaddr_storage(IpAddr::V4(*v4.ip()), v4.port()),
-        SocketAddr::V6(v6) => to_sockaddr_storage_with(
-            IpAddr::V6(*v6.ip()),
-            v6.port(),
-            v6.flowinfo(),
-            v6.scope_id(),
-        ),
-    }
-}
-
-#[allow(dead_code)]
-#[inline]
-pub(crate) unsafe fn try_ip_from_raw(
-    sa: *const libc::sockaddr,
-    len: libc::socklen_t,
-) -> Option<(IpAddr, Option<u32>)> {
-    let sar: Option<SockaddrRef<'_>> = unsafe { SockaddrRef::from_raw(sa, len) };
-    sar.map(|s| match s {
-        SockaddrRef::V4(_) => (s.to_ip(), None),
-        SockaddrRef::V6(_) => (s.to_ip(), s.to_ipv6_scope()),
-    })
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
