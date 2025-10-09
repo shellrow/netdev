@@ -58,7 +58,7 @@ pub fn get_interface_flags(if_name: &str) -> std::io::Result<u32> {
     if res < 0 {
         Err(std::io::Error::last_os_error())
     } else {
-        #[cfg(target_vendor = "apple")]
+        #[cfg(any(target_vendor = "apple", target_os = "openbsd"))]
         {
             Ok(unsafe { ifr.ifr_ifru.ifru_flags as u32 })
         }
@@ -68,7 +68,7 @@ pub fn get_interface_flags(if_name: &str) -> std::io::Result<u32> {
             Ok(ifr.ifru_flags[0] as u32)
         }
 
-        #[cfg(all(not(target_vendor = "apple"), not(target_os = "netbsd")))]
+        #[cfg(not(any(target_vendor = "apple", target_os = "netbsd", target_os = "openbsd")))]
         {
             Ok(unsafe { ifr.ifr_ifru.ifru_flags[0] as u32 })
         }
