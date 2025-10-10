@@ -9,13 +9,9 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 #[cfg(feature = "gateway")]
 use crate::net::device::NetworkDevice;
 #[cfg(feature = "gateway")]
-use crate::net::ip::get_local_ipaddr;
-#[cfg(feature = "gateway")]
 use crate::os::unix::dns::get_system_dns_conf;
 #[cfg(feature = "gateway")]
 use std::collections::HashMap;
-#[cfg(feature = "gateway")]
-use std::net::IpAddr;
 
 fn push_ipv4(v: &mut Vec<Ipv4Net>, add: (Ipv4Addr, u8)) {
     if v.iter()
@@ -51,10 +47,6 @@ fn calc_v6_scope_id(addr: &Ipv6Addr, ifindex: u32) -> u32 {
 
 pub fn interfaces() -> Vec<Interface> {
     let mut ifaces = Vec::new();
-
-    #[cfg(feature = "gateway")]
-    let local_ip_opt: Option<IpAddr> = get_local_ipaddr();
-
     // Fill ifaces via netlink first
     // If netlink fails, fallback to unix_interfaces
     match netlink::collect_interfaces() {
@@ -151,23 +143,14 @@ pub fn interfaces() -> Vec<Interface> {
         if iface.mtu.is_none() {
             iface.mtu = super::mtu::get_mtu(&iface.name);
         }
-
-        #[cfg(feature = "gateway")]
-        {
-            if let Some(local_ip) = local_ip_opt {
-                match local_ip {
-                    IpAddr::V4(local_ipv4) => {
-                        if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
-                            iface.default = true;
-                            iface.dns_servers = get_system_dns_conf();
-                        }
-                    }
-                    IpAddr::V6(local_ipv6) => {
-                        if iface.ipv6.iter().any(|x| x.addr() == local_ipv6) {
-                            iface.default = true;
-                            iface.dns_servers = get_system_dns_conf();
-                        }
-                    }
+    }
+    #[cfg(feature = "gateway")]
+    {
+        if let Some(local_ip) = crate::net::ip::get_local_ipaddr() {
+            if let Some(idx) = crate::interface::pick_default_iface_index(&ifaces, local_ip) {
+                if let Some(iface) = ifaces.iter_mut().find(|it| it.index == idx) {
+                    iface.default = true;
+                    iface.dns_servers = get_system_dns_conf();
                 }
             }
         }
