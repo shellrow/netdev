@@ -6,14 +6,16 @@ pub mod types;
 
 use crate::interface::interface::Interface;
 
+#[cfg(feature = "gateway")]
+use std::net::IpAddr;
+
 /// Get default Network Interface
 #[cfg(feature = "gateway")]
 pub fn get_default_interface() -> Result<Interface, String> {
     use crate::net::ip::get_local_ipaddr;
-    use std::net::IpAddr;
 
-    let interfaces: Vec<Interface> = interfaces();
-    for iface in &interfaces {
+    let ifaces: Vec<Interface> = interfaces();
+    for iface in &ifaces {
         if iface.default {
             return Ok(iface.clone());
         }
@@ -22,26 +24,46 @@ pub fn get_default_interface() -> Result<Interface, String> {
         Some(local_ip) => local_ip,
         None => return Err(String::from("Local IP address not found")),
     };
-    for iface in interfaces {
-        match local_ip {
-            IpAddr::V4(local_ipv4) => {
-                if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
-                    return Ok(iface);
-                }
-            }
-            IpAddr::V6(local_ipv6) => {
-                if iface.ipv6.iter().any(|x| x.addr() == local_ipv6) {
-                    return Ok(iface);
-                }
-            }
-        }
-    }
-    Err(String::from("Default Interface not found"))
+    let idx: u32 = pick_default_iface_index(&ifaces, local_ip)
+        .ok_or_else(|| String::from("Default interface not found"))?;
+    ifaces
+        .into_iter()
+        .find(|it| it.index == idx)
+        .ok_or_else(|| String::from("Default interface not found"))
 }
 
 /// Get a list of available Network Interfaces
 pub fn get_interfaces() -> Vec<Interface> {
     interfaces()
+}
+
+/// Pick the interface index corresponding to the system's default route.
+/// Prefers exact IP match; falls back to subnet containment.
+#[cfg(feature = "gateway")]
+pub(crate) fn pick_default_iface_index(ifaces: &[Interface], local_ip: IpAddr) -> Option<u32> {
+    let mut subnet_candidate: Option<u32> = None;
+
+    for iface in ifaces {
+        match local_ip {
+            IpAddr::V4(ipv4) => {
+                if iface.ipv4.iter().any(|x| x.addr() == ipv4) {
+                    return Some(iface.index);
+                }
+                if subnet_candidate.is_none() && iface.ipv4.iter().any(|x| x.contains(&ipv4)) {
+                    subnet_candidate = Some(iface.index);
+                }
+            }
+            IpAddr::V6(ipv6) => {
+                if iface.ipv6.iter().any(|x| x.addr() == ipv6) {
+                    return Some(iface.index);
+                }
+                if subnet_candidate.is_none() && iface.ipv6.iter().any(|x| x.contains(&ipv6)) {
+                    subnet_candidate = Some(iface.index);
+                }
+            }
+        }
+    }
+    subnet_candidate
 }
 
 pub(crate) fn interfaces() -> Vec<Interface> {
