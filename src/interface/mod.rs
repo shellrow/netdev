@@ -97,29 +97,32 @@ pub(crate) fn interfaces() -> Vec<Interface> {
 #[cfg(test)]
 mod tests {
     #![cfg(feature = "gateway")]
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-    use crate::interface::{interface::Interface, pick_default_iface_index};
     use crate::interface::types::InterfaceType;
+    use crate::interface::{interface::Interface, pick_default_iface_index};
     use ipnet::{Ipv4Net, Ipv6Net};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     #[test]
     fn exact_match_and_fallback_v4() {
         let mut a = Interface::dummy();
         a.index = 1;
         a.if_type = InterfaceType::Ethernet;
-        a.ipv4 = vec![Ipv4Net::new(Ipv4Addr::new(192,168,1,10), 24).unwrap()];
+        a.ipv4 = vec![Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 10), 24).unwrap()];
 
         let mut b = Interface::dummy();
         b.index = 2;
         b.if_type = InterfaceType::Ethernet;
-        b.ipv4 = vec![Ipv4Net::new(Ipv4Addr::new(10,0,0,2), 8).unwrap()];
+        b.ipv4 = vec![Ipv4Net::new(Ipv4Addr::new(10, 0, 0, 2), 8).unwrap()];
 
         // Prefers exact match
-        let local = IpAddr::V4(Ipv4Addr::new(192,168,1,10));
-        assert_eq!(pick_default_iface_index(&[a.clone(), b.clone()], local), Some(1));
+        let local = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10));
+        assert_eq!(
+            pick_default_iface_index(&[a.clone(), b.clone()], local),
+            Some(1)
+        );
 
         // Fallback to subnet match
-        let in_subnet = IpAddr::V4(Ipv4Addr::new(10,0,5,23));
+        let in_subnet = IpAddr::V4(Ipv4Addr::new(10, 0, 5, 23));
         assert_eq!(pick_default_iface_index(&[a, b], in_subnet), Some(2));
     }
 
@@ -137,7 +140,10 @@ mod tests {
 
         // Prefers exact match
         let local = IpAddr::V6("2001:db8::10".parse().unwrap());
-        assert_eq!(pick_default_iface_index(&[a.clone(), b.clone()], local), Some(11));
+        assert_eq!(
+            pick_default_iface_index(&[a.clone(), b.clone()], local),
+            Some(11)
+        );
 
         // Fallback to subnet match
         let in_subnet = IpAddr::V6("2606:4700::abcd".parse().unwrap());
@@ -148,8 +154,8 @@ mod tests {
     fn no_exact_nor_subnet() {
         let mut a = Interface::dummy();
         a.index = 3;
-        a.ipv4 = vec![Ipv4Net::new(Ipv4Addr::new(192,168,0,5), 24).unwrap()];
-        let local = IpAddr::V4(Ipv4Addr::new(172,16,0,1));
+        a.ipv4 = vec![Ipv4Net::new(Ipv4Addr::new(192, 168, 0, 5), 24).unwrap()];
+        let local = IpAddr::V4(Ipv4Addr::new(172, 16, 0, 1));
         assert_eq!(pick_default_iface_index(&[a], local), None);
     }
 }

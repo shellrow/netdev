@@ -35,8 +35,8 @@ pub fn is_known_loopback_mac(mac: &MacAddr) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::net::mac::MacAddr;
     use crate::net::db::oui;
+    use crate::net::mac::MacAddr;
 
     #[test]
     fn detects_loopback() {
