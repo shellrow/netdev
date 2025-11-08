@@ -246,3 +246,30 @@ impl Interface {
         crate::stats::counters::update_interface_stats(self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::interface::interface::Interface;
+    use ipnet::{Ipv4Net, Ipv6Net};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn global_helpers_filter() {
+        let mut itf = Interface::dummy();
+        itf.ipv4 = vec![
+            Ipv4Net::new(Ipv4Addr::new(10, 0, 0, 1), 8).unwrap(), // private
+            Ipv4Net::new(Ipv4Addr::new(1, 1, 1, 1), 32).unwrap(), // global
+        ];
+        itf.ipv6 = vec![
+            Ipv6Net::new(Ipv6Addr::LOCALHOST, 128).unwrap(), // loopback
+            Ipv6Net::new("2606:4700:4700::1111".parse().unwrap(), 128).unwrap(), // global
+        ];
+
+        // Check global_ip_addrs() fillters correctly
+        let globals = itf.global_ip_addrs();
+        assert!(globals.contains(&IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1))));
+        assert!(globals.contains(&IpAddr::V6("2606:4700:4700::1111".parse().unwrap())));
+        assert!(!globals.contains(&IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))));
+        assert!(!globals.contains(&IpAddr::V6(Ipv6Addr::LOCALHOST)));
+    }
+}

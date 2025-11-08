@@ -32,3 +32,21 @@ pub fn is_known_loopback_mac(mac: &MacAddr) -> bool {
     let mac = mac.address();
     KNOWN_LOOPBACK_MAC_ADDRESSES.contains(&mac.to_uppercase().as_str())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::net::db::oui;
+    use crate::net::mac::MacAddr;
+
+    #[test]
+    fn detects_loopback() {
+        let mac: MacAddr = "00:00:00:00:00:00".parse().unwrap();
+        assert!(oui::is_known_loopback_mac(&mac));
+    }
+
+    #[test]
+    fn detects_virtual() {
+        let mac: MacAddr = "00:50:56:AA:BB:CC".parse().unwrap();
+        assert!(oui::is_virtual_mac(&mac));
+    }
+}
