@@ -1,13 +1,13 @@
 //! SystemConfiguration::NetworkInterface-related types and functions for macOS.
 
-use std::collections::HashMap;
-use std::io::Cursor;
+use crate::interface::types::InterfaceType;
 use mac_addr::MacAddr;
 use objc2_core_foundation::{CFArray, CFRetained};
 use objc2_system_configuration::SCNetworkInterface;
-use crate::interface::types::InterfaceType;
+use std::collections::HashMap;
+use std::io::Cursor;
 
-const SC_NWIF_PATH : &str = "/Library/Preferences/SystemConfiguration/NetworkInterfaces.plist";
+const SC_NWIF_PATH: &str = "/Library/Preferences/SystemConfiguration/NetworkInterfaces.plist";
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct SCInterface {
@@ -67,16 +67,14 @@ pub(crate) fn get_sc_interface_map() -> HashMap<String, SCInterface> {
 
         let name = bsd_name.to_string();
 
-        let sc_if_type: Option<String> = sc_iface
-            .interface_type()
-            .map(|s| s.to_string());
+        let sc_if_type: Option<String> = sc_iface.interface_type().map(|s| s.to_string());
 
         let friendly_name = sc_iface.localized_display_name().map(|s| s.to_string());
 
-        let mac: Option<MacAddr> = sc_iface.hardware_address_string().and_then(|mac_str| {
-            Some(MacAddr::from_hex_format(&mac_str.to_string()))
-        });
-        
+        let mac: Option<MacAddr> = sc_iface
+            .hardware_address_string()
+            .and_then(|mac_str| Some(MacAddr::from_hex_format(&mac_str.to_string())));
+
         if_map.insert(
             name.clone(),
             SCInterface {
@@ -134,7 +132,8 @@ fn load_sc_interfaces_plist_map(bytes: &[u8]) -> HashMap<String, SCInterface> {
 
         let active = d.get("Active").and_then(|v| v.as_boolean());
 
-        let mac = d.get("IOMACAddress")
+        let mac = d
+            .get("IOMACAddress")
             .and_then(|v| v.as_data())
             .and_then(|data| {
                 if data.len() == 6 {

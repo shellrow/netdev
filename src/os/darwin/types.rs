@@ -1,5 +1,5 @@
-use std::{ffi::CString, mem};
 use crate::interface::types::InterfaceType;
+use std::{ffi::CString, mem};
 
 /// Get the interface type from ifaddrs if_data.ifi_type field.
 pub fn get_interface_type(addr_ref: &libc::ifaddrs) -> InterfaceType {
@@ -86,14 +86,11 @@ pub(crate) fn get_functional_type(name: &str) -> InterfaceType {
     if !ok {
         return InterfaceType::Unknown;
     }
-    
+
     #[allow(clippy::unnecessary_cast)]
-    let type_id = unsafe {
-        ifr.ifr_ifru.ifru_functional_type as u32
-    };
+    let type_id = unsafe { ifr.ifr_ifru.ifru_functional_type as u32 };
 
     map_to_interface_type(type_id)
-
 }
 
 pub(crate) fn interface_type_by_name(name: &str) -> Option<InterfaceType> {

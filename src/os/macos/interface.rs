@@ -1,13 +1,13 @@
+use crate::os::darwin::types::{get_functional_type, interface_type_by_name};
+use crate::os::macos::sc::{get_sc_interface_map, read_sc_interfaces_plist_map};
 use crate::{
     interface::interface::Interface,
     os::{macos::sc::SCInterface, unix::interface::unix_interfaces},
     prelude::InterfaceType,
 };
-use crate::os::macos::sc::{read_sc_interfaces_plist_map, get_sc_interface_map};
-use crate::os::darwin::types::{get_functional_type, interface_type_by_name};
 use std::collections::HashMap;
 
-pub fn interfaces() -> Vec<Interface> {    
+pub fn interfaces() -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = unix_interfaces();
 
     let if_extra_map: HashMap<String, SCInterface> = match read_sc_interfaces_plist_map() {
@@ -15,7 +15,7 @@ pub fn interfaces() -> Vec<Interface> {
         Err(_) => {
             // Fallback to SCNetworkInterfaceCopyAll ...
             get_sc_interface_map()
-        },
+        }
     };
 
     #[cfg(feature = "gateway")]
@@ -32,7 +32,7 @@ pub fn interfaces() -> Vec<Interface> {
         if let Some(name_type) = interface_type_by_name(&iface.name) {
             iface.if_type = name_type;
         }
-        
+
         if let Some(sc_inface) = if_extra_map.get(&iface.name) {
             if let Some(sc_type) = sc_inface.if_type() {
                 iface.if_type = sc_type;
