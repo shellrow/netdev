@@ -1,29 +1,49 @@
 use crate::{interface::interface::Interface, os::unix::interface::unix_interfaces};
+use crate::interface::types::InterfaceType;
 
 pub fn interfaces() -> Vec<Interface> {
-    #[cfg(not(feature = "gateway"))]
-    {
-        unix_interfaces()
-    }
-    #[cfg(feature = "gateway")]
-    {
-        use crate::os::unix::dns::get_system_dns_conf;
+    let mut ifaces: Vec<Interface> = unix_interfaces();
 
-        let mut ifaces: Vec<Interface> = unix_interfaces();
-        let gateway_map = crate::os::darwin::route::get_gateway_map();
-        for iface in &mut ifaces {
+    let nw_iface_map = crate::os::darwin::network::nw_interface_map();
+
+    #[cfg(feature = "gateway")]
+    let gateway_map = crate::os::darwin::route::get_gateway_map();
+
+    for iface in &mut ifaces {
+        // If interface type is Ethernet, try to get a more accurate type
+        if iface.if_type == InterfaceType::Ethernet {
+            let ft: InterfaceType = crate::os::darwin::types::get_functional_type(&iface.name);
+            if ft != InterfaceType::Unknown {
+                iface.if_type = ft;
+            }
+        }
+        if let Some(name_type) = crate::os::darwin::types::interface_type_by_name(&iface.name) {
+            iface.if_type = name_type;
+        }
+
+        if let Some(nw_iface) = nw_iface_map.get(&iface.name) {
+            iface.if_type = nw_iface.if_type;
+        }
+
+        #[cfg(feature = "gateway")]
+        {
             if let Some(gateway) = gateway_map.get(&iface.index) {
                 iface.gateway = Some(gateway.clone());
             }
         }
+    }
+
+    #[cfg(feature = "gateway")]
+    {
         if let Some(local_ip) = crate::net::ip::get_local_ipaddr() {
             if let Some(idx) = crate::interface::pick_default_iface_index(&ifaces, local_ip) {
                 if let Some(iface) = ifaces.iter_mut().find(|it| it.index == idx) {
                     iface.default = true;
-                    iface.dns_servers = get_system_dns_conf();
+                    iface.dns_servers = crate::os::unix::dns::get_system_dns_conf();
                 }
             }
         }
-        ifaces
     }
+
+    ifaces
 }

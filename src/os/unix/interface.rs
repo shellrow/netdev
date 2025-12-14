@@ -8,6 +8,7 @@ use super::sockaddr::{SockaddrRef, compute_sockaddr_len, netmask_ip_autolen, try
 use crate::interface::interface::Interface;
 use crate::interface::mtu::get_mtu;
 use crate::interface::state::OperState;
+use crate::interface::types::InterfaceType;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::os::unix::types::get_interface_type;
 use crate::stats::counters::{InterfaceStats, get_stats};
@@ -40,7 +41,7 @@ fn unix_interfaces_inner(
     let mut addr = addrs;
     while !addr.is_null() {
         let addr_ref: &libc::ifaddrs = unsafe { &*addr };
-        let if_type = get_interface_type(addr_ref);
+        let if_type: InterfaceType = get_interface_type(addr_ref);
         let c_str = addr_ref.ifa_name as *const c_char;
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name: String = unsafe { from_utf8_unchecked(bytes).to_owned() };

@@ -1,27 +1,41 @@
 use crate::{
-    interface::{interface::Interface, types::InterfaceType},
-    os::unix::interface::unix_interfaces,
+    interface::interface::Interface,
+    os::{macos::sc::SCInterface, unix::interface::unix_interfaces},
+    prelude::InterfaceType,
 };
+use std::collections::HashMap;
 
-#[derive(Debug)]
-pub struct SCInterface {
-    #[allow(dead_code)]
-    pub name: String,
-    pub friendly_name: Option<String>,
-    pub interface_type: InterfaceType,
-}
-
-pub fn interfaces() -> Vec<Interface> {
-    let type_map = super::types::get_if_type_map();
+pub fn interfaces() -> Vec<Interface> {    
     let mut ifaces: Vec<Interface> = unix_interfaces();
+
+    let if_extra_map: HashMap<String, SCInterface> = match crate::os::macos::sc::read_networkinterfaces_plist_map() {
+        Ok(m) => m,
+        Err(_) => {
+            // Fallback to SCNetworkInterfaceCopyAll ...
+            crate::os::macos::sc::get_sc_if_map()
+        },
+    };
 
     #[cfg(feature = "gateway")]
     let gateway_map = crate::os::darwin::route::get_gateway_map();
 
     for iface in &mut ifaces {
-        if let Some(sc_interface) = type_map.get(&iface.name) {
-            iface.if_type = sc_interface.interface_type;
-            iface.friendly_name = sc_interface.friendly_name.clone();
+        // If interface type is Ethernet, try to get a more accurate type
+        if iface.if_type == InterfaceType::Ethernet {
+            let ft: InterfaceType = crate::os::darwin::types::get_functional_type(&iface.name);
+            if ft != InterfaceType::Unknown {
+                iface.if_type = ft;
+            }
+        }
+        if let Some(name_type) = crate::os::darwin::types::interface_type_by_name(&iface.name) {
+            iface.if_type = name_type;
+        }
+        
+        if let Some(sc_inface) = if_extra_map.get(&iface.name) {
+            if let Some(sc_type) = sc_inface.if_type() {
+                iface.if_type = sc_type;
+            }
+            iface.friendly_name = sc_inface.friendly_name.clone();
         }
 
         #[cfg(feature = "gateway")]
