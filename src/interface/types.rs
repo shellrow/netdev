@@ -69,6 +69,8 @@ pub enum InterfaceType {
     Bridge,
     /// Controller Area Network
     Can,
+    /// Peer-to-Peer Wireless (Wi-Fi Direct / AWDL)
+    PeerToPeerWireless,
     /// Unknown interface type with a specific value
     UnknownWithValue(u32),
 }
@@ -198,6 +200,7 @@ impl InterfaceType {
             InterfaceType::Wwanpp => String::from("WWANPP"),
             InterfaceType::Wwanpp2 => String::from("WWANPP2"),
             InterfaceType::Can => String::from("CAN"),
+            InterfaceType::PeerToPeerWireless => String::from("Peer-to-Peer Wireless"),
             InterfaceType::UnknownWithValue(v) => format!("Unknown ({})", v),
         }
     }
