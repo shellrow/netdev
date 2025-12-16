@@ -5,6 +5,8 @@ use crate::{interface::interface::Interface, os::unix::interface::unix_interface
 pub fn interfaces() -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = unix_interfaces();
 
+    let nw_iface_map = super::network::nw_interface_map();
+
     #[cfg(feature = "gateway")]
     let gateway_map = crate::os::darwin::route::get_gateway_map();
 
@@ -19,6 +21,10 @@ pub fn interfaces() -> Vec<Interface> {
 
         if let Some(name_type) = interface_type_by_name(&iface.name) {
             iface.if_type = name_type;
+        }
+
+        if let Some(nw_iface) = nw_iface_map.get(&iface.name) {
+            iface.if_type = nw_iface.if_type;
         }
 
         #[cfg(feature = "gateway")]
