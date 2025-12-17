@@ -9,7 +9,9 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use block2::RcBlock;
-use dispatch2::{DispatchQueue, DispatchQueueGlobalPriority, DispatchRetained, GlobalQueueIdentifier};
+use dispatch2::{
+    DispatchQueue, DispatchQueueGlobalPriority, DispatchRetained, GlobalQueueIdentifier,
+};
 
 use crate::interface::types::InterfaceType;
 
