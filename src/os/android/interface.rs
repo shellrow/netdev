@@ -3,19 +3,16 @@ use crate::interface::interface::Interface;
 use crate::interface::state::OperState;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::net::mac::MacAddr;
-use crate::os::linux::mtu;
-use crate::os::linux::sysfs;
-use crate::os::unix::interface::unix_interfaces;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 #[cfg(feature = "gateway")]
 use crate::net::device::NetworkDevice;
 #[cfg(feature = "gateway")]
-use crate::os::linux::procfs;
-#[cfg(feature = "gateway")]
 use crate::os::unix::dns::get_system_dns_conf;
 #[cfg(feature = "gateway")]
 use std::collections::HashMap;
+
+use crate::os::unix::interface::unix_interfaces;
 
 fn push_ipv4(v: &mut Vec<Ipv4Net>, add: (Ipv4Addr, u8)) {
     if v.iter()
@@ -50,9 +47,8 @@ fn calc_v6_scope_id(addr: &Ipv6Addr, ifindex: u32) -> u32 {
 }
 
 pub fn interfaces() -> Vec<Interface> {
-    let mut ifaces = Vec::new();
-    // Fill ifaces via netlink first
-    // If netlink fails, fallback to unix_interfaces
+    let mut ifaces: Vec<Interface> = Vec::new();
+
     match netlink::collect_interfaces() {
         Ok(rows) => {
             for r in rows {
@@ -62,7 +58,7 @@ pub fn interfaces() -> Vec<Interface> {
                     name: name.clone(),
                     friendly_name: None,
                     description: None,
-                    if_type: sysfs::get_interface_type(&name),
+                    if_type: super::types::guess_type_by_name(&name).unwrap_or(r.if_type),
                     mac_addr: r.mac.map(MacAddr::from_octets),
                     ipv4: Vec::new(),
                     ipv6: Vec::new(),
@@ -71,7 +67,7 @@ pub fn interfaces() -> Vec<Interface> {
                     oper_state: OperState::from_if_flags(r.flags),
                     transmit_speed: None,
                     receive_speed: None,
-                    stats: None,
+                    stats: r.stats.clone(),
                     #[cfg(feature = "gateway")]
                     gateway: None,
                     #[cfg(feature = "gateway")]
@@ -93,27 +89,31 @@ pub fn interfaces() -> Vec<Interface> {
             }
         }
         Err(_) => {
-            // Fallback: unix ifaddrs
+            // fallback: unix ifaddrs
             ifaces = unix_interfaces();
+
+            for iface in &mut ifaces {
+                if let Some(t) = super::types::guess_type_by_name(&iface.name) {
+                    iface.if_type = t;
+                }
+            }
         }
     }
 
-    // Fill gateway info if feature enabled
+    // Fill gateway info
     #[cfg(feature = "gateway")]
-    match netlink::collect_routes() {
-        Ok(gmap) => {
+    {
+        if let Ok(gmap) = netlink::collect_routes() {
             let by_index: HashMap<u32, &netlink::GwRow> =
                 gmap.iter().map(|(k, v)| (*k, v)).collect();
+
             for iface in &mut ifaces {
                 if iface.index == 0 {
                     continue;
                 }
                 if let Some(row) = by_index.get(&iface.index) {
                     let dev = NetworkDevice {
-                        mac_addr: row
-                            .mac
-                            .map(|m| MacAddr::from_octets(m))
-                            .unwrap_or(MacAddr::zero()),
+                        mac_addr: row.mac.map(MacAddr::from_octets).unwrap_or(MacAddr::zero()),
                         ipv4: row.gw_v4.clone(),
                         ipv6: row.gw_v6.clone(),
                     };
@@ -121,35 +121,7 @@ pub fn interfaces() -> Vec<Interface> {
                 }
             }
         }
-        Err(_) => {
-            // Fallback: procfs
-            let gateway_map: HashMap<String, NetworkDevice> = procfs::get_gateway_map();
-            for iface in &mut ifaces {
-                if let Some(gateway) = gateway_map.get(&iface.name) {
-                    iface.gateway = Some(gateway.clone());
-                }
-            }
-        }
-    }
 
-    // Fill other info
-    for iface in &mut ifaces {
-        iface.if_type = sysfs::get_interface_type(&iface.name);
-        let if_speed = sysfs::get_interface_speed(&iface.name);
-        iface.transmit_speed = if_speed;
-        iface.receive_speed = if_speed;
-        iface.oper_state = sysfs::operstate(&iface.name);
-
-        if iface.stats.is_none() {
-            iface.stats = crate::stats::counters::get_stats_from_name(&iface.name);
-        }
-
-        if iface.mtu.is_none() {
-            iface.mtu = mtu::get_mtu(&iface.name);
-        }
-    }
-    #[cfg(feature = "gateway")]
-    {
         if let Some(local_ip) = crate::net::ip::get_local_ipaddr() {
             if let Some(idx) = crate::interface::pick_default_iface_index(&ifaces, local_ip) {
                 if let Some(iface) = ifaces.iter_mut().find(|it| it.index == idx) {
@@ -159,5 +131,6 @@ pub fn interfaces() -> Vec<Interface> {
             }
         }
     }
+
     ifaces
 }

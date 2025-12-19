@@ -1,8 +1,11 @@
 #[cfg(target_family = "unix")]
 pub use crate::os::unix::flags::*;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(target_os = "linux")]
 pub use crate::os::linux::flags::*;
+
+#[cfg(target_os = "android")]
+pub use crate::os::android::flags::*;
 
 #[cfg(target_vendor = "apple")]
 pub use crate::os::darwin::flags::*;

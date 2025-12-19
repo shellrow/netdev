@@ -10,7 +10,14 @@ pub fn get_interface_type(addr_ref: &libc::ifaddrs) -> InterfaceType {
     let c_str = addr_ref.ifa_name as *const c_char;
     let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
     let name: String = unsafe { from_utf8_unchecked(bytes).to_owned() };
-    crate::os::linux::sysfs::get_interface_type(&name)
+    #[cfg(target_os = "linux")]
+    {
+        crate::os::linux::sysfs::get_interface_type(&name)
+    }
+    #[cfg(target_os = "android")]
+    {
+        crate::os::android::types::guess_type_by_name(&name).unwrap_or(InterfaceType::Unknown)
+    }
 }
 
 #[cfg(target_vendor = "apple")]
