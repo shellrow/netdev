@@ -1,5 +1,8 @@
+pub mod flags;
 pub mod interface;
 pub mod netlink;
+pub mod state;
+pub mod types;
 
 use once_cell::sync::OnceCell;
 

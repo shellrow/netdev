@@ -1,11 +1,15 @@
 pub mod arp;
+#[cfg(not(target_os = "android"))]
 pub mod flags;
 #[cfg(not(target_os = "android"))]
 pub mod interface;
 pub mod mtu;
 #[cfg(not(target_os = "android"))]
 pub mod netlink;
+#[cfg(not(target_os = "android"))]
 #[cfg(feature = "gateway")]
 pub mod procfs;
+#[cfg(not(target_os = "android"))]
 pub mod state;
+#[cfg(not(target_os = "android"))]
 pub mod sysfs;

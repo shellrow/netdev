@@ -1,3 +1,5 @@
+use crate::interface::types::InterfaceType;
+use crate::stats::counters::InterfaceStats;
 use netlink_packet_core::{NLM_F_DUMP, NLM_F_REQUEST, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::{
     RouteNetlinkMessage,
@@ -7,6 +9,7 @@ use netlink_packet_route::{
 use netlink_sys::{Socket, SocketAddr, protocols::NETLINK_ROUTE};
 use std::io::ErrorKind;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::time::SystemTime;
 use std::{
     collections::HashMap,
     io, thread,
@@ -327,6 +330,54 @@ fn mtu_from_link(link: &LinkMessage) -> Option<u32> {
     None
 }
 
+fn if_type_from_link(link: &LinkMessage, name: &str) -> InterfaceType {
+    let arphrd = link.header.link_layer_type as u32;
+    let mut t = InterfaceType::try_from(arphrd).unwrap_or(InterfaceType::UnknownWithValue(arphrd));
+
+    // override by name guess
+    // ARPHRD may be unreliable on some devices
+    if let Some(guess) = super::types::guess_type_by_name(name) {
+        t = guess;
+    }
+
+    t
+}
+
+fn stats_from_link(link: &LinkMessage) -> Option<InterfaceStats> {
+    for nla in &link.attributes {
+        match nla {
+            LinkAttribute::Stats64(s) => {
+                return Some(InterfaceStats {
+                    rx_bytes: s.rx_bytes,
+                    tx_bytes: s.tx_bytes,
+                    timestamp: Some(SystemTime::now()),
+                });
+            }
+            LinkAttribute::Stats(s) => {
+                return Some(InterfaceStats {
+                    rx_bytes: s.rx_bytes as u64,
+                    tx_bytes: s.tx_bytes as u64,
+                    timestamp: Some(SystemTime::now()),
+                });
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+pub fn get_flags_by_name(name: &str) -> io::Result<Option<u32>> {
+    let links = dump_links()?;
+    for l in links {
+        if let Some(ifname) = name_from_link(&l) {
+            if ifname == name {
+                return Ok(Some(l.header.flags.bits()));
+            }
+        }
+    }
+    Ok(None)
+}
+
 #[derive(Debug, Clone)]
 pub struct IfRow {
     pub index: u32,
@@ -336,6 +387,8 @@ pub struct IfRow {
     pub ipv6: Vec<(Ipv6Addr, u8)>,
     pub flags: u32,
     pub mtu: Option<u32>,
+    pub if_type: InterfaceType,
+    pub stats: Option<InterfaceStats>,
 }
 
 pub fn collect_interfaces() -> io::Result<Vec<IfRow>> {
@@ -349,6 +402,9 @@ pub fn collect_interfaces() -> io::Result<Vec<IfRow>> {
         let mac = mac_from_link(&l);
         let flags = l.header.flags.bits();
         let mtu_nl = mtu_from_link(&l);
+        let if_type = if_type_from_link(&l, &name);
+        let stats = stats_from_link(&l);
+
         base.insert(
             idx,
             IfRow {
@@ -359,6 +415,8 @@ pub fn collect_interfaces() -> io::Result<Vec<IfRow>> {
                 ipv6: vec![],
                 flags,
                 mtu: mtu_nl,
+                if_type,
+                stats,
             },
         );
     }
