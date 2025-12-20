@@ -13,29 +13,38 @@
 `netdev` provides a cross-platform API for network interface.
 
 ## Key Features
-- Get list of available network interfaces
-- Get default network interface
-- Access additional information related to network interface
-- Get traffic statistics (RX/TX bytes) for each interface
+- Enumerate all available network interfaces
+- Detect the default network interface
+- Retrieve interface metadata:
+    - Interface type
+    - MAC address
+    - IPv4 / IPv6 addresses and prefixes
+    - MTU, flags, operational state, etc...
+- Native traffic statistics (RX/TX bytes) for each interface
+- Designed for **cross-platform**
 
-Please refer to the [Interface][doc-interface-url] struct documentation for detail.
-
-## Notice
-This project was rebranded from [default-net][default-net-crates-io-url] by the author myself for future expansion, continuation, and better alignment with naming conventions.
+See the [Interface][doc-interface-url] struct documentation for detail.
 
 ## Supported platform
 - Linux
-- macOS and other Apple targets (iOS, watchOS, tvOS, etc.)
+- macOS
 - Windows
+- Android
+- iOS (and other Apple targets)
+- BSDs
 
 ## Usage
-Add `netdev` to your dependencies  
-```toml:Cargo.toml
+Add `netdev` to your `Cargo.toml`
+```toml
 [dependencies]
-netdev = "0.39"
+netdev = "0.40"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
+
+## Project History
+This crate was originally published as [default-net][default-net-crates-io-url] 
+and later rebranded to `netdev` by the author myself for future expansion, clearer naming, and long-term maintenance.
 
 ## Tested on
 - Linux
