@@ -3,6 +3,10 @@ use crate::interface::types::InterfaceType;
 pub fn guess_type_by_name(name: &str) -> Option<InterfaceType> {
     let n = name.as_bytes();
 
+    // Loopback: lo
+    if n == b"lo" {
+        return Some(InterfaceType::Loopback);
+    }
     // Wi-Fi: wlan0 / wlan1 / wifi0
     if n.starts_with(b"wlan") || n.starts_with(b"wifi") {
         return Some(InterfaceType::Wireless80211);
@@ -10,6 +14,10 @@ pub fn guess_type_by_name(name: &str) -> Option<InterfaceType> {
     // Cellular: rmnet_data0 / rmnet0 / ccmni0 / pdp0
     if n.starts_with(b"rmnet") || n.starts_with(b"ccmni") || n.starts_with(b"pdp") {
         return Some(InterfaceType::Wwanpp);
+    }
+    // Wi-Fi Direct: p2p0
+    if n.starts_with(b"p2p") {
+        return Some(InterfaceType::PeerToPeerWireless);
     }
     // Tunnel: tun0 / tap0 / ipsec0 / clat4
     if n.starts_with(b"tun")
