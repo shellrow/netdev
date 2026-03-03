@@ -20,8 +20,8 @@ libc = "0.2"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 netlink-packet-core = "0.8"
-netlink-packet-route = "0.25"
-netlink-sys = "0.8"
+netlink-packet-route = "0.29"
+netlink-sys = "0.8.5"
 
 [target.'cfg(target_os = "android")'.dependencies]
 dlopen2 = { version = "0.5", default-features = false }
