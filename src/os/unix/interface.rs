@@ -31,7 +31,7 @@ fn unix_interfaces_inner(
     getifaddrs: unsafe extern "C" fn(*mut *mut libc::ifaddrs) -> libc::c_int,
     freeifaddrs: unsafe extern "C" fn(*mut libc::ifaddrs),
 ) -> Vec<Interface> {
-    let mut ifaces: Vec<Interface> = vec![];
+    let mut ifaces: Vec<Interface> = Vec::new();
     let mut addrs: MaybeUninit<*mut libc::ifaddrs> = MaybeUninit::uninit();
     if unsafe { getifaddrs(addrs.as_mut_ptr()) } != 0 {
         return ifaces;
@@ -113,58 +113,51 @@ fn unix_interfaces_inner(
         // Check if there is already an interface with this name (since getifaddrs returns one
         // entry per address, so if the interface has multiple addresses, it returns multiple entries).
         // If so, add the IP addresses from the current entry into the existing interface. Otherwise, add a new interface.
-        let mut found: bool = false;
-        for iface in &mut ifaces {
-            if name == iface.name {
-                if let Some(mac) = mac.clone() {
-                    iface.mac_addr = Some(mac);
-                }
-
-                if iface.stats.is_none() {
-                    iface.stats = stats.clone();
-                }
-
-                if ini_ipv4.is_some() {
-                    iface.ipv4.push(ini_ipv4.unwrap());
-                }
-
-                if ini_ipv6.is_some() {
-                    iface.ipv6.push(ini_ipv6.unwrap());
-                    iface.ipv6_scope_ids.push(ipv6_scope_id.unwrap());
-                }
-                found = true;
+        if let Some(iface) = ifaces.iter_mut().find(|iface| iface.name == name) {
+            if let Some(mac) = mac {
+                iface.mac_addr = Some(mac);
             }
-        }
-        if !found {
+            if iface.stats.is_none() {
+                iface.stats = stats;
+            }
+            if let Some(ipv4_addr) = ini_ipv4 {
+                iface.ipv4.push(ipv4_addr);
+            }
+            if let (Some(ipv6_addr), Some(scope_id)) = (ini_ipv6, ipv6_scope_id) {
+                iface.ipv6.push(ipv6_addr);
+                iface.ipv6_scope_ids.push(scope_id);
+            }
+        } else {
+            let mtu = get_mtu(addr_ref, &name);
             let interface: Interface = Interface {
                 index: if_index,
-                name: name.clone(),
+                name,
                 friendly_name: None,
                 description: None,
                 if_type: if_type,
-                mac_addr: mac.clone(),
+                mac_addr: mac,
                 ipv4: match ini_ipv4 {
                     Some(ipv4_addr) => vec![ipv4_addr],
-                    None => vec![],
+                    None => Vec::new(),
                 },
                 ipv6: match ini_ipv6 {
                     Some(ipv6_addr) => vec![ipv6_addr],
-                    None => vec![],
+                    None => Vec::new(),
                 },
-                ipv6_scope_ids: match ini_ipv6 {
-                    Some(_) => vec![ipv6_scope_id.unwrap()],
-                    None => vec![],
+                ipv6_scope_ids: match ipv6_scope_id {
+                    Some(scope_id) => vec![scope_id],
+                    None => Vec::new(),
                 },
                 flags: addr_ref.ifa_flags,
                 oper_state: OperState::from_if_flags(addr_ref.ifa_flags),
                 transmit_speed: None,
                 receive_speed: None,
-                stats: stats,
+                stats,
                 #[cfg(feature = "gateway")]
                 gateway: None,
                 #[cfg(feature = "gateway")]
                 dns_servers: Vec::new(),
-                mtu: get_mtu(addr_ref, &name),
+                mtu,
                 #[cfg(feature = "gateway")]
                 default: false,
             };

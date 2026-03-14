@@ -9,8 +9,6 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use crate::net::device::NetworkDevice;
 #[cfg(feature = "gateway")]
 use crate::os::unix::dns::get_system_dns_conf;
-#[cfg(feature = "gateway")]
-use std::collections::HashMap;
 
 use crate::os::unix::interface::unix_interfaces;
 
@@ -127,21 +125,17 @@ pub fn interfaces() -> Vec<Interface> {
     // Fill gateway info
     #[cfg(feature = "gateway")]
     {
-        if let Ok(gmap) = netlink::collect_routes() {
-            let by_index: HashMap<u32, &netlink::GwRow> =
-                gmap.iter().map(|(k, v)| (*k, v)).collect();
-
+        if let Ok(mut gmap) = netlink::collect_routes() {
             for iface in &mut ifaces {
                 if iface.index == 0 {
                     continue;
                 }
-                if let Some(row) = by_index.get(&iface.index) {
-                    let dev = NetworkDevice {
+                if let Some(row) = gmap.remove(&iface.index) {
+                    iface.gateway = Some(NetworkDevice {
                         mac_addr: row.mac.map(MacAddr::from_octets).unwrap_or(MacAddr::zero()),
-                        ipv4: row.gw_v4.clone(),
-                        ipv6: row.gw_v6.clone(),
-                    };
-                    iface.gateway = Some(dev);
+                        ipv4: row.gw_v4,
+                        ipv6: row.gw_v6,
+                    });
                 }
             }
         }
