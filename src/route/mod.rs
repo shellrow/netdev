@@ -2,7 +2,10 @@ use crate::interface::interface::Interface;
 use crate::net::device::NetworkDevice;
 use std::net::IpAddr;
 
-/// Get default Gateway
+/// Returns the default gateway associated with the active default interface.
+///
+/// Returns an error when the local IP address cannot be determined, when no matching interface
+/// is found, or when the platform does not provide gateway information for the default route.
 pub fn get_default_gateway() -> Result<NetworkDevice, String> {
     let local_ip: IpAddr = match crate::net::ip::get_local_ipaddr() {
         Some(local_ip) => local_ip,

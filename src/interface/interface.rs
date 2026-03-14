@@ -11,81 +11,109 @@ use crate::net::device::NetworkDevice;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// Structure of Network Interface information
+/// A network interface.
+///
+/// Values are collected from platform-specific system APIs.
+/// Some metadata is optional.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Interface {
-    /// Index of network interface. This is an integer which uniquely identifies the interface
+    /// OS-assigned index of network interface. This is an integer which uniquely identifies the interface 
     /// on this machine.
     pub index: u32,
-    /// Machine-readable name of the network interface. On unix-like OSs, this is the interface
-    /// name, like 'eth0' or 'eno1'. On Windows, this is the interface's GUID as a string.
+    /// System name of the interface.
+    ///
+    /// On Unix-like systems this is usually a BSD or kernel name such as `eth0`, `en0`, or
+    /// `wlan0`. On Windows this is the adapter name GUID string.
     pub name: String,
-    /// Friendly name of network interface. On Windows, this is the network adapter configured
-    /// name, e.g. "Ethernet 5" or "Wi-Fi". On Mac, this is the interface display name,
-    /// such as "Ethernet" or "FireWire". If no friendly name is available, this is left as None.
+    /// Human-readable interface name, when the platform provides one.
+    ///
+    /// Examples include `Wi-Fi` or `Ethernet` on Windows and display names on macOS. 
+    /// This field is commonly `None` on Linux, Android, iOS, and BSD systems.
     pub friendly_name: Option<String>,
-    /// Description of the network interface. On Windows, this is the network adapter model, such
-    /// as "Realtek USB GbE Family Controller #4" or "Software Loopback Interface 1". Currently
-    /// this is not available on platforms other than Windows.
+    /// Adapter description, when the platform provides one.
+    ///
+    /// On Windows this is usually the adapter model or driver description.
+    /// This field is generally `None` on non-Windows platforms.
     pub description: Option<String>,
-    /// Interface Type
+    /// Interface classification.
+    ///
+    /// The value is derived from platform-specific type identifiers and may be
+    /// `InterfaceType::Unknown` when the OS does not expose a recognizable type.
     pub if_type: InterfaceType,
-    /// MAC address of network interface
+    /// Link-layer address of the interface, when available.
+    ///
+    /// This field may be `None` for interfaces without a MAC address, for virtual interfaces,
+    /// or on platforms that do not expose the address through the available APIs.
     pub mac_addr: Option<MacAddr>,
-    /// List of Ipv4Nets (IPv4 address + netmask) for the network interface
+    /// IPv4 addresses assigned to the interface, including prefix length.
+    ///
+    /// The vector is empty when the interface has no IPv4 addresses or when they could not be read.
     pub ipv4: Vec<Ipv4Net>,
-    /// List of Ipv6Nets (IPv6 address + netmask) for the network interface
+    /// IPv6 addresses assigned to the interface, including prefix length.
+    ///
+    /// The vector is empty when the interface has no IPv6 addresses or when they could not be read.
     pub ipv6: Vec<Ipv6Net>,
-    /// List of IPv6 Scope IDs for each of the corresponding elements in the ipv6 address vector.
-    /// The Scope ID is an integer which uniquely identifies this interface address on the system,
-    /// and must be provided when using link-local addressing to specify which interface
-    /// you wish to use. The scope ID can be the same as the interface index, but is not
-    /// required to be by the standard.
-    /// The scope ID can also be referred to as the zone index.
+    /// IPv6 scope IDs aligned with entries in `Interface::ipv6`.
+    ///
+    /// Scope IDs are primarily relevant for link-local IPv6 addresses and may also be called
+    /// zone indexes. A value can be `0` when no scope is needed or when the platform did not
+    /// provide one.
     pub ipv6_scope_ids: Vec<u32>,
-    /// Flags for the network interface (OS Specific)
+    /// Raw interface flags.
+    ///
+    /// Bit meanings are platform-specific.
     pub flags: u32,
-    /// Operational state at the time of interface discovery
+    /// Operational state at the time the interface snapshot was collected.
     pub oper_state: OperState,
-    /// Speed in bits per second of the transmit for the network interface, if known.
-    /// Currently only supported on Linux, Android, and Windows.
+    /// Transmit link speed in bits per second.
+    ///
+    /// This field is usually available on Linux, Android, and Windows.
+    /// It may be `None` for virtual adapters, unsupported drivers, or platforms that do not
+    /// expose link speed.
     pub transmit_speed: Option<u64>,
-    /// Speed in bits per second of the receive for the network interface.
-    /// Currently only supported on Linux, Android, and Windows.
+    /// Reported receive link speed in bits per second.
+    ///
+    /// This field follows the same availability rules as `Interface::transmit_speed`.
     pub receive_speed: Option<u64>,
-    /// Statistics for this network interface, such as received and transmitted bytes.
+    /// Traffic counters captured when the interface snapshot was collected.
     ///
-    /// This field is populated at the time of interface discovery
-    /// (e.g., via [`crate::interface::get_interfaces()`] or [`crate::interface::get_default_interface()`]).
-    ///
-    /// The values represent a snapshot of total RX and TX bytes since system boot,
-    /// and include a timestamp (`SystemTime`) indicating when the snapshot was taken.
-    ///
-    /// If more up-to-date statistics are needed, use [`Interface::update_stats()`] to refresh this field.
+    /// The counters are cumulative totals reported by the OS, typically since boot.
+    /// This field may be `None` when the current platform or adapter does not expose statistics.
+    /// Use `Interface::update_stats` to refresh the snapshot in place.
     pub stats: Option<InterfaceStats>,
-    /// Default gateway for the network interface. This is the address of the router to which
-    /// IP packets are forwarded when they need to be sent to a device outside
-    /// of the local network.
+    /// Default gateway associated with this interface, when known.
+    ///
+    /// This field is available only with the `gateway` feature. It may be `None` when the
+    /// interface is not the default route, when the gateway has no link-layer address available,
+    /// or when the platform cannot resolve gateway information.
     #[cfg(feature = "gateway")]
     pub gateway: Option<NetworkDevice>,
-    /// DNS server addresses for the network interface
+    /// DNS resolver addresses associated with this interface.
+    ///
+    /// This field is available only with the `gateway` feature. 
     #[cfg(feature = "gateway")]
     pub dns_servers: Vec<IpAddr>,
-    /// Maximum Transmission Unit (MTU) for the network interface
+    /// Maximum transmission unit in bytes, when available.
+    ///
+    /// This field may be `None` when the platform API does not provide the MTU or the lookup fails.
     pub mtu: Option<u32>,
-    /// Whether this is the default interface for accessing the Internet.
+    /// Whether this interface was identified as the default route.
+    ///
+    /// This field is available only with the `gateway` feature.
     #[cfg(feature = "gateway")]
     pub default: bool,
 }
 
 impl Interface {
-    /// Construct a new default Interface instance
+    /// Returns the interface currently selected as the system default route.
     #[cfg(feature = "gateway")]
     pub fn default() -> Result<Interface, String> {
         super::resolve_default_interface(super::interfaces())
     }
-    // Construct a dummy Interface instance
+    /// Returns an empty placeholder interface.
+    ///
+    /// This constructor is mainly useful for tests and internal assembly of interface data.
     pub fn dummy() -> Interface {
         Interface {
             index: 0,
@@ -111,62 +139,71 @@ impl Interface {
             default: false,
         }
     }
-    /// Check if the network interface is up
+    /// Returns `true` when the interface has the OS `UP` flag set.
     pub fn is_up(&self) -> bool {
         self.flags & (super::flags::IFF_UP as u32) != 0
     }
-    /// Check if the network interface is a Loopback interface
+    /// Returns `true` when the interface is marked as loopback.
     pub fn is_loopback(&self) -> bool {
         self.flags & (super::flags::IFF_LOOPBACK as u32) != 0
     }
-    /// Check if the network interface is a Point-to-Point interface
+    /// Returns `true` when the interface is marked as point-to-point.
     pub fn is_point_to_point(&self) -> bool {
         self.flags & (super::flags::IFF_POINTOPOINT as u32) != 0
     }
-    /// Check if the network interface is a Multicast interface
+    /// Returns `true` when the interface supports multicast according to its flags.
     pub fn is_multicast(&self) -> bool {
         self.flags & (super::flags::IFF_MULTICAST as u32) != 0
     }
-    /// Check if the network interface is a Broadcast interface
+    /// Returns `true` when the interface supports broadcast according to its flags.
     pub fn is_broadcast(&self) -> bool {
         self.flags & (super::flags::IFF_BROADCAST as u32) != 0
     }
-    /// Check if the network interface is a TUN interface
+    /// Returns `true` for interfaces that look like TUN-style point-to-point devices.
+    ///
+    /// This is a heuristic based on interface flags and is not guaranteed to identify every
+    /// virtual tunnel interface on every platform.
     pub fn is_tun(&self) -> bool {
         self.is_up() && self.is_point_to_point() && !self.is_broadcast() && !self.is_loopback()
     }
-    /// Check if the network interface is running and ready to send/receive packets
+    /// Returns `true` when the platform reports the interface as able to pass traffic.
+    ///
+    /// The exact definition depends on the operating system.
     pub fn is_running(&self) -> bool {
         super::flags::is_running(&self)
     }
-    /// Check if the network interface is a physical interface
+    /// Returns `true` when the interface appears to be backed by physical hardware.
     pub fn is_physical(&self) -> bool {
         use crate::net::db::oui;
         super::flags::is_physical_interface(&self)
             && !oui::is_virtual_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
             && !oui::is_known_loopback_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
     }
-    /// Get the operational state of the network interface
+    /// Returns the cached operational state.
     pub fn oper_state(&self) -> OperState {
         self.oper_state
     }
-    /// Check if the operational state of the interface is up
+    /// Returns `true` when `Interface::oper_state` is `OperState::Up`.
     pub fn is_oper_up(&self) -> bool {
         self.oper_state == OperState::Up
     }
-    /// Update the `oper_state` field by re-reading the current operstate from the system
+    /// Refreshes [`Interface::oper_state`] from the operating system.
     pub fn update_oper_state(&mut self) {
         self.oper_state = super::state::operstate(&self.name);
     }
-    /// Returns a list of IPv4 addresses assigned to this interface.
+    /// Returns the IPv4 addresses assigned to this interface.
+    ///
+    /// Prefix lengths are discarded. Use `Interface::ipv4` when the network prefix is needed.
     pub fn ipv4_addrs(&self) -> Vec<Ipv4Addr> {
         self.ipv4.iter().map(|net| net.addr()).collect()
     }
-    /// Returns a list of IPv6 addresses assigned to this interface.
+    /// Returns the IPv6 host addresses assigned to this interface.
+    ///
+    /// Prefix lengths are discarded. Use `Interface::ipv6` when the network prefix is needed.
     pub fn ipv6_addrs(&self) -> Vec<Ipv6Addr> {
         self.ipv6.iter().map(|net| net.addr()).collect()
     }
-    /// Returns a list of all IP addresses (both IPv4 and IPv6) assigned to this interface.
+    /// Returns all IPv4 and IPv6 host addresses assigned to this interface.
     pub fn ip_addrs(&self) -> Vec<IpAddr> {
         self.ipv4_addrs()
             .into_iter()
@@ -174,48 +211,50 @@ impl Interface {
             .chain(self.ipv6_addrs().into_iter().map(IpAddr::V6))
             .collect()
     }
-    /// Returns true if this interface has at least one IPv4 address.
+    /// Returns `true` when at least one IPv4 address is present.
     pub fn has_ipv4(&self) -> bool {
         !self.ipv4.is_empty()
     }
-    /// Returns true if this interface has at least one IPv6 address.
+    /// Returns `true` when at least one IPv6 address is present.
     pub fn has_ipv6(&self) -> bool {
         !self.ipv6.is_empty()
     }
-    /// Returns true if this interface has at least one globally routable IPv4 address.
+    /// Returns `true` when at least one assigned IPv4 address appears globally routable.
     pub fn has_global_ipv4(&self) -> bool {
         self.ipv4_addrs().iter().any(|ip| is_global_ipv4(ip))
     }
-    /// Returns true if this interface has at least one globally routable IPv6 address.
+    /// Returns `true` when at least one assigned IPv6 address appears globally routable.
     pub fn has_global_ipv6(&self) -> bool {
         self.ipv6_addrs().iter().any(|ip| is_global_ipv6(ip))
     }
-    /// Returns true if this interface has at least one globally routable IP address (v4 or v6).
+    /// Returns `true` when at least one assigned IPv4 or IPv6 address appears globally routable.
     pub fn has_global_ip(&self) -> bool {
         self.ip_addrs().iter().any(|ip| is_global_ip(ip))
     }
-    /// Returns a list of globally routable IPv4 addresses assigned to this interface.
+    /// Returns IPv4 addresses that appear globally routable.
     pub fn global_ipv4_addrs(&self) -> Vec<Ipv4Addr> {
         self.ipv4_addrs()
             .into_iter()
             .filter(|ip| is_global_ipv4(ip))
             .collect()
     }
-    /// Returns a list of globally routable IPv6 addresses assigned to this interface.
+    /// Returns IPv6 addresses that appear globally routable.
     pub fn global_ipv6_addrs(&self) -> Vec<Ipv6Addr> {
         self.ipv6_addrs()
             .into_iter()
             .filter(|ip| is_global_ipv6(ip))
             .collect()
     }
-    /// Returns a list of globally routable IP addresses (both IPv4 and IPv6).
+    /// Returns IPv4 and IPv6 addresses that appear globally routable.
     pub fn global_ip_addrs(&self) -> Vec<IpAddr> {
         self.ip_addrs()
             .into_iter()
             .filter(|ip| is_global_ip(ip))
             .collect()
     }
-    /// Updates the runtime traffic statistics for this interface (e.g., rx/tx byte counters).
+    /// Refreshes `Interface::stats` for this interface.
+    ///
+    /// On supported platforms this updates the byte counters and timestamp with a new snapshot.
     pub fn update_stats(&mut self) -> std::io::Result<()> {
         crate::stats::counters::update_interface_stats(self)
     }

@@ -9,13 +9,20 @@ use crate::interface::interface::Interface;
 #[cfg(feature = "gateway")]
 use std::net::IpAddr;
 
-/// Get default Network Interface
+/// Returns the interface currently used for the system's default route.
+///
+/// This function is available when the `gateway` feature is enabled.
+///
+/// Returns an error when no default route can be determined or when the local IP address
+/// cannot be resolved on the current platform.
 #[cfg(feature = "gateway")]
 pub fn get_default_interface() -> Result<Interface, String> {
     resolve_default_interface(interfaces())
 }
 
-/// Get a list of available Network Interfaces
+/// Returns a list of the network interfaces.
+///
+/// Each `Interface` contains the data that could be collected at discovery time.
 pub fn get_interfaces() -> Vec<Interface> {
     interfaces()
 }

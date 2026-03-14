@@ -6,29 +6,31 @@ use serde::{Deserialize, Serialize};
 
 /// Operational state of a network interface.
 ///
-/// See also:
-/// <https://www.kernel.org/doc/Documentation/networking/operstates.txt>
+/// This enum models the common states used by Linux and maps equivalent states from
+/// other platforms when possible.
+///
+/// See also: <https://www.kernel.org/doc/Documentation/networking/operstates.txt>
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum OperState {
-    /// Interface state is unknown
+    /// Interface state could not be determined.
     Unknown,
-    /// Interface is not present
+    /// Interface is not present.
     NotPresent,
-    /// Interface is administratively or otherwise down
+    /// Interface is administratively or otherwise down.
     Down,
-    /// Interface is down because a lower layer is down
+    /// Interface is down because a lower layer is down.
     LowerLayerDown,
-    /// Interface is in testing state
+    /// Interface is in testing state.
     Testing,
-    /// Interface is dormant
+    /// Interface is dormant.
     Dormant,
-    /// Interface is operational
+    /// Interface is operational.
     Up,
 }
 
 impl OperState {
-    /// Return lowercase string representation matching `/sys/class/net/*/operstate`
+    /// Returns the lowercase representation used by Linux `operstate` files.
     pub fn as_str(&self) -> &'static str {
         match self {
             OperState::Unknown => "unknown",
@@ -41,13 +43,10 @@ impl OperState {
         }
     }
 
-    /// Determine the operational state based on interface flags.
+    /// Derives an operational state from raw interface flags.
     ///
-    /// This is primarily a fallback mechanism for platforms where
-    /// `/sys/class/net/*/operstate` or native operstate APIs are not available.
-    ///
-    /// On Windows, this method is **not used** in practice, as the `OperState` is
-    /// obtained through native API calls.
+    /// This is used as a fallback when no dedicated operstate API is available.
+    /// The result is necessarily less precise than native platform state reporting.
     pub fn from_if_flags(if_flags: u32) -> Self {
         #[cfg(not(target_os = "windows"))]
         {
@@ -96,6 +95,10 @@ impl FromStr for OperState {
     }
 }
 
+/// Reads the current operational state for the named interface.
+///
+/// This function performs a fresh OS query and does not rely on a previously collected
+/// snapshot.
 pub fn operstate(if_name: &str) -> OperState {
     #[cfg(target_os = "linux")]
     {

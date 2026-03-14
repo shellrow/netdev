@@ -48,22 +48,15 @@ fn try_ipv6() -> Option<IpAddr> {
     };
 }
 
-/// Retrieve the IP address of the default network interface.
+/// Returns the local IP address selected for outbound traffic.
 ///
-/// This function attempts to bind a UDP socket to an unspecified IP address (0.0.0.0 or ::)
-/// and port (0), which allows the system to select an appropriate IP address and port.
-/// After binding, it attempts to connect the socket to a designated non-routable IP address
-/// (`10.254.254.254` or `fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff` on port 1). This is a
-/// trick commonly used to prompt the OS to populate the socket's local address with the IP
-/// address of the interface that would route to the specified address.
+/// This function opens a UDP socket and lets the operating system choose the source address
+/// that would be used to reach a non-routable destination. No application data is sent.
 ///
-/// The function returns the local IP address if these operations succeed.
-/// If any operation fails (binding, connecting, or retrieving the address),
-/// the function returns `None`, indicating the inability to determine the local IP.
+/// The returned address is useful for identifying the interface currently preferred for the
+/// default route.
 ///
-/// Returns:
-/// - `Some(IpAddr)`: IP address of the default network interface if successful.
-/// - `None`: If any error occurs during the operations.
+/// Returns `None` when socket creation, address selection, or local address inspection fails.
 #[cfg(feature = "gateway")]
 pub fn get_local_ipaddr() -> Option<IpAddr> {
     // binding the IPv4 socket can actually succeed but a later step will fail in IPv6-only,

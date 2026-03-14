@@ -3,80 +3,85 @@ use std::convert::TryFrom;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// Type of Network Interface
+/// Cross-platform classification of a network interface.
+///
+/// The variants normalize platform-specific type identifiers.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum InterfaceType {
-    /// Unknown interface type
+    /// Interface type could not be determined.
     Unknown,
-    /// The network interface using an Ethernet connection
+    /// Ethernet interface.
     Ethernet,
-    /// The network interface using a Token-Ring connection
+    /// Token Ring interface.
     TokenRing,
-    /// The network interface using a Fiber Distributed Data Interface (FDDI) connection
+    /// Fiber Distributed Data Interface (FDDI).
     Fddi,
-    /// The network interface using a basic rate interface Integrated Services Digital Network (ISDN) connection
+    /// Basic-rate ISDN interface.
     BasicIsdn,
-    /// The network interface using a primary rate interface Integrated Services Digital Network (ISDN) connection
+    /// Primary-rate ISDN interface.
     PrimaryIsdn,
-    /// The network interface using a Point-To-Point protocol (PPP) connection
+    /// Point-to-Point Protocol (PPP) interface.
     Ppp,
-    /// The loopback interface (often used for testing)
+    /// Loopback interface.
     Loopback,
-    /// The network interface using an Ethernet 3 megabit/second connection
+    /// Legacy 3 Mbps Ethernet interface.
     Ethernet3Megabit,
-    /// The network interface using a Serial Line Internet Protocol (SLIP) connection
+    /// Serial Line Internet Protocol (SLIP) interface.
     Slip,
-    /// The network interface using asynchronous transfer mode (ATM) for data transmission
+    /// Asynchronous Transfer Mode (ATM) interface.
     Atm,
-    /// The network interface using a modem
+    /// Generic modem interface.
     GenericModem,
-    /// Proprietary virtual/internal interface
+    /// Proprietary virtual or internal interface.
     ProprietaryVirtual,
-    /// The network interface using a Fast Ethernet connection over twisted pair and provides a data rate of 100 megabits per second (100BASE-T)
+    /// Fast Ethernet over twisted pair.
     FastEthernetT,
-    /// The network interface using a connection configured for ISDN and the X.25 protocol.
+    /// ISDN/X.25 interface.
     Isdn,
-    /// The network interface using a Fast Ethernet connection over optical fiber and provides a data rate of 100 megabits per second (100Base-FX)
+    /// Fast Ethernet over fiber.
     FastEthernetFx,
-    /// The network interface using a wireless LAN connection (IEEE 802.11)
+    /// IEEE 802.11 wireless LAN interface.
     Wireless80211,
-    /// The network interface using an Asymmetric Digital Subscriber Line (ADSL)
+    /// Asymmetric DSL interface.
     AsymmetricDsl,
-    /// The network interface using a Rate Adaptive Digital Subscriber Line (RADSL)
+    /// Rate-adaptive DSL interface.
     RateAdaptDsl,
-    /// The network interface using a Symmetric Digital Subscriber Line (SDSL)
+    /// Symmetric DSL interface.
     SymmetricDsl,
-    /// The network interface using a Very High Data Rate Digital Subscriber Line (VDSL)
+    /// Very-high-bit-rate DSL interface.
     VeryHighSpeedDsl,
-    /// The network interface using the Internet Protocol (IP) in combination with asynchronous transfer mode (ATM) for data transmission
+    /// IP over ATM interface.
     IPOverAtm,
-    /// The network interface using a gigabit Ethernet connection and provides a data rate of 1,000 megabits per second (1 gigabit per second)
+    /// Gigabit Ethernet interface.
     GigabitEthernet,
-    /// The network interface using a tunnel connection
+    /// Tunnel interface.
     Tunnel,
-    /// The network interface using a Multirate Digital Subscriber Line
+    /// Multirate symmetric DSL interface.
     MultiRateSymmetricDsl,
-    /// The network interface using a High Performance Serial Bus
+    /// High-performance serial bus interface.
     HighPerformanceSerialBus,
-    /// The network interface using a mobile broadband interface for WiMax devices
+    /// Mobile broadband interface for WiMAX devices.
     Wman,
-    /// The network interface using a mobile broadband interface for GSM-based devices
+    /// Mobile broadband interface for GSM-based devices.
     Wwanpp,
-    /// The network interface using a mobile broadband interface for CDMA-based devices
+    /// Mobile broadband interface for CDMA-based devices.
     Wwanpp2,
-    /// Transparent bridge interface
+    /// Transparent bridge interface.
     Bridge,
-    /// Controller Area Network
+    /// Controller Area Network (CAN) interface.
     Can,
-    /// Peer-to-Peer Wireless (Wi-Fi Direct / AWDL)
+    /// Peer-to-peer wireless interface, such as Wi-Fi Direct or AWDL.
     PeerToPeerWireless,
-    /// Unknown interface type with a specific value
+    /// Unrecognized platform-specific type value.
     UnknownWithValue(u32),
 }
 
 impl InterfaceType {
-    /// Returns OS-specific value of InterfaceType
+    /// Returns the native numeric type identifier for the current target platform.
+    ///
+    /// For variants that have no direct mapping on the current platform, this method returns
+    /// `u32::MAX`.
     #[cfg(target_os = "windows")]
     pub fn value(&self) -> u32 {
         match *self {
@@ -113,7 +118,10 @@ impl InterfaceType {
             _ => u32::MAX,
         }
     }
-    /// Returns OS-specific value of InterfaceType
+    /// Returns the native numeric type identifier for the current target platform.
+    ///
+    /// For variants that have no direct mapping on the current platform, this method returns
+    /// `u32::MAX`.
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn value(&self) -> u32 {
         use crate::os::linux::arp;
@@ -136,7 +144,10 @@ impl InterfaceType {
             _ => u32::MAX,
         }
     }
-    /// Returns OS-specific value of InterfaceType
+    /// Returns the native numeric type identifier for the current target platform.
+    ///
+    /// For variants that have no direct mapping on the current platform, this method returns
+    /// `u32::MAX`.
     #[cfg(any(
         target_vendor = "apple",
         target_os = "openbsd",
@@ -166,7 +177,7 @@ impl InterfaceType {
             _ => u32::MAX,
         }
     }
-    /// Returns name of InterfaceType
+    /// Returns a human-readable name for the interface type.
     pub fn name(&self) -> String {
         match *self {
             InterfaceType::Unknown => String::from("Unknown"),
