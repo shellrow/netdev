@@ -2,8 +2,10 @@ pub mod flags;
 pub mod interface;
 pub mod netlink;
 pub mod state;
+pub mod sysfs;
 pub mod types;
 
+use dlopen2::raw::Library;
 use once_cell::sync::OnceCell;
 
 pub fn get_libc_ifaddrs() -> Option<(
@@ -18,19 +20,13 @@ pub fn get_libc_ifaddrs() -> Option<(
 
 fn load_symbol<T>(sym: &'static str) -> Option<T> {
     const LIB_NAME: &str = "libc.so";
+    static LIBC: OnceCell<Option<Library>> = OnceCell::new();
 
-    match dlopen2::raw::Library::open(LIB_NAME) {
-        Ok(lib) => match unsafe { lib.symbol::<T>(sym) } {
-            Ok(val) => Some(val),
-            Err(err) => {
-                eprintln!("failed to load symbol {} from {}: {:?}", sym, LIB_NAME, err);
-                None
-            }
-        },
-        Err(err) => {
-            eprintln!("failed to load {}: {:?}", LIB_NAME, err);
-            None
-        }
+    let lib = LIBC.get_or_init(|| Library::open(LIB_NAME).ok()).as_ref()?;
+
+    match unsafe { lib.symbol::<T>(sym) } {
+        Ok(val) => Some(val),
+        Err(_) => None,
     }
 }
 
