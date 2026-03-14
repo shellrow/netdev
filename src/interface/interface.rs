@@ -83,33 +83,7 @@ impl Interface {
     /// Construct a new default Interface instance
     #[cfg(feature = "gateway")]
     pub fn default() -> Result<Interface, String> {
-        use crate::net::ip::get_local_ipaddr;
-
-        let interfaces: Vec<Interface> = super::interfaces();
-        for iface in &interfaces {
-            if iface.default {
-                return Ok(iface.clone());
-            }
-        }
-        let local_ip: IpAddr = match get_local_ipaddr() {
-            Some(local_ip) => local_ip,
-            None => return Err(String::from("Local IP address not found")),
-        };
-        for iface in interfaces {
-            match local_ip {
-                IpAddr::V4(local_ipv4) => {
-                    if iface.ipv4.iter().any(|x| x.addr() == local_ipv4) {
-                        return Ok(iface);
-                    }
-                }
-                IpAddr::V6(local_ipv6) => {
-                    if iface.ipv6.iter().any(|x| x.addr() == local_ipv6) {
-                        return Ok(iface);
-                    }
-                }
-            }
-        }
-        Err(String::from("Default Interface not found"))
+        super::resolve_default_interface(super::interfaces())
     }
     // Construct a dummy Interface instance
     pub fn dummy() -> Interface {

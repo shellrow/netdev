@@ -12,24 +12,7 @@ use std::net::IpAddr;
 /// Get default Network Interface
 #[cfg(feature = "gateway")]
 pub fn get_default_interface() -> Result<Interface, String> {
-    use crate::net::ip::get_local_ipaddr;
-
-    let ifaces: Vec<Interface> = interfaces();
-    for iface in &ifaces {
-        if iface.default {
-            return Ok(iface.clone());
-        }
-    }
-    let local_ip: IpAddr = match get_local_ipaddr() {
-        Some(local_ip) => local_ip,
-        None => return Err(String::from("Local IP address not found")),
-    };
-    let idx: u32 = pick_default_iface_index(&ifaces, local_ip)
-        .ok_or_else(|| String::from("Default interface not found"))?;
-    ifaces
-        .into_iter()
-        .find(|it| it.index == idx)
-        .ok_or_else(|| String::from("Default interface not found"))
+    resolve_default_interface(interfaces())
 }
 
 /// Get a list of available Network Interfaces
@@ -64,6 +47,35 @@ pub(crate) fn pick_default_iface_index(ifaces: &[Interface], local_ip: IpAddr) -
         }
     }
     subnet_candidate
+}
+
+#[cfg(feature = "gateway")]
+pub(crate) fn iface_has_ip(iface: &Interface, local_ip: IpAddr) -> bool {
+    match local_ip {
+        IpAddr::V4(ipv4) => iface.ipv4.iter().any(|x| x.addr() == ipv4),
+        IpAddr::V6(ipv6) => iface.ipv6.iter().any(|x| x.addr() == ipv6),
+    }
+}
+
+#[cfg(feature = "gateway")]
+pub(crate) fn resolve_default_interface(mut ifaces: Vec<Interface>) -> Result<Interface, String> {
+    use crate::net::ip::get_local_ipaddr;
+
+    if let Some(pos) = ifaces.iter().position(|iface| iface.default) {
+        return Ok(ifaces.swap_remove(pos));
+    }
+
+    let local_ip: IpAddr = match get_local_ipaddr() {
+        Some(local_ip) => local_ip,
+        None => return Err(String::from("Local IP address not found")),
+    };
+
+    let idx = pick_default_iface_index(&ifaces, local_ip)
+        .ok_or_else(|| String::from("Default interface not found"))?;
+    ifaces
+        .into_iter()
+        .find(|iface| iface.index == idx)
+        .ok_or_else(|| String::from("Default interface not found"))
 }
 
 pub(crate) fn interfaces() -> Vec<Interface> {
