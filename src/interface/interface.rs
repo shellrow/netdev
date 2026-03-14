@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Interface {
-    /// OS-assigned index of network interface. This is an integer which uniquely identifies the interface 
+    /// OS-assigned index of network interface. This is an integer which uniquely identifies the interface
     /// on this machine.
     pub index: u32,
     /// System name of the interface.
@@ -28,7 +28,7 @@ pub struct Interface {
     pub name: String,
     /// Human-readable interface name, when the platform provides one.
     ///
-    /// Examples include `Wi-Fi` or `Ethernet` on Windows and display names on macOS. 
+    /// Examples include `Wi-Fi` or `Ethernet` on Windows and display names on macOS.
     /// This field is commonly `None` on Linux, Android, iOS, and BSD systems.
     pub friendly_name: Option<String>,
     /// Adapter description, when the platform provides one.
@@ -91,7 +91,7 @@ pub struct Interface {
     pub gateway: Option<NetworkDevice>,
     /// DNS resolver addresses associated with this interface.
     ///
-    /// This field is available only with the `gateway` feature. 
+    /// This field is available only with the `gateway` feature.
     #[cfg(feature = "gateway")]
     pub dns_servers: Vec<IpAddr>,
     /// Maximum transmission unit in bytes, when available.
