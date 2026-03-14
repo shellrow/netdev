@@ -46,6 +46,32 @@ fn calc_v6_scope_id(addr: &Ipv6Addr, ifindex: u32) -> u32 {
     }
 }
 
+fn finalize_interface(iface: &mut Interface) {
+    if let Some(sysfs_type) = super::sysfs::get_interface_type(&iface.name) {
+        iface.if_type = sysfs_type;
+    } else if let Some(guessed_type) = super::types::guess_type_by_name(&iface.name) {
+        iface.if_type = guessed_type;
+    }
+
+    if iface.transmit_speed.is_none() || iface.receive_speed.is_none() {
+        let speed = super::sysfs::get_interface_speed(&iface.name);
+        if iface.transmit_speed.is_none() {
+            iface.transmit_speed = speed;
+        }
+        if iface.receive_speed.is_none() {
+            iface.receive_speed = speed;
+        }
+    }
+
+    if iface.stats.is_none() {
+        iface.stats = crate::stats::counters::get_stats_from_name(&iface.name);
+    }
+
+    if iface.mtu.is_none() {
+        iface.mtu = crate::os::linux::mtu::get_mtu(&iface.name);
+    }
+}
+
 pub fn interfaces() -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = Vec::new();
 
@@ -91,13 +117,11 @@ pub fn interfaces() -> Vec<Interface> {
         Err(_) => {
             // fallback: unix ifaddrs
             ifaces = unix_interfaces();
-
-            for iface in &mut ifaces {
-                if let Some(t) = super::types::guess_type_by_name(&iface.name) {
-                    iface.if_type = t;
-                }
-            }
         }
+    }
+
+    for iface in &mut ifaces {
+        finalize_interface(iface);
     }
 
     // Fill gateway info
