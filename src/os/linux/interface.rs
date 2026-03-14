@@ -97,32 +97,26 @@ pub fn interfaces() -> Vec<Interface> {
     // Fill gateway info if feature enabled
     #[cfg(feature = "gateway")]
     match netlink::collect_routes() {
-        Ok(gmap) => {
-            let by_index: HashMap<u32, &netlink::GwRow> =
-                gmap.iter().map(|(k, v)| (*k, v)).collect();
+        Ok(mut gmap) => {
             for iface in &mut ifaces {
                 if iface.index == 0 {
                     continue;
                 }
-                if let Some(row) = by_index.get(&iface.index) {
-                    let dev = NetworkDevice {
-                        mac_addr: row
-                            .mac
-                            .map(|m| MacAddr::from_octets(m))
-                            .unwrap_or(MacAddr::zero()),
-                        ipv4: row.gw_v4.clone(),
-                        ipv6: row.gw_v6.clone(),
-                    };
-                    iface.gateway = Some(dev);
+                if let Some(row) = gmap.remove(&iface.index) {
+                    iface.gateway = Some(NetworkDevice {
+                        mac_addr: row.mac.map(MacAddr::from_octets).unwrap_or(MacAddr::zero()),
+                        ipv4: row.gw_v4,
+                        ipv6: row.gw_v6,
+                    });
                 }
             }
         }
         Err(_) => {
             // Fallback: procfs
-            let gateway_map: HashMap<String, NetworkDevice> = super::procfs::get_gateway_map();
+            let mut gateway_map: HashMap<String, NetworkDevice> = super::procfs::get_gateway_map();
             for iface in &mut ifaces {
-                if let Some(gateway) = gateway_map.get(&iface.name) {
-                    iface.gateway = Some(gateway.clone());
+                if let Some(gateway) = gateway_map.remove(&iface.name) {
+                    iface.gateway = Some(gateway);
                 }
             }
         }

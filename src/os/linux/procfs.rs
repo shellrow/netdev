@@ -37,24 +37,19 @@ fn convert_hex_ipv6(hex_ip: &str) -> Ipv6Addr {
 
 fn get_arp_map() -> HashMap<Ipv4Addr, MacAddr> {
     let mut arp_map: HashMap<Ipv4Addr, MacAddr> = HashMap::new();
-    let arp_data = read_to_string(PATH_PROC_NET_ARP);
-    let arp_text = match arp_data {
-        Ok(content) => content,
-        Err(_) => String::new(),
-    };
-    let arp_table: Vec<&str> = arp_text.trim().split("\n").collect();
-    for row in arp_table {
-        let mut fields: Vec<&str> = row.split(" ").collect();
-        fields.retain(|value| *value != "");
-        if fields.len() >= 6 {
-            // fields[0]: IP Address
-            // fields[3]: MAC Address (colon-separated string of hex format)
-            // fields[5]: Interface Name
-            match Ipv4Addr::from_str(fields[0]) {
-                Ok(ipv4_addr) => {
-                    arp_map.insert(ipv4_addr, MacAddr::from_hex_format(fields[3]));
-                }
-                Err(_) => {}
+    if let Ok(arp_text) = read_to_string(PATH_PROC_NET_ARP) {
+        for row in arp_text.lines() {
+            let mut fields = row.split_whitespace();
+            let Some(ip_addr) = fields.next() else {
+                continue;
+            };
+            let _hw_type = fields.next();
+            let _flags = fields.next();
+            let Some(mac_addr) = fields.next() else {
+                continue;
+            };
+            if let Ok(ipv4_addr) = Ipv4Addr::from_str(ip_addr) {
+                arp_map.insert(ipv4_addr, MacAddr::from_hex_format(mac_addr));
             }
         }
     }
@@ -63,19 +58,18 @@ fn get_arp_map() -> HashMap<Ipv4Addr, MacAddr> {
 
 fn get_ipv4_gateway_map() -> HashMap<String, Ipv4Addr> {
     let mut ipv4_gateway_map: HashMap<String, Ipv4Addr> = HashMap::new();
-    let route_data = read_to_string(PATH_PROC_NET_ROUTE);
-    let route_text = match route_data {
-        Ok(content) => content,
-        Err(_) => String::new(),
-    };
-    let route_table: Vec<&str> = route_text.trim().split("\n").collect();
-    for row in route_table {
-        let fields: Vec<&str> = row.split("\t").collect();
-        if fields.len() >= 3 {
-            // fields[0]: Interface Name
-            // fields[2]: IPv4 Address 8 hex chars
-            if fields[2] != "00000000" {
-                ipv4_gateway_map.insert(fields[0].to_string(), convert_hex_ipv4(fields[2]));
+    if let Ok(route_text) = read_to_string(PATH_PROC_NET_ROUTE) {
+        for row in route_text.lines() {
+            let mut fields = row.split_whitespace();
+            let Some(if_name) = fields.next() else {
+                continue;
+            };
+            let _destination = fields.next();
+            let Some(gateway) = fields.next() else {
+                continue;
+            };
+            if gateway != "00000000" {
+                ipv4_gateway_map.insert(if_name.to_owned(), convert_hex_ipv4(gateway));
             }
         }
     }
@@ -84,26 +78,18 @@ fn get_ipv4_gateway_map() -> HashMap<String, Ipv4Addr> {
 
 fn get_ipv6_gateway_map() -> HashMap<String, Ipv6Addr> {
     let mut ipv6_gateway_map: HashMap<String, Ipv6Addr> = HashMap::new();
-    let route_data = read_to_string(PATH_PROC_NET_IPV6_ROUTE);
-    let route_text = match route_data {
-        Ok(content) => content,
-        Err(_) => String::new(),
-    };
-    let route_table: Vec<&str> = route_text.trim().split("\n").collect();
-    for row in route_table {
-        let fields: Vec<&str> = row.split_whitespace().collect();
-        if fields.len() >= 10 {
-            // fields[0]: destination
-            // fields[1]: destination prefix length
-            // fields[4]: IPv6 Address 32 hex chars without colons
-            // fields[9]: Interface Name
-
+    if let Ok(route_text) = read_to_string(PATH_PROC_NET_IPV6_ROUTE) {
+        for row in route_text.lines() {
+            let fields: Vec<&str> = row.split_whitespace().collect();
+            if fields.len() < 10 {
+                continue;
+            }
             // default route has zero destination and zero prefix length
             if fields[0] == "00000000000000000000000000000000"
                 && fields[1] == "00"
                 && fields[4] != "00000000000000000000000000000000"
             {
-                ipv6_gateway_map.insert(fields[9].to_string(), convert_hex_ipv6(fields[4]));
+                ipv6_gateway_map.insert(fields[9].to_owned(), convert_hex_ipv6(fields[4]));
             }
         }
     }
@@ -116,7 +102,7 @@ pub fn get_gateway_map() -> HashMap<String, NetworkDevice> {
     for (if_name, ipv4_addr) in get_ipv4_gateway_map() {
         let gateway = gateway_map.entry(if_name).or_insert(NetworkDevice::new());
         if let Some(mac_addr) = arp_map.get(&ipv4_addr) {
-            gateway.mac_addr = mac_addr.clone();
+            gateway.mac_addr = *mac_addr;
         }
         gateway.ipv4.push(ipv4_addr);
     }
