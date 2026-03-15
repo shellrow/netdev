@@ -1,11 +1,12 @@
-//! Cross-platform library for network interface.
+//! Cross-platform library for enumerating network interfaces with metadata.
 //!
-//! `netdev` enumerates local network interfaces and exposes commonly needed metadata.
+//! `netdev` provides a unified API for discovering local network interfaces
+//! and retrieving commonly used metadata across platforms.
 //!
 //! Main entry points:
 //! - [`get_interfaces`] returns a snapshot of all visible interfaces.
 //! - [`Interface`] represents one interface and its collected metadata.
-//! - [`get_default_interface`] and [`get_default_gateway`] are available with the `gateway` feature(default).
+//! - [`get_default_interface`] and [`get_default_gateway`] are available with the `gateway` feature (default).
 //!
 pub mod interface;
 pub mod net;

@@ -9,8 +9,10 @@
 [default-net-crates-io-url]: https://crates.io/crates/default-net
 
 # netdev [![Crates.io][crates-badge]][crates-url] ![License][license-badge]
-  
-`netdev` provides a cross-platform API for network interface.
+
+Cross-platform library for enumerating network interfaces with metadata.    
+`netdev` provides a unified API for discovering local network interfaces
+and retrieving commonly used metadata across platforms.
 
 ## Key Features
 - Enumerate all available network interfaces
