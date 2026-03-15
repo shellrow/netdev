@@ -187,7 +187,7 @@ impl Interface {
     pub fn is_oper_up(&self) -> bool {
         self.oper_state == OperState::Up
     }
-    /// Refreshes [`Interface::oper_state`] from the operating system.
+    /// Refreshes `Interface::oper_state` from the operating system.
     pub fn update_oper_state(&mut self) {
         self.oper_state = super::state::operstate(&self.name);
     }
