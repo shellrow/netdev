@@ -1,3 +1,4 @@
+/// Common imports for interface discovery and inspection.
 pub use crate::interface::get_interfaces;
 pub use crate::interface::interface::Interface;
 pub use crate::interface::state::OperState;

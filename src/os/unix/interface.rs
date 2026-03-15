@@ -31,7 +31,7 @@ fn unix_interfaces_inner(
     getifaddrs: unsafe extern "C" fn(*mut *mut libc::ifaddrs) -> libc::c_int,
     freeifaddrs: unsafe extern "C" fn(*mut libc::ifaddrs),
 ) -> Vec<Interface> {
-    let mut ifaces: Vec<Interface> = vec![];
+    let mut ifaces: Vec<Interface> = Vec::new();
     let mut addrs: MaybeUninit<*mut libc::ifaddrs> = MaybeUninit::uninit();
     if unsafe { getifaddrs(addrs.as_mut_ptr()) } != 0 {
         return ifaces;
@@ -44,9 +44,10 @@ fn unix_interfaces_inner(
         let c_str = addr_ref.ifa_name as *const c_char;
         let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
         let name: String = unsafe { from_utf8_unchecked(bytes).to_owned() };
+        let if_index = if_nametoindex_or_zero(&name);
         let cap: libc::socklen_t = super::sockaddr::sockaddr_storage_cap();
         let addr_len_opt = unsafe { compute_sockaddr_len(addr_ref.ifa_addr, None, Some(cap)) };
-        let (mac, ip, ipv6_scope_id) = match addr_len_opt {
+        let (mac, ip, mut ipv6_scope_id) = match addr_len_opt {
             Some(addr_len) => {
                 let mac = unsafe {
                     try_mac_from_raw(addr_ref.ifa_addr as *const libc::sockaddr, addr_len)
@@ -99,10 +100,9 @@ fn unix_interfaces_inner(
                     };
                     match Ipv6Net::with_netmask(ipv6, netmask) {
                         Ok(ipv6_net) => {
+                            let scope_id = resolve_ipv6_scope_id(&ipv6, ipv6_scope_id, if_index);
                             ini_ipv6 = Some(ipv6_net);
-                            if ipv6_scope_id.is_none() {
-                                panic!("IPv6 address without scope ID!")
-                            }
+                            ipv6_scope_id = Some(scope_id);
                         }
                         Err(_) => {}
                     };
@@ -113,58 +113,51 @@ fn unix_interfaces_inner(
         // Check if there is already an interface with this name (since getifaddrs returns one
         // entry per address, so if the interface has multiple addresses, it returns multiple entries).
         // If so, add the IP addresses from the current entry into the existing interface. Otherwise, add a new interface.
-        let mut found: bool = false;
-        for iface in &mut ifaces {
-            if name == iface.name {
-                if let Some(mac) = mac.clone() {
-                    iface.mac_addr = Some(mac);
-                }
-
-                if iface.stats.is_none() {
-                    iface.stats = stats.clone();
-                }
-
-                if ini_ipv4.is_some() {
-                    iface.ipv4.push(ini_ipv4.unwrap());
-                }
-
-                if ini_ipv6.is_some() {
-                    iface.ipv6.push(ini_ipv6.unwrap());
-                    iface.ipv6_scope_ids.push(ipv6_scope_id.unwrap());
-                }
-                found = true;
+        if let Some(iface) = ifaces.iter_mut().find(|iface| iface.name == name) {
+            if let Some(mac) = mac {
+                iface.mac_addr = Some(mac);
             }
-        }
-        if !found {
+            if iface.stats.is_none() {
+                iface.stats = stats;
+            }
+            if let Some(ipv4_addr) = ini_ipv4 {
+                iface.ipv4.push(ipv4_addr);
+            }
+            if let (Some(ipv6_addr), Some(scope_id)) = (ini_ipv6, ipv6_scope_id) {
+                iface.ipv6.push(ipv6_addr);
+                iface.ipv6_scope_ids.push(scope_id);
+            }
+        } else {
+            let mtu = get_mtu(addr_ref, &name);
             let interface: Interface = Interface {
-                index: 0, // We will set these below
-                name: name.clone(),
+                index: if_index,
+                name,
                 friendly_name: None,
                 description: None,
                 if_type: if_type,
-                mac_addr: mac.clone(),
+                mac_addr: mac,
                 ipv4: match ini_ipv4 {
                     Some(ipv4_addr) => vec![ipv4_addr],
-                    None => vec![],
+                    None => Vec::new(),
                 },
                 ipv6: match ini_ipv6 {
                     Some(ipv6_addr) => vec![ipv6_addr],
-                    None => vec![],
+                    None => Vec::new(),
                 },
-                ipv6_scope_ids: match ini_ipv6 {
-                    Some(_) => vec![ipv6_scope_id.unwrap()],
-                    None => vec![],
+                ipv6_scope_ids: match ipv6_scope_id {
+                    Some(scope_id) => vec![scope_id],
+                    None => Vec::new(),
                 },
                 flags: addr_ref.ifa_flags,
                 oper_state: OperState::from_if_flags(addr_ref.ifa_flags),
                 transmit_speed: None,
                 receive_speed: None,
-                stats: stats,
+                stats,
                 #[cfg(feature = "gateway")]
                 gateway: None,
                 #[cfg(feature = "gateway")]
                 dns_servers: Vec::new(),
-                mtu: get_mtu(addr_ref, &name),
+                mtu,
                 #[cfg(feature = "gateway")]
                 default: false,
             };
@@ -176,10 +169,50 @@ fn unix_interfaces_inner(
         freeifaddrs(addrs);
     }
     for iface in &mut ifaces {
-        let name = CString::new(iface.name.as_bytes()).unwrap();
-        unsafe {
-            iface.index = libc::if_nametoindex(name.as_ptr());
+        if iface.index == 0 {
+            iface.index = if_nametoindex_or_zero(&iface.name);
         }
     }
     ifaces
+}
+
+fn if_nametoindex_or_zero(name: &str) -> u32 {
+    match CString::new(name.as_bytes()) {
+        Ok(name) => unsafe { libc::if_nametoindex(name.as_ptr()) },
+        Err(_) => 0,
+    }
+}
+
+fn resolve_ipv6_scope_id(addr: &Ipv6Addr, raw_scope_id: Option<u32>, if_index: u32) -> u32 {
+    match raw_scope_id {
+        Some(scope_id) if scope_id != 0 => scope_id,
+        _ if addr.is_unicast_link_local() => if_index,
+        _ => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_ipv6_scope_id;
+    use std::net::Ipv6Addr;
+
+    #[test]
+    fn preserves_non_zero_ipv6_scope_id() {
+        let addr = "fe80::1".parse::<Ipv6Addr>().unwrap();
+        assert_eq!(resolve_ipv6_scope_id(&addr, Some(9), 3), 9);
+    }
+
+    #[test]
+    fn derives_link_local_scope_from_interface_index() {
+        let addr = "fe80::1".parse::<Ipv6Addr>().unwrap();
+        assert_eq!(resolve_ipv6_scope_id(&addr, None, 7), 7);
+        assert_eq!(resolve_ipv6_scope_id(&addr, Some(0), 7), 7);
+    }
+
+    #[test]
+    fn keeps_global_ipv6_scope_id_zero() {
+        let addr = "2001:db8::1".parse::<Ipv6Addr>().unwrap();
+        assert_eq!(resolve_ipv6_scope_id(&addr, None, 7), 0);
+        assert_eq!(resolve_ipv6_scope_id(&addr, Some(0), 7), 0);
+    }
 }

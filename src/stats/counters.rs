@@ -6,15 +6,19 @@ use serde::{Deserialize, Serialize};
 use crate::interface::interface::Interface;
 
 /// Interface traffic statistics at a given point in time.
+///
+/// The counters are cumulative values reported by the operating system, typically since boot.
+/// Availability depends on the target platform and the specific interface driver.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct InterfaceStats {
-    /// Total received bytes on this interface.
+    /// Total number of received bytes.
     pub rx_bytes: u64,
-    /// Total transmitted bytes on this interface.
+    /// Total number of transmitted bytes.
     pub tx_bytes: u64,
-    /// The system timestamp when this snapshot was taken.
-    /// May be `None` if the platform does not support it.
+    /// Time when this snapshot was collected.
+    ///
+    /// This is `None` only when the platform-specific collector cannot provide a timestamp.
     pub timestamp: Option<SystemTime>,
 }
 

@@ -9,8 +9,6 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use crate::net::device::NetworkDevice;
 #[cfg(feature = "gateway")]
 use crate::os::unix::dns::get_system_dns_conf;
-#[cfg(feature = "gateway")]
-use std::collections::HashMap;
 
 use crate::os::unix::interface::unix_interfaces;
 
@@ -43,6 +41,32 @@ fn calc_v6_scope_id(addr: &Ipv6Addr, ifindex: u32) -> u32 {
         ifindex
     } else {
         0
+    }
+}
+
+fn finalize_interface(iface: &mut Interface) {
+    if let Some(sysfs_type) = super::sysfs::get_interface_type(&iface.name) {
+        iface.if_type = sysfs_type;
+    } else if let Some(guessed_type) = super::types::guess_type_by_name(&iface.name) {
+        iface.if_type = guessed_type;
+    }
+
+    if iface.transmit_speed.is_none() || iface.receive_speed.is_none() {
+        let speed = super::sysfs::get_interface_speed(&iface.name);
+        if iface.transmit_speed.is_none() {
+            iface.transmit_speed = speed;
+        }
+        if iface.receive_speed.is_none() {
+            iface.receive_speed = speed;
+        }
+    }
+
+    if iface.stats.is_none() {
+        iface.stats = crate::stats::counters::get_stats_from_name(&iface.name);
+    }
+
+    if iface.mtu.is_none() {
+        iface.mtu = crate::os::linux::mtu::get_mtu(&iface.name);
     }
 }
 
@@ -91,33 +115,27 @@ pub fn interfaces() -> Vec<Interface> {
         Err(_) => {
             // fallback: unix ifaddrs
             ifaces = unix_interfaces();
-
-            for iface in &mut ifaces {
-                if let Some(t) = super::types::guess_type_by_name(&iface.name) {
-                    iface.if_type = t;
-                }
-            }
         }
+    }
+
+    for iface in &mut ifaces {
+        finalize_interface(iface);
     }
 
     // Fill gateway info
     #[cfg(feature = "gateway")]
     {
-        if let Ok(gmap) = netlink::collect_routes() {
-            let by_index: HashMap<u32, &netlink::GwRow> =
-                gmap.iter().map(|(k, v)| (*k, v)).collect();
-
+        if let Ok(mut gmap) = netlink::collect_routes() {
             for iface in &mut ifaces {
                 if iface.index == 0 {
                     continue;
                 }
-                if let Some(row) = by_index.get(&iface.index) {
-                    let dev = NetworkDevice {
+                if let Some(row) = gmap.remove(&iface.index) {
+                    iface.gateway = Some(NetworkDevice {
                         mac_addr: row.mac.map(MacAddr::from_octets).unwrap_or(MacAddr::zero()),
-                        ipv4: row.gw_v4.clone(),
-                        ipv6: row.gw_v6.clone(),
-                    };
-                    iface.gateway = Some(dev);
+                        ipv4: row.gw_v4,
+                        ipv6: row.gw_v6,
+                    });
                 }
             }
         }

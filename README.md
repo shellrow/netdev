@@ -9,8 +9,10 @@
 [default-net-crates-io-url]: https://crates.io/crates/default-net
 
 # netdev [![Crates.io][crates-badge]][crates-url] ![License][license-badge]
-  
-`netdev` provides a cross-platform API for network interface.
+
+Cross-platform library for enumerating network interfaces with metadata.    
+`netdev` provides a unified API for discovering local network interfaces
+and retrieving commonly used metadata across platforms.
 
 ## Key Features
 - Enumerate all available network interfaces
@@ -37,7 +39,7 @@ See the [Interface][doc-interface-url] struct documentation for detail.
 Add `netdev` to your `Cargo.toml`
 ```toml
 [dependencies]
-netdev = "0.40"
+netdev = "0.41"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
