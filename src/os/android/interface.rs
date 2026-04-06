@@ -87,6 +87,7 @@ pub fn interfaces() -> Vec<Interface> {
                     ipv4: Vec::new(),
                     ipv6: Vec::new(),
                     ipv6_scope_ids: Vec::new(),
+                    ipv6_addr_flags: Vec::new(),
                     flags: r.flags,
                     oper_state: OperState::from_if_flags(r.flags),
                     transmit_speed: None,
@@ -104,9 +105,13 @@ pub fn interfaces() -> Vec<Interface> {
                 for (a, p) in r.ipv4 {
                     push_ipv4(&mut iface.ipv4, (a, p));
                 }
-                for (a, p) in r.ipv6 {
+                for (i, (a, p)) in r.ipv6.into_iter().enumerate() {
                     push_ipv6(&mut iface.ipv6, (a, p));
                     iface.ipv6_scope_ids.push(calc_v6_scope_id(&a, iface.index));
+                    let raw = r.ipv6_addr_flags.get(i).copied().unwrap_or(0);
+                    iface
+                        .ipv6_addr_flags
+                        .push(crate::os::linux::ipv6_addr_flags::from_netlink_flags(raw));
                 }
 
                 ifaces.push(iface);

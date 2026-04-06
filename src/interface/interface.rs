@@ -1,3 +1,4 @@
+use crate::interface::ipv6_addr_flags::Ipv6AddrFlags;
 use crate::interface::state::OperState;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::net::ip::{is_global_ip, is_global_ipv4, is_global_ipv6};
@@ -60,6 +61,8 @@ pub struct Interface {
     /// zone indexes. A value can be `0` when no scope is needed or when the platform did not
     /// provide one.
     pub ipv6_scope_ids: Vec<u32>,
+    /// Per-address IPv6 flags, aligned with entries in `Interface::ipv6`.
+    pub ipv6_addr_flags: Vec<Ipv6AddrFlags>,
     /// Raw interface flags.
     ///
     /// Bit meanings are platform-specific.
@@ -125,6 +128,7 @@ impl Interface {
             ipv4: Vec::new(),
             ipv6: Vec::new(),
             ipv6_scope_ids: Vec::new(),
+            ipv6_addr_flags: Vec::new(),
             flags: 0,
             oper_state: OperState::Unknown,
             transmit_speed: None,

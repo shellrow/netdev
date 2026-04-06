@@ -3,7 +3,7 @@ use crate::stats::counters::InterfaceStats;
 use netlink_packet_core::{NLM_F_DUMP, NLM_F_REQUEST, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::{
     RouteNetlinkMessage,
-    address::{AddressAttribute, AddressMessage},
+    address::{AddressAttribute, AddressFlags, AddressMessage},
     link::{LinkAttribute, LinkMessage},
 };
 use netlink_sys::{Socket, SocketAddr, protocols::NETLINK_ROUTE};
@@ -236,17 +236,25 @@ fn name_from_link(link: &LinkMessage) -> Option<String> {
     None
 }
 
-fn ip_from_addr(addr: &AddressMessage) -> Option<(IpAddr, u8)> {
+fn ip_from_addr(addr: &AddressMessage) -> Option<(IpAddr, u8, u32)> {
     let pfx = addr.header.prefix_len;
+    let mut ip_out = None;
+    let mut flags: Option<AddressFlags> = None;
     for nla in &addr.attributes {
         match nla {
             AddressAttribute::Local(ip) | AddressAttribute::Address(ip) => {
-                return Some((*ip, pfx));
+                ip_out = Some(*ip);
+            }
+            AddressAttribute::Flags(f) => {
+                flags = Some(*f);
             }
             _ => {}
         }
     }
-    None
+    let addr_flags = flags
+        .map(|f| f.bits())
+        .unwrap_or(addr.header.flags.bits() as u32);
+    ip_out.map(|ip| (ip, pfx, addr_flags))
 }
 
 #[cfg(feature = "gateway")]
@@ -385,6 +393,7 @@ pub struct IfRow {
     pub mac: Option<[u8; 6]>,
     pub ipv4: Vec<(Ipv4Addr, u8)>,
     pub ipv6: Vec<(Ipv6Addr, u8)>,
+    pub ipv6_addr_flags: Vec<u32>,
     pub flags: u32,
     pub mtu: Option<u32>,
     pub if_type: InterfaceType,
@@ -413,6 +422,7 @@ pub fn collect_interfaces() -> io::Result<Vec<IfRow>> {
                 mac,
                 ipv4: vec![],
                 ipv6: vec![],
+                ipv6_addr_flags: vec![],
                 flags,
                 mtu: mtu_nl,
                 if_type,
@@ -423,11 +433,14 @@ pub fn collect_interfaces() -> io::Result<Vec<IfRow>> {
 
     for a in addrs {
         let idx = a.header.index as u32;
-        if let Some((ip, pfx)) = ip_from_addr(&a) {
+        if let Some((ip, pfx, addr_flags)) = ip_from_addr(&a) {
             if let Some(row) = base.get_mut(&idx) {
                 match ip {
                     IpAddr::V4(v4) => row.ipv4.push((v4, pfx)),
-                    IpAddr::V6(v6) => row.ipv6.push((v6, pfx)),
+                    IpAddr::V6(v6) => {
+                        row.ipv6.push((v6, pfx));
+                        row.ipv6_addr_flags.push(addr_flags);
+                    }
                 }
             }
         }

@@ -6,6 +6,7 @@ use std::str::from_utf8_unchecked;
 
 use super::sockaddr::{SockaddrRef, compute_sockaddr_len, netmask_ip_autolen, try_mac_from_raw};
 use crate::interface::interface::Interface;
+use crate::interface::ipv6_addr_flags::get_ipv6_addr_flags;
 use crate::interface::mtu::get_mtu;
 use crate::interface::state::OperState;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
@@ -124,11 +125,17 @@ fn unix_interfaces_inner(
                 iface.ipv4.push(ipv4_addr);
             }
             if let (Some(ipv6_addr), Some(scope_id)) = (ini_ipv6, ipv6_scope_id) {
+                let af = get_ipv6_addr_flags(&iface.name, &ipv6_addr.addr());
                 iface.ipv6.push(ipv6_addr);
                 iface.ipv6_scope_ids.push(scope_id);
+                iface.ipv6_addr_flags.push(af);
             }
         } else {
             let mtu = get_mtu(addr_ref, &name);
+            let ini_ipv6_flags = ini_ipv6
+                .as_ref()
+                .map(|net| vec![get_ipv6_addr_flags(&name, &net.addr())])
+                .unwrap_or_default();
             let interface: Interface = Interface {
                 index: if_index,
                 name,
@@ -148,6 +155,7 @@ fn unix_interfaces_inner(
                     Some(scope_id) => vec![scope_id],
                     None => Vec::new(),
                 },
+                ipv6_addr_flags: ini_ipv6_flags,
                 flags: addr_ref.ifa_flags,
                 oper_state: OperState::from_if_flags(addr_ref.ifa_flags),
                 transmit_speed: None,
@@ -214,5 +222,24 @@ mod tests {
         let addr = "2001:db8::1".parse::<Ipv6Addr>().unwrap();
         assert_eq!(resolve_ipv6_scope_id(&addr, None, 7), 0);
         assert_eq!(resolve_ipv6_scope_id(&addr, Some(0), 7), 0);
+    }
+
+    #[test]
+    fn ipv6_addr_flags_aligned_with_addrs() {
+        let ifaces = super::unix_interfaces();
+        for iface in &ifaces {
+            assert_eq!(
+                iface.ipv6.len(),
+                iface.ipv6_addr_flags.len(),
+                "ipv6_addr_flags length mismatch for {}",
+                iface.name
+            );
+            assert_eq!(
+                iface.ipv6.len(),
+                iface.ipv6_scope_ids.len(),
+                "ipv6_scope_ids length mismatch for {}",
+                iface.name
+            );
+        }
     }
 }
