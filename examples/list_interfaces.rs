@@ -29,13 +29,27 @@ fn main() {
         // Print IPv6 addresses with scope ID and per-address flags
         for (i, ipv6) in interface.ipv6.iter().enumerate() {
             let scope_id = interface.ipv6_scope_ids.get(i).copied().unwrap_or(0);
-            let flags = interface.ipv6_addr_flags.get(i).copied().unwrap_or_default();
+            let flags = interface
+                .ipv6_addr_flags
+                .get(i)
+                .copied()
+                .unwrap_or_default();
             let mut flag_strs = Vec::new();
-            if flags.deprecated { flag_strs.push("deprecated"); }
-            if flags.temporary { flag_strs.push("temporary"); }
-            if flags.tentative { flag_strs.push("tentative"); }
-            if flags.duplicated { flag_strs.push("duplicated"); }
-            if flags.permanent { flag_strs.push("permanent"); }
+            if flags.deprecated {
+                flag_strs.push("deprecated");
+            }
+            if flags.temporary {
+                flag_strs.push("temporary");
+            }
+            if flags.tentative {
+                flag_strs.push("tentative");
+            }
+            if flags.duplicated {
+                flag_strs.push("duplicated");
+            }
+            if flags.permanent {
+                flag_strs.push("permanent");
+            }
             let flag_str = if flag_strs.is_empty() {
                 String::new()
             } else {
