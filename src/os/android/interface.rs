@@ -23,15 +23,17 @@ fn push_ipv4(v: &mut Vec<Ipv4Net>, add: (Ipv4Addr, u8)) {
     }
 }
 
-fn push_ipv6(v: &mut Vec<Ipv6Net>, add: (Ipv6Addr, u8)) {
+fn push_ipv6(v: &mut Vec<Ipv6Net>, add: (Ipv6Addr, u8)) -> bool {
     if v.iter()
         .any(|n| n.addr() == add.0 && n.prefix_len() == add.1)
     {
-        return;
+        return false;
     }
     if let Ok(net) = Ipv6Net::new(add.0, add.1) {
         v.push(net);
+        return true;
     }
+    false
 }
 
 #[inline]
@@ -87,6 +89,7 @@ pub fn interfaces() -> Vec<Interface> {
                     ipv4: Vec::new(),
                     ipv6: Vec::new(),
                     ipv6_scope_ids: Vec::new(),
+                    ipv6_addr_flags: Vec::new(),
                     flags: r.flags,
                     oper_state: OperState::from_if_flags(r.flags),
                     transmit_speed: None,
@@ -104,9 +107,14 @@ pub fn interfaces() -> Vec<Interface> {
                 for (a, p) in r.ipv4 {
                     push_ipv4(&mut iface.ipv4, (a, p));
                 }
-                for (a, p) in r.ipv6 {
-                    push_ipv6(&mut iface.ipv6, (a, p));
-                    iface.ipv6_scope_ids.push(calc_v6_scope_id(&a, iface.index));
+                for (i, (a, p)) in r.ipv6.into_iter().enumerate() {
+                    if push_ipv6(&mut iface.ipv6, (a, p)) {
+                        iface.ipv6_scope_ids.push(calc_v6_scope_id(&a, iface.index));
+                        let raw = r.ipv6_addr_flags.get(i).copied().unwrap_or(0);
+                        iface
+                            .ipv6_addr_flags
+                            .push(crate::os::linux::ipv6_addr_flags::from_netlink_flags(raw));
+                    }
                 }
 
                 ifaces.push(iface);

@@ -5,12 +5,14 @@ use windows_sys::Win32::NetworkManagement::IpHelper::{
 };
 use windows_sys::Win32::NetworkManagement::Ndis::NET_IF_OPER_STATUS_UP;
 use windows_sys::Win32::Networking::WinSock::{
-    AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_INET, SOCKET_ADDRESS,
+    AF_INET, AF_INET6, AF_UNSPEC, IpDadStateDeprecated, IpDadStateDuplicate, IpDadStateTentative,
+    IpSuffixOriginRandom, SOCKADDR_INET, SOCKET_ADDRESS,
 };
 
 use super::flags;
 use super::macros::linked_list_iter;
 use crate::interface::interface::Interface;
+use crate::interface::ipv6_addr_flags::Ipv6AddrFlags;
 use crate::interface::state::OperState;
 use crate::interface::types::InterfaceType;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
@@ -180,6 +182,7 @@ pub fn interfaces() -> Vec<Interface> {
             let mut ipv4_vec: Vec<Ipv4Net> = vec![];
             let mut ipv6_vec: Vec<Ipv6Net> = vec![];
             let mut ipv6_scope_id_vec: Vec<u32> = vec![];
+            let mut ipv6_flags_vec: Vec<Ipv6AddrFlags> = vec![];
             // Enumerate all IPs
             for cur_a in unsafe { linked_list_iter!(&cur.FirstUnicastAddress) } {
                 let (ip_addr, ipv6_scope_id) = unsafe { socket_address_to_ipaddr(&cur_a.Address) };
@@ -194,6 +197,14 @@ pub fn interfaces() -> Vec<Interface> {
                         Ok(ipv6_net) => {
                             ipv6_vec.push(ipv6_net);
                             ipv6_scope_id_vec.push(ipv6_scope_id.unwrap());
+
+                            ipv6_flags_vec.push(Ipv6AddrFlags {
+                                deprecated: cur_a.DadState == IpDadStateDeprecated,
+                                tentative: cur_a.DadState == IpDadStateTentative,
+                                duplicated: cur_a.DadState == IpDadStateDuplicate,
+                                temporary: cur_a.SuffixOrigin == IpSuffixOriginRandom,
+                                permanent: false,
+                            });
                         }
                         Err(_) => {}
                     },
@@ -247,6 +258,7 @@ pub fn interfaces() -> Vec<Interface> {
                 ipv4: ipv4_vec,
                 ipv6: ipv6_vec,
                 ipv6_scope_ids: ipv6_scope_id_vec,
+                ipv6_addr_flags: ipv6_flags_vec,
                 flags,
                 oper_state,
                 transmit_speed: sanitize_u64(cur.TransmitLinkSpeed),

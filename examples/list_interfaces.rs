@@ -26,14 +26,37 @@ fn main() {
         }
         println!("\tIPv4: {:?}", interface.ipv4);
 
-        // Print the IPv6 addresses with the scope ID after them as a suffix
-        let ipv6_strs: Vec<String> = interface
-            .ipv6
-            .iter()
-            .zip(interface.ipv6_scope_ids)
-            .map(|(ipv6, scope_id)| format!("{:?}%{}", ipv6, scope_id))
-            .collect();
-        println!("\tIPv6: [{}]", ipv6_strs.join(", "));
+        // Print IPv6 addresses with scope ID and per-address flags
+        for (i, ipv6) in interface.ipv6.iter().enumerate() {
+            let scope_id = interface.ipv6_scope_ids.get(i).copied().unwrap_or(0);
+            let flags = interface
+                .ipv6_addr_flags
+                .get(i)
+                .copied()
+                .unwrap_or_default();
+            let mut flag_strs = Vec::new();
+            if flags.deprecated {
+                flag_strs.push("deprecated");
+            }
+            if flags.temporary {
+                flag_strs.push("temporary");
+            }
+            if flags.tentative {
+                flag_strs.push("tentative");
+            }
+            if flags.duplicated {
+                flag_strs.push("duplicated");
+            }
+            if flags.permanent {
+                flag_strs.push("permanent");
+            }
+            let flag_str = if flag_strs.is_empty() {
+                String::new()
+            } else {
+                format!(" [{}]", flag_strs.join(", "))
+            };
+            println!("\tIPv6: {:?}%{}{}", ipv6, scope_id, flag_str);
+        }
 
         println!("\tTransmit Speed: {:?}", interface.transmit_speed);
         println!("\tReceive Speed: {:?}", interface.receive_speed);
