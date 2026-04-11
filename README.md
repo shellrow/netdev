@@ -64,11 +64,13 @@ and later rebranded to `netdev` by the author myself for future expansion, clear
     - Arch 
         - 2024.05.01
 - macOS (Apple Silicon)
+    - 26.3.1
     - 14.7.6
 - macOS (Intel)
     - 13.4.1
     - 11.6
 - Windows 
+    - 11 25H2 26200.8037
     - 11 24H2 26100.6584
     - 11 23H2 22631.4602
     - 11 Pro 22H2 22621.3155
