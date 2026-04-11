@@ -1,6 +1,6 @@
 [package]
 name = "netdev"
-version = "0.41.0"
+version = "0.42.0"
 authors = ["shellrow <shellrow@foctal.com>"]
 edition = "2024"
 description = "Cross-platform library for enumerating network interfaces with metadata."
