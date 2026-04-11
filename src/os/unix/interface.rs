@@ -1,8 +1,7 @@
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_char;
-use std::str::from_utf8_unchecked;
 
 use super::sockaddr::{SockaddrRef, compute_sockaddr_len, netmask_ip_autolen, try_mac_from_raw};
 use crate::interface::interface::Interface;
@@ -10,7 +9,7 @@ use crate::interface::ipv6_addr_flags::get_ipv6_addr_flags;
 use crate::interface::mtu::get_mtu;
 use crate::interface::state::OperState;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
-use crate::os::unix::types::get_interface_type;
+use crate::os::unix::types::{get_interface_type, interface_name_from_ptr};
 use crate::stats::counters::{InterfaceStats, get_stats};
 
 #[cfg(target_os = "android")]
@@ -43,8 +42,7 @@ fn unix_interfaces_inner(
         let addr_ref: &libc::ifaddrs = unsafe { &*addr };
         let if_type = get_interface_type(addr_ref);
         let c_str = addr_ref.ifa_name as *const c_char;
-        let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
-        let name: String = unsafe { from_utf8_unchecked(bytes).to_owned() };
+        let name = interface_name_from_ptr(c_str);
         let if_index = if_nametoindex_or_zero(&name);
         let cap: libc::socklen_t = super::sockaddr::sockaddr_storage_cap();
         let addr_len_opt = unsafe { compute_sockaddr_len(addr_ref.ifa_addr, None, Some(cap)) };
@@ -122,20 +120,25 @@ fn unix_interfaces_inner(
                 iface.stats = stats;
             }
             if let Some(ipv4_addr) = ini_ipv4 {
-                iface.ipv4.push(ipv4_addr);
+                push_ipv4(&mut iface.ipv4, ipv4_addr);
             }
             if let (Some(ipv6_addr), Some(scope_id)) = (ini_ipv6, ipv6_scope_id) {
                 let af = get_ipv6_addr_flags(&iface.name, &ipv6_addr.addr());
-                iface.ipv6.push(ipv6_addr);
-                iface.ipv6_scope_ids.push(scope_id);
-                iface.ipv6_addr_flags.push(af);
+                push_ipv6(
+                    &mut iface.ipv6,
+                    &mut iface.ipv6_scope_ids,
+                    &mut iface.ipv6_addr_flags,
+                    ipv6_addr,
+                    scope_id,
+                    af,
+                );
             }
         } else {
             let mtu = get_mtu(addr_ref, &name);
-            let ini_ipv6_flags = ini_ipv6
-                .as_ref()
-                .map(|net| vec![get_ipv6_addr_flags(&name, &net.addr())])
-                .unwrap_or_default();
+            let ini_ipv6_flags = match ini_ipv6.as_ref() {
+                Some(ipv6_addr) => vec![get_ipv6_addr_flags(&name, &ipv6_addr.addr())],
+                None => Vec::new(),
+            };
             let interface: Interface = Interface {
                 index: if_index,
                 name,
@@ -182,6 +185,36 @@ fn unix_interfaces_inner(
         }
     }
     ifaces
+}
+
+fn push_ipv4(v: &mut Vec<Ipv4Net>, net: Ipv4Net) -> bool {
+    if v.iter()
+        .any(|existing| existing.addr() == net.addr() && existing.prefix_len() == net.prefix_len())
+    {
+        return false;
+    }
+    v.push(net);
+    true
+}
+
+fn push_ipv6(
+    addrs: &mut Vec<Ipv6Net>,
+    scope_ids: &mut Vec<u32>,
+    addr_flags: &mut Vec<crate::interface::ipv6_addr_flags::Ipv6AddrFlags>,
+    net: Ipv6Net,
+    scope_id: u32,
+    flags: crate::interface::ipv6_addr_flags::Ipv6AddrFlags,
+) -> bool {
+    if addrs
+        .iter()
+        .any(|existing| existing.addr() == net.addr() && existing.prefix_len() == net.prefix_len())
+    {
+        return false;
+    }
+    addrs.push(net);
+    scope_ids.push(scope_id);
+    addr_flags.push(flags);
+    true
 }
 
 fn if_nametoindex_or_zero(name: &str) -> u32 {

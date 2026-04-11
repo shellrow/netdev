@@ -177,8 +177,13 @@ pub fn interfaces() -> Vec<Interface> {
                 .to_string_lossy()
                 .into_owned();
             // MAC address
-            let mac_addr_arr: [u8; 6] = cur.PhysicalAddress[..6].try_into().unwrap_or_default();
-            let mac_addr: MacAddr = MacAddr::from_octets(mac_addr_arr);
+            let mac_addr = if cur.PhysicalAddressLength == 6 {
+                Some(MacAddr::from_octets(
+                    cur.PhysicalAddress[..6].try_into().unwrap(),
+                ))
+            } else {
+                None
+            };
             let mut ipv4_vec: Vec<Ipv4Net> = vec![];
             let mut ipv6_vec: Vec<Ipv6Net> = vec![];
             let mut ipv6_scope_id_vec: Vec<u32> = vec![];
@@ -254,7 +259,7 @@ pub fn interfaces() -> Vec<Interface> {
                 friendly_name: Some(unsafe { from_wide_string(cur.FriendlyName) }),
                 description: Some(unsafe { from_wide_string(cur.Description) }),
                 if_type,
-                mac_addr: Some(mac_addr),
+                mac_addr,
                 ipv4: ipv4_vec,
                 ipv6: ipv6_vec,
                 ipv6_scope_ids: ipv6_scope_id_vec,

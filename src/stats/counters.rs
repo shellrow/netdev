@@ -55,14 +55,10 @@ pub(crate) fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
     use std::fs::read_to_string;
     let rx_path = format!("/sys/class/net/{}/statistics/rx_bytes", name);
     let tx_path = format!("/sys/class/net/{}/statistics/tx_bytes", name);
-    let rx_bytes = match read_to_string(rx_path) {
-        Ok(s) => s.trim().parse::<u64>().unwrap_or(0),
-        Err(_) => 0,
-    };
-    let tx_bytes = match read_to_string(tx_path) {
-        Ok(s) => s.trim().parse::<u64>().unwrap_or(0),
-        Err(_) => 0,
-    };
+
+    let rx_bytes = read_to_string(rx_path).ok()?.trim().parse::<u64>().ok()?;
+    let tx_bytes = read_to_string(tx_path).ok()?.trim().parse::<u64>().ok()?;
+
     Some(InterfaceStats {
         rx_bytes,
         tx_bytes,
