@@ -1,6 +1,13 @@
 #![allow(non_camel_case_types)]
 
-use libc::{c_int, pid_t, size_t};
+#[cfg(target_os = "freebsd")]
+mod freebsd;
+#[cfg(target_os = "netbsd")]
+mod netbsd;
+#[cfg(target_os = "openbsd")]
+mod openbsd;
+
+use libc::{c_int, size_t};
 use std::{
     collections::HashMap,
     ffi::c_void,
@@ -8,6 +15,13 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     ptr,
 };
+
+#[cfg(target_os = "freebsd")]
+use self::freebsd::{SOCKADDR_ALIGN, message_header_len, rt_msghdr};
+#[cfg(target_os = "netbsd")]
+use self::netbsd::{SOCKADDR_ALIGN, message_header_len, rt_msghdr};
+#[cfg(target_os = "openbsd")]
+use self::openbsd::{SOCKADDR_ALIGN, message_header_len, rt_msghdr};
 
 use crate::net::{device::NetworkDevice, mac::MacAddr};
 
@@ -21,8 +35,6 @@ const RTM_VERSION: u8 = 5;
 #[cfg(target_os = "netbsd")]
 const RTM_VERSION: u8 = 4;
 
-const RTF_WASCLONED: i32 = 0x20000;
-
 const RTAX_DST: usize = 0;
 const RTAX_GATEWAY: usize = 1;
 const RTAX_NETMASK: usize = 2;
@@ -33,43 +45,6 @@ const RTAX_MAX: usize = 8;
 const RTAX_MAX: usize = 9;
 #[cfg(target_os = "openbsd")]
 const RTAX_MAX: usize = 15;
-
-const SA_ALIGN: usize = 4;
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-struct rt_metrics {
-    rmx_locks: u32,
-    rmx_mtu: u32,
-    rmx_hopcount: u32,
-    rmx_expire: i32,
-    rmx_recvpipe: u32,
-    rmx_sendpipe: u32,
-    rmx_ssthresh: u32,
-    rmx_rtt: u32,
-    rmx_rttvar: u32,
-    rmx_pksent: u32,
-    rmx_weight: u32,
-    rmx_nhidx: u32,
-    rmx_filler: [u32; 2],
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-struct rt_msghdr {
-    rtm_msglen: u16,
-    rtm_version: u8,
-    rtm_type: u8,
-    rtm_index: u16,
-    rtm_flags: c_int,
-    rtm_addrs: c_int,
-    rtm_pid: pid_t,
-    rtm_seq: c_int,
-    rtm_errno: c_int,
-    rtm_use: c_int,
-    rtm_inits: u32,
-    rtm_rmx: rt_metrics,
-}
 
 unsafe extern "C" {
     fn sysctl(
@@ -154,9 +129,9 @@ fn sysctl_vec(mib: &mut [c_int]) -> io::Result<Vec<u8>> {
 #[inline]
 fn roundup(len: usize) -> usize {
     if len == 0 {
-        SA_ALIGN
+        SOCKADDR_ALIGN
     } else {
-        (len + (SA_ALIGN - 1)) & !(SA_ALIGN - 1)
+        (len + (SOCKADDR_ALIGN - 1)) & !(SOCKADDR_ALIGN - 1)
     }
 }
 
@@ -344,9 +319,8 @@ struct RawRoute {
 }
 
 fn parse_one_route(hdr: &rt_msghdr, addr_block: &[u8]) -> Option<RawRoute> {
-    const MSG_START_INDEX: usize = 60;
     let mut addrs: [Option<*const libc::sockaddr>; RTAX_MAX] = [None; RTAX_MAX];
-    let mut off = MSG_START_INDEX;
+    let mut off = 0usize;
 
     for idx in 0..RTAX_MAX {
         if (hdr.rtm_addrs & (1 << idx)) != 0 {
@@ -432,7 +406,11 @@ fn get_arp_table() -> io::Result<HashMap<IpAddr, MacAddr>> {
             return Err(code_to_error(hdr.rtm_errno));
         }
 
-        let addr_block = &buf[off + mem::size_of::<rt_msghdr>()..off + msglen];
+        let hdrlen = message_header_len(hdr);
+        if hdrlen < mem::size_of::<rt_msghdr>() || off + hdrlen > off + msglen {
+            break;
+        }
+        let addr_block = &buf[off + hdrlen..off + msglen];
         if let Some((ip, mac)) = message_to_arppair(addr_block) {
             arp_map.insert(ip, mac);
         }
@@ -469,15 +447,15 @@ fn list_routes() -> io::Result<Vec<RawRoute>> {
             off += msglen;
             continue;
         }
-        if (hdr.rtm_flags & RTF_WASCLONED) != 0 {
-            off += msglen;
-            continue;
-        }
         if hdr.rtm_errno != 0 {
             return Err(code_to_error(hdr.rtm_errno));
         }
 
-        let addr_block = &buf[off + mem::size_of::<rt_msghdr>()..off + msglen];
+        let hdrlen = message_header_len(hdr);
+        if hdrlen < mem::size_of::<rt_msghdr>() || off + hdrlen > off + msglen {
+            break;
+        }
+        let addr_block = &buf[off + hdrlen..off + msglen];
         if let Some(rr) = parse_one_route(hdr, addr_block) {
             out.push(rr);
         }
