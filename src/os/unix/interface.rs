@@ -1,8 +1,7 @@
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_char;
-use std::str::from_utf8_unchecked;
 
 use super::sockaddr::{SockaddrRef, compute_sockaddr_len, netmask_ip_autolen, try_mac_from_raw};
 use crate::interface::interface::Interface;
@@ -10,7 +9,7 @@ use crate::interface::ipv6_addr_flags::get_ipv6_addr_flags;
 use crate::interface::mtu::get_mtu;
 use crate::interface::state::OperState;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
-use crate::os::unix::types::get_interface_type;
+use crate::os::unix::types::{get_interface_type, interface_name_from_ptr};
 use crate::stats::counters::{InterfaceStats, get_stats};
 
 #[cfg(target_os = "android")]
@@ -43,8 +42,7 @@ fn unix_interfaces_inner(
         let addr_ref: &libc::ifaddrs = unsafe { &*addr };
         let if_type = get_interface_type(addr_ref);
         let c_str = addr_ref.ifa_name as *const c_char;
-        let bytes = unsafe { CStr::from_ptr(c_str).to_bytes() };
-        let name: String = unsafe { from_utf8_unchecked(bytes).to_owned() };
+        let name = interface_name_from_ptr(c_str);
         let if_index = if_nametoindex_or_zero(&name);
         let cap: libc::socklen_t = super::sockaddr::sockaddr_storage_cap();
         let addr_len_opt = unsafe { compute_sockaddr_len(addr_ref.ifa_addr, None, Some(cap)) };
