@@ -39,7 +39,7 @@ See the [Interface][doc-interface-url] struct documentation for detail.
 Add `netdev` to your `Cargo.toml`
 ```toml
 [dependencies]
-netdev = "0.41"
+netdev = "0.42"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
