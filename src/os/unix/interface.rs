@@ -120,20 +120,25 @@ fn unix_interfaces_inner(
                 iface.stats = stats;
             }
             if let Some(ipv4_addr) = ini_ipv4 {
-                iface.ipv4.push(ipv4_addr);
+                push_ipv4(&mut iface.ipv4, ipv4_addr);
             }
             if let (Some(ipv6_addr), Some(scope_id)) = (ini_ipv6, ipv6_scope_id) {
                 let af = get_ipv6_addr_flags(&iface.name, &ipv6_addr.addr());
-                iface.ipv6.push(ipv6_addr);
-                iface.ipv6_scope_ids.push(scope_id);
-                iface.ipv6_addr_flags.push(af);
+                push_ipv6(
+                    &mut iface.ipv6,
+                    &mut iface.ipv6_scope_ids,
+                    &mut iface.ipv6_addr_flags,
+                    ipv6_addr,
+                    scope_id,
+                    af,
+                );
             }
         } else {
             let mtu = get_mtu(addr_ref, &name);
-            let ini_ipv6_flags = ini_ipv6
-                .as_ref()
-                .map(|net| vec![get_ipv6_addr_flags(&name, &net.addr())])
-                .unwrap_or_default();
+            let ini_ipv6_flags = match ini_ipv6.as_ref() {
+                Some(ipv6_addr) => vec![get_ipv6_addr_flags(&name, &ipv6_addr.addr())],
+                None => Vec::new(),
+            };
             let interface: Interface = Interface {
                 index: if_index,
                 name,
@@ -180,6 +185,36 @@ fn unix_interfaces_inner(
         }
     }
     ifaces
+}
+
+fn push_ipv4(v: &mut Vec<Ipv4Net>, net: Ipv4Net) -> bool {
+    if v.iter()
+        .any(|existing| existing.addr() == net.addr() && existing.prefix_len() == net.prefix_len())
+    {
+        return false;
+    }
+    v.push(net);
+    true
+}
+
+fn push_ipv6(
+    addrs: &mut Vec<Ipv6Net>,
+    scope_ids: &mut Vec<u32>,
+    addr_flags: &mut Vec<crate::interface::ipv6_addr_flags::Ipv6AddrFlags>,
+    net: Ipv6Net,
+    scope_id: u32,
+    flags: crate::interface::ipv6_addr_flags::Ipv6AddrFlags,
+) -> bool {
+    if addrs
+        .iter()
+        .any(|existing| existing.addr() == net.addr() && existing.prefix_len() == net.prefix_len())
+    {
+        return false;
+    }
+    addrs.push(net);
+    scope_ids.push(scope_id);
+    addr_flags.push(flags);
+    true
 }
 
 fn if_nametoindex_or_zero(name: &str) -> u32 {
