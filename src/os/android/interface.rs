@@ -94,6 +94,7 @@ pub fn interfaces() -> Vec<Interface> {
                     oper_state: OperState::from_if_flags(r.flags),
                     transmit_speed: None,
                     receive_speed: None,
+                    auto_negotiate: None,
                     stats: r.stats.clone(),
                     #[cfg(feature = "gateway")]
                     gateway: None,
