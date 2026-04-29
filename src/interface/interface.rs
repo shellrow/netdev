@@ -71,7 +71,7 @@ pub struct Interface {
     pub oper_state: OperState,
     /// Transmit link speed in bits per second.
     ///
-    /// This field is usually available on Linux, Android, and Windows.
+    /// This field is usually available on Linux, Android, BSD, macOS and Windows.
     /// It may be `None` for virtual adapters, unsupported drivers, or platforms that do not
     /// expose link speed.
     pub transmit_speed: Option<u64>,
@@ -79,6 +79,10 @@ pub struct Interface {
     ///
     /// This field follows the same availability rules as `Interface::transmit_speed`.
     pub receive_speed: Option<u64>,
+    /// Whether this interface was configured to auto-negotiate the link speed.
+    ///
+    /// It may `None` if reading this information has not been implemented for a specific OS.
+    pub auto_negotiate: Option<bool>,
     /// Traffic counters captured when the interface snapshot was collected.
     ///
     /// The counters are cumulative totals reported by the OS, typically since boot.
@@ -133,6 +137,7 @@ impl Interface {
             oper_state: OperState::Unknown,
             transmit_speed: None,
             receive_speed: None,
+            auto_negotiate: None,
             stats: None,
             #[cfg(feature = "gateway")]
             gateway: None,

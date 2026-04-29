@@ -139,6 +139,7 @@ fn unix_interfaces_inner(
                 Some(ipv6_addr) => vec![get_ipv6_addr_flags(&name, &ipv6_addr.addr())],
                 None => Vec::new(),
             };
+
             let interface: Interface = Interface {
                 index: if_index,
                 name,
@@ -163,6 +164,7 @@ fn unix_interfaces_inner(
                 oper_state: OperState::from_if_flags(addr_ref.ifa_flags),
                 transmit_speed: None,
                 receive_speed: None,
+                auto_negotiate: None,
                 stats,
                 #[cfg(feature = "gateway")]
                 gateway: None,
@@ -182,6 +184,19 @@ fn unix_interfaces_inner(
     for iface in &mut ifaces {
         if iface.index == 0 {
             iface.index = if_nametoindex_or_zero(&iface.name);
+        }
+
+        #[cfg(any(
+            target_os = "macos",
+            target_os = "freebsd",
+            target_os = "openbsd",
+            target_os = "netbsd"
+        ))]
+        if let Some(ls) = crate::os::unix::link_speed::get_link_speed(&iface.name).ok() {
+            iface.transmit_speed = ls.bps;
+            iface.receive_speed = ls.bps;
+
+            iface.auto_negotiate = Some(ls.auto_negotiate);
         }
     }
     ifaces

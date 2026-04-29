@@ -268,6 +268,7 @@ pub fn interfaces() -> Vec<Interface> {
                 oper_state,
                 transmit_speed: sanitize_u64(cur.TransmitLinkSpeed),
                 receive_speed: sanitize_u64(cur.ReceiveLinkSpeed),
+                auto_negotiate: None,
                 stats,
                 #[cfg(feature = "gateway")]
                 gateway: if default_gateway.mac_addr == MacAddr::zero() {

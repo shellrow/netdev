@@ -2,21 +2,23 @@ use crate::os::darwin::types::{get_functional_type, interface_type_by_name};
 use crate::os::macos::sc::{get_sc_interface_map, read_sc_interfaces_plist_map};
 use crate::{
     interface::interface::Interface,
-    os::{macos::sc::SCInterface, unix::interface::unix_interfaces},
+    os::{
+        macos::sc::SCInterface, macos::wifi::get_wifi_transmit_rate,
+        unix::interface::unix_interfaces,
+    },
     prelude::InterfaceType,
 };
+
 use std::collections::HashMap;
 
 pub fn interfaces() -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = unix_interfaces();
 
-    let if_extra_map: HashMap<String, SCInterface> = match read_sc_interfaces_plist_map() {
-        Ok(m) => m,
-        Err(_) => {
+    let if_extra_map: HashMap<String, SCInterface> =
+        read_sc_interfaces_plist_map().unwrap_or_else(|_| {
             // Fallback to SCNetworkInterfaceCopyAll ...
             get_sc_interface_map()
-        }
-    };
+        });
 
     #[cfg(feature = "gateway")]
     let gateway_map = crate::os::darwin::route::get_gateway_map();
@@ -38,6 +40,10 @@ pub fn interfaces() -> Vec<Interface> {
                 iface.if_type = sc_type;
             }
             iface.friendly_name = sc_inface.friendly_name.clone();
+        }
+
+        if iface.if_type == InterfaceType::Wireless80211 {
+            iface.transmit_speed = get_wifi_transmit_rate(&iface.name);
         }
 
         #[cfg(feature = "gateway")]
