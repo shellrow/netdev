@@ -71,6 +71,7 @@ pub fn interfaces() -> Vec<Interface> {
                     transmit_speed: None,
                     receive_speed: None,
                     auto_negotiate: None,
+                    dhcp_enabled: None,
                     stats: None,
                     #[cfg(feature = "gateway")]
                     gateway: None,
@@ -137,6 +138,7 @@ pub fn interfaces() -> Vec<Interface> {
         let if_speed = super::sysfs::get_interface_speed(&iface.name);
         iface.transmit_speed = if_speed;
         iface.receive_speed = if_speed;
+        iface.dhcp_enabled = super::dhcp::dhcp_enabled(&iface.name, iface.index);
         iface.oper_state = super::sysfs::operstate(&iface.name);
 
         if iface.stats.is_none() {

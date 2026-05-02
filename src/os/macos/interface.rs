@@ -1,5 +1,5 @@
 use crate::os::darwin::types::{get_functional_type, interface_type_by_name};
-use crate::os::macos::sc::{get_sc_interface_map, read_sc_interfaces_plist_map};
+use crate::os::macos::sc::{get_sc_interface_map, read_sc_plist_interface_map};
 use crate::{
     interface::interface::Interface,
     os::{
@@ -15,7 +15,7 @@ pub fn interfaces() -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = unix_interfaces();
 
     let if_extra_map: HashMap<String, SCInterface> =
-        read_sc_interfaces_plist_map().unwrap_or_else(|_| {
+        read_sc_plist_interface_map().unwrap_or_else(|_| {
             // Fallback to SCNetworkInterfaceCopyAll ...
             get_sc_interface_map()
         });
@@ -40,6 +40,7 @@ pub fn interfaces() -> Vec<Interface> {
                 iface.if_type = sc_type;
             }
             iface.friendly_name = sc_inface.friendly_name.clone();
+            iface.dhcp_enabled = sc_inface.dhcp_enabled;
         }
 
         if iface.if_type == InterfaceType::Wireless80211 {

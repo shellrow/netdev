@@ -29,6 +29,7 @@ fn main() {
             println!("\tTransmit Speed: {:?}", interface.transmit_speed);
             println!("\tReceive Speed: {:?}", interface.receive_speed);
             println!("\tAuto-negotiate: {:?}", interface.auto_negotiate);
+            println!("\tDHCP enabled: {:?}", interface.dhcp_enabled);
             println!("\tStats: {:?}", interface.stats);
             if let Some(gateway) = interface.gateway {
                 println!("Default Gateway");

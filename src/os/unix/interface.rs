@@ -165,6 +165,7 @@ fn unix_interfaces_inner(
                 transmit_speed: None,
                 receive_speed: None,
                 auto_negotiate: None,
+                dhcp_enabled: None,
                 stats,
                 #[cfg(feature = "gateway")]
                 gateway: None,
