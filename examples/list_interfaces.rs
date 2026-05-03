@@ -61,7 +61,8 @@ fn main() {
         println!("\tTransmit Speed: {:?}", interface.transmit_speed);
         println!("\tReceive Speed: {:?}", interface.receive_speed);
         println!("\tAuto-negotiate: {:?}", interface.auto_negotiate);
-        println!("\tDHCP enabled: {:?}", interface.dhcp_enabled);
+        println!("\tDHCPv4 enabled: {:?}", interface.dhcp_v4_enabled);
+        println!("\tDHCPv6 enabled: {:?}", interface.dhcp_v6_enabled);
         println!("\tStats: {:?}", interface.stats);
         #[cfg(feature = "gateway")]
         if let Some(gateway) = interface.gateway {

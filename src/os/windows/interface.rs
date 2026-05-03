@@ -270,7 +270,10 @@ pub fn interfaces() -> Vec<Interface> {
                 transmit_speed: sanitize_u64(cur.TransmitLinkSpeed),
                 receive_speed: sanitize_u64(cur.ReceiveLinkSpeed),
                 auto_negotiate: None,
-                dhcp_enabled: Some(unsafe { cur.Anonymous2.Flags } & IP_ADAPTER_DHCP_ENABLED != 0),
+                dhcp_v4_enabled: Some(
+                    unsafe { cur.Anonymous2.Flags } & IP_ADAPTER_DHCP_ENABLED != 0,
+                ),
+                dhcp_v6_enabled: None,
                 stats,
                 #[cfg(feature = "gateway")]
                 gateway: if default_gateway.mac_addr == MacAddr::zero() {

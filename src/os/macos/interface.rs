@@ -40,7 +40,8 @@ pub fn interfaces() -> Vec<Interface> {
                 iface.if_type = sc_type;
             }
             iface.friendly_name = sc_inface.friendly_name.clone();
-            iface.dhcp_enabled = sc_inface.dhcp_enabled;
+            iface.dhcp_v4_enabled = sc_inface.dhcp_v4_enabled;
+            iface.dhcp_v6_enabled = sc_inface.dhcp_v6_enabled;
         }
 
         if iface.if_type == InterfaceType::Wireless80211 {

@@ -20,7 +20,8 @@ pub(crate) struct SCInterface {
     pub sc_type: Option<String>,
     #[allow(dead_code)]
     pub active: Option<bool>,
-    pub dhcp_enabled: Option<bool>,
+    pub dhcp_v4_enabled: Option<bool>,
+    pub dhcp_v6_enabled: Option<bool>,
 }
 
 impl SCInterface {
@@ -84,7 +85,8 @@ pub(crate) fn get_sc_interface_map() -> HashMap<String, SCInterface> {
                 sc_type: sc_if_type,
                 mac,
                 active: None,
-                dhcp_enabled: None,
+                dhcp_v4_enabled: None,
+                dhcp_v6_enabled: None,
             },
         );
     }
@@ -155,7 +157,8 @@ fn load_sc_interfaces_plist_map(bytes: &[u8]) -> HashMap<String, SCInterface> {
                 sc_type,
                 mac,
                 active,
-                dhcp_enabled: None,
+                dhcp_v4_enabled: None,
+                dhcp_v6_enabled: None,
             },
         );
     }
@@ -242,12 +245,18 @@ fn insert_service_metadata(map: &mut HashMap<String, SCInterface>, service: &pli
         .and_then(|v| v.as_string())
         .or_else(|| interface.get("Type").and_then(|v| v.as_string()))
         .map(ToOwned::to_owned);
-    let dhcp_enabled = service
+    let dhcp_v4_enabled = service
         .get("IPv4")
         .and_then(|v| v.as_dictionary())
         .and_then(|ipv4| ipv4.get("ConfigMethod"))
         .and_then(|v| v.as_string())
-        .and_then(map_ipv4_config_method_to_dhcp);
+        .and_then(map_ipv4_config_method_to_dhcp_v4);
+    let dhcp_v6_enabled = service
+        .get("IPv6")
+        .and_then(|v| v.as_dictionary())
+        .and_then(|ipv6| ipv6.get("ConfigMethod"))
+        .and_then(|v| v.as_string())
+        .and_then(map_ipv6_config_method_to_dhcp_v6);
 
     map.insert(
         bsd_name.to_string(),
@@ -257,15 +266,23 @@ fn insert_service_metadata(map: &mut HashMap<String, SCInterface>, service: &pli
             friendly_name,
             sc_type,
             active: None,
-            dhcp_enabled,
+            dhcp_v4_enabled,
+            dhcp_v6_enabled,
         },
     );
 }
 
-fn map_ipv4_config_method_to_dhcp(method: &str) -> Option<bool> {
+fn map_ipv4_config_method_to_dhcp_v4(method: &str) -> Option<bool> {
     match method {
         "DHCP" => Some(true),
-        "Manual" | "BOOTP" | "INFORM" | "LinkLocal" | "PPP" | "Automatic" | "Off" => Some(false),
+        "Manual" | "Off" => Some(false),
+        _ => None,
+    }
+}
+
+fn map_ipv6_config_method_to_dhcp_v6(method: &str) -> Option<bool> {
+    match method {
+        "Manual" | "LinkLocal" | "Off" => Some(false),
         _ => None,
     }
 }
@@ -292,8 +309,11 @@ fn merge_sc_interface_maps(
         if entry.active.is_none() {
             entry.active = overlay_iface.active;
         }
-        if overlay_iface.dhcp_enabled.is_some() {
-            entry.dhcp_enabled = overlay_iface.dhcp_enabled;
+        if overlay_iface.dhcp_v4_enabled.is_some() {
+            entry.dhcp_v4_enabled = overlay_iface.dhcp_v4_enabled;
+        }
+        if overlay_iface.dhcp_v6_enabled.is_some() {
+            entry.dhcp_v6_enabled = overlay_iface.dhcp_v6_enabled;
         }
     }
     base
@@ -320,14 +340,27 @@ pub(crate) fn read_sc_plist_interface_map() -> std::io::Result<HashMap<String, S
 
 #[cfg(test)]
 mod tests {
-    use super::{load_sc_preferences_plist_map, map_ipv4_config_method_to_dhcp};
+    use super::{
+        load_sc_preferences_plist_map, map_ipv4_config_method_to_dhcp_v4,
+        map_ipv6_config_method_to_dhcp_v6,
+    };
 
     #[test]
-    fn maps_ipv4_config_methods_to_dhcp_state() {
-        assert_eq!(map_ipv4_config_method_to_dhcp("DHCP"), Some(true));
-        assert_eq!(map_ipv4_config_method_to_dhcp("Manual"), Some(false));
-        assert_eq!(map_ipv4_config_method_to_dhcp("Automatic"), Some(false));
-        assert_eq!(map_ipv4_config_method_to_dhcp("Unknown"), None);
+    fn maps_ipv4_config_methods_to_dhcp_v4_state() {
+        assert_eq!(map_ipv4_config_method_to_dhcp_v4("DHCP"), Some(true));
+        assert_eq!(map_ipv4_config_method_to_dhcp_v4("Manual"), Some(false));
+        assert_eq!(map_ipv4_config_method_to_dhcp_v4("Off"), Some(false));
+        assert_eq!(map_ipv4_config_method_to_dhcp_v4("Automatic"), None);
+        assert_eq!(map_ipv4_config_method_to_dhcp_v4("Unknown"), None);
+    }
+
+    #[test]
+    fn maps_ipv6_config_methods_to_dhcp_v6_state() {
+        assert_eq!(map_ipv6_config_method_to_dhcp_v6("Automatic"), None);
+        assert_eq!(map_ipv6_config_method_to_dhcp_v6("Manual"), Some(false));
+        assert_eq!(map_ipv6_config_method_to_dhcp_v6("LinkLocal"), Some(false));
+        assert_eq!(map_ipv6_config_method_to_dhcp_v6("Off"), Some(false));
+        assert_eq!(map_ipv6_config_method_to_dhcp_v6("Unknown"), None);
     }
 
     #[test]
@@ -358,6 +391,11 @@ mod tests {
             </dict>
             <key>UserDefinedName</key>
             <string>Wi-Fi</string>
+            <key>IPv6</key>
+            <dict>
+                <key>ConfigMethod</key>
+                <string>Automatic</string>
+            </dict>
         </dict>
     </dict>
     <key>Sets</key>
@@ -386,6 +424,7 @@ mod tests {
         let iface = map.get("en1").unwrap();
         assert_eq!(iface.friendly_name.as_deref(), Some("Wi-Fi"));
         assert_eq!(iface.sc_type.as_deref(), Some("AirPort"));
-        assert_eq!(iface.dhcp_enabled, Some(true));
+        assert_eq!(iface.dhcp_v4_enabled, Some(true));
+        assert_eq!(iface.dhcp_v6_enabled, None);
     }
 }
