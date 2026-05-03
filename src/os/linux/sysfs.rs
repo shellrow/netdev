@@ -17,14 +17,35 @@ fn is_wifi_interface(ifname: &str) -> bool {
     let base = PathBuf::from("/sys/class/net").join(ifname);
 
     // 1) Check uevent file for DEVTYPE=wlan
-    if let Some(ue) = read_trimmed(base.join("uevent")) {
-        if ue.lines().any(|l| l.trim() == "DEVTYPE=wlan") {
-            return true;
-        }
+    if let Some(ue) = read_trimmed(base.join("uevent"))
+        && ue.lines().any(|l| l.trim() == "DEVTYPE=wlan")
+    {
+        return true;
     }
 
     // 2) Check for wireless or phy80211 directories
     exists(base.join("wireless")) || exists(base.join("phy80211"))
+}
+
+/// Check if the interface is a WWAN/mobile broadband interface.
+fn is_wwan_interface(ifname: &str) -> bool {
+    let base = PathBuf::from("/sys/class/net").join(ifname);
+
+    if let Some(uevent) = read_trimmed(base.join("uevent"))
+        && uevent.lines().any(|line| line.trim() == "DEVTYPE=wwan")
+    {
+        return true;
+    }
+
+    is_wwan_name(ifname)
+}
+
+fn is_wwan_name(ifname: &str) -> bool {
+    ifname == "wwan"
+        || ifname.starts_with("wwan")
+        || ifname.starts_with("wwp")
+        || ifname.starts_with("rmnet")
+        || ifname.starts_with("ccmni")
 }
 
 /// Check if the interface is a virtual interface.
@@ -52,6 +73,11 @@ pub fn get_interface_type(ifname: &str) -> InterfaceType {
     if is_wifi_interface(ifname) {
         return InterfaceType::Wireless80211;
     }
+
+    if is_wwan_interface(ifname) {
+        return InterfaceType::Wwan;
+    }
+
     // Read the type from sysfs
     let p = PathBuf::from("/sys/class/net").join(ifname).join("type");
     let ty = match read_trimmed(&p).and_then(|s| s.parse::<u32>().ok()) {

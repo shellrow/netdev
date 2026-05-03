@@ -63,6 +63,8 @@ pub enum InterfaceType {
     HighPerformanceSerialBus,
     /// Mobile broadband interface for WiMAX devices.
     Wman,
+    /// Wireless wide area network interface, such as a mobile broadband or cellular modem.
+    Wwan,
     /// Mobile broadband interface for GSM-based devices.
     Wwanpp,
     /// Mobile broadband interface for CDMA-based devices.
@@ -208,6 +210,7 @@ impl InterfaceType {
             InterfaceType::HighPerformanceSerialBus => String::from("High Performance Serial Bus"),
             InterfaceType::Bridge => String::from("Bridge"),
             InterfaceType::Wman => String::from("WMAN"),
+            InterfaceType::Wwan => String::from("WWAN"),
             InterfaceType::Wwanpp => String::from("WWANPP"),
             InterfaceType::Wwanpp2 => String::from("WWANPP2"),
             InterfaceType::Can => String::from("CAN"),
