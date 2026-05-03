@@ -95,6 +95,8 @@ pub fn interfaces() -> Vec<Interface> {
                     transmit_speed: None,
                     receive_speed: None,
                     auto_negotiate: None,
+                    dhcp_v4_enabled: None,
+                    dhcp_v6_enabled: None,
                     stats: r.stats.clone(),
                     #[cfg(feature = "gateway")]
                     gateway: None,

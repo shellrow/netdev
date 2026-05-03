@@ -2,6 +2,7 @@ use std::net::IpAddr;
 use windows_sys::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
     GAA_FLAG_INCLUDE_GATEWAYS, GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH,
+    IP_ADAPTER_DHCP_ENABLED,
 };
 use windows_sys::Win32::NetworkManagement::Ndis::NET_IF_OPER_STATUS_UP;
 use windows_sys::Win32::Networking::WinSock::{
@@ -269,6 +270,10 @@ pub fn interfaces() -> Vec<Interface> {
                 transmit_speed: sanitize_u64(cur.TransmitLinkSpeed),
                 receive_speed: sanitize_u64(cur.ReceiveLinkSpeed),
                 auto_negotiate: None,
+                dhcp_v4_enabled: Some(
+                    unsafe { cur.Anonymous2.Flags } & IP_ADAPTER_DHCP_ENABLED != 0,
+                ),
+                dhcp_v6_enabled: None,
                 stats,
                 #[cfg(feature = "gateway")]
                 gateway: if default_gateway.mac_addr == MacAddr::zero() {

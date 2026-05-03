@@ -83,6 +83,16 @@ pub struct Interface {
     ///
     /// It may `None` if reading this information has not been implemented for a specific OS.
     pub auto_negotiate: Option<bool>,
+    /// Whether this interface is configured to use DHCP for IPv4.
+    ///
+    /// This may be `None` if reading this information is not available on the
+    /// current platform, not implemented, or not applicable to the interface.
+    pub dhcp_v4_enabled: Option<bool>,
+    /// Whether this interface is configured to use DHCP for IPv6.
+    ///
+    /// This may be `None` if reading this information is not available on the
+    /// current platform, not implemented, or not applicable to the interface.
+    pub dhcp_v6_enabled: Option<bool>,
     /// Traffic counters captured when the interface snapshot was collected.
     ///
     /// The counters are cumulative totals reported by the OS, typically since boot.
@@ -138,6 +148,8 @@ impl Interface {
             transmit_speed: None,
             receive_speed: None,
             auto_negotiate: None,
+            dhcp_v4_enabled: None,
+            dhcp_v6_enabled: None,
             stats: None,
             #[cfg(feature = "gateway")]
             gateway: None,
@@ -274,6 +286,12 @@ mod tests {
     use crate::interface::interface::Interface;
     use ipnet::{Ipv4Net, Ipv6Net};
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn dummy_initializes_dhcp_state_as_unknown() {
+        assert_eq!(Interface::dummy().dhcp_v4_enabled, None);
+        assert_eq!(Interface::dummy().dhcp_v6_enabled, None);
+    }
 
     #[test]
     fn global_helpers_filter() {

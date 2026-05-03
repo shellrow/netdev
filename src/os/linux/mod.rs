@@ -1,5 +1,7 @@
 pub mod arp;
 #[cfg(not(target_os = "android"))]
+mod dhcp;
+#[cfg(not(target_os = "android"))]
 pub mod flags;
 #[cfg(not(target_os = "android"))]
 pub mod interface;
