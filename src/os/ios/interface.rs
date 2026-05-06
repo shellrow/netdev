@@ -101,9 +101,7 @@ pub fn interfaces() -> Vec<Interface> {
             if let Some(iface) = ifaces.iter_mut().find(|it| it.index == idx) {
                 iface.default = true;
 
-                // iOS family targets do not reliably expose resolver addresses,
-                // but the Unix fallback is harmless when it is available.
-                iface.dns_servers = crate::os::unix::dns::get_system_dns_conf();
+                iface.dns_servers = crate::os::ios::dns::get_system_dns_conf();
             }
         }
     }
