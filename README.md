@@ -59,7 +59,8 @@ netdev = { version = "0.43", default-features = false, features = ["gateway"] }
 ```
 
 ## Apple behavior
-`netdev` links `SystemConfiguration.framework` automatically on `macOS` and `iOS` through the crate's own build script, so downstream apps do not need to add that framework manually just to use `netdev`.
+`netdev` links `SystemConfiguration.framework` automatically on `macOS` and `iOS` through the crate's own build script.
+If your final app link is performed by Xcode, you may still need to add `SystemConfiguration.framework` to the app target manually.
 
 ## Project History
 This crate was originally published as [default-net][default-net-crates-io-url] 
