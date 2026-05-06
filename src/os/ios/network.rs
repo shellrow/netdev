@@ -21,6 +21,7 @@ use crate::net::device::NetworkDevice;
 pub(crate) struct NWInterface {
     pub bsd_name: String,
     pub if_type: InterfaceType,
+    #[cfg(feature = "gateway")]
     pub index: u32,
 }
 
@@ -55,6 +56,7 @@ impl NWPathSnapshot {
         map
     }
 
+    #[cfg(feature = "gateway")]
     pub fn first_non_loopback_interface_index(&self) -> Option<u32> {
         self.interfaces
             .iter()
@@ -138,6 +140,7 @@ unsafe extern "C" {
 
     fn nw_interface_get_name(interface: nw_interface_t) -> *const c_char;
     fn nw_interface_get_type(interface: nw_interface_t) -> nw_interface_type_t;
+    #[cfg(feature = "gateway")]
     fn nw_interface_get_index(interface: nw_interface_t) -> u32;
 
     fn nw_endpoint_get_type(endpoint: nw_endpoint_t) -> nw_endpoint_type_t;
@@ -222,13 +225,17 @@ fn collect_path_snapshot(path: nw_path_t) -> NWPathSnapshot {
             .to_string_lossy()
             .into_owned();
         let if_type = map_interface_type(unsafe { nw_interface_get_type(iface) });
+        #[cfg(feature = "gateway")]
         let index = unsafe { nw_interface_get_index(iface) };
 
-        interfaces_ref.lock().unwrap().push(NWInterface {
+        let nw_interface = NWInterface {
             bsd_name: name,
             if_type,
+            #[cfg(feature = "gateway")]
             index,
-        });
+        };
+
+        interfaces_ref.lock().unwrap().push(nw_interface);
 
         1
     });
