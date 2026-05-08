@@ -338,17 +338,9 @@ fn mtu_from_link(link: &LinkMessage) -> Option<u32> {
     None
 }
 
-fn if_type_from_link(link: &LinkMessage, name: &str) -> InterfaceType {
+fn if_type_from_link(link: &LinkMessage, _name: &str) -> InterfaceType {
     let arphrd = link.header.link_layer_type as u32;
-    let mut t = InterfaceType::try_from(arphrd).unwrap_or(InterfaceType::UnknownWithValue(arphrd));
-
-    // override by name guess
-    // ARPHRD may be unreliable on some devices
-    if let Some(guess) = super::types::guess_type_by_name(name) {
-        t = guess;
-    }
-
-    t
+    InterfaceType::try_from(arphrd).unwrap_or(InterfaceType::UnknownWithValue(arphrd))
 }
 
 fn stats_from_link(link: &LinkMessage) -> Option<InterfaceStats> {
@@ -402,7 +394,7 @@ pub struct IfRow {
 
 pub fn collect_interfaces() -> io::Result<Vec<IfRow>> {
     let links = dump_links()?;
-    let addrs = dump_addrs()?;
+    let addrs = dump_addrs().unwrap_or_default();
 
     let mut base: HashMap<u32, IfRow> = HashMap::new();
     for l in links {

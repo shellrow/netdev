@@ -50,6 +50,9 @@ For more details, see [examples][examples-url] or [doc][doc-url].
 - `apple-system-configuration-extra` (default)
   - Enables deeper Apple metadata enrichment using `SystemConfiguration` APIs.
   - On Apple targets, this adds metadata such as interface display names, DHCP hints, and iOS DNS resolver lookup when the platform exposes them.
+- `android-extra` (default)
+  - Enables deeper Android metadata enrichment using Android platform APIs through JNI bindings.
+  - On Android, this can add metadata such as traffic stats, DNS servers, DHCP hints, and Wi-Fi link speed when the app provides the required Android context and permissions.
 
 To opt out of the deeper Apple enrichment while keeping gateway helpers:
 
@@ -61,6 +64,9 @@ netdev = { version = "0.43", default-features = false, features = ["gateway"] }
 ## Apple behavior
 `netdev` links `SystemConfiguration.framework` automatically on `macOS` and `iOS` through the crate's own build script.
 If your final app link is performed by Xcode, you may still need to add `SystemConfiguration.framework` to the app target manually.
+
+## Android behavior
+If you want Android-specific values such as DNS servers, DHCP hints, or Wi-Fi link speed, your app may still need to initialize the Android context for Rust and declare Android permissions such as `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE`.
 
 ## Project History
 This crate was originally published as [default-net][default-net-crates-io-url] 

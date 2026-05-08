@@ -1,3 +1,5 @@
+#[cfg(feature = "android-extra")]
+pub mod api;
 pub mod flags;
 pub mod interface;
 pub mod netlink;
