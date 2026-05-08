@@ -18,10 +18,10 @@ and retrieving commonly used metadata across platforms.
 - Enumerate all available network interfaces
 - Detect the default network interface
 - Retrieve interface metadata:
-    - Interface type
-    - MAC address
-    - IPv4 / IPv6 addresses and prefixes
-    - MTU, flags, operational state, etc...
+  - Interface type
+  - MAC address
+  - IPv4 / IPv6 addresses and prefixes
+  - MTU, flags, operational state, etc...
 - Native traffic statistics (RX/TX bytes) for each interface
 - Designed for **cross-platform**
 
@@ -32,7 +32,7 @@ See the [Interface][doc-interface-url] struct documentation for detail.
 - macOS
 - Windows
 - Android
-- iOS (and other Apple targets)
+- iOS
 - BSDs
 
 ## Usage
@@ -43,6 +43,24 @@ netdev = "0.43"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
+
+## Feature flags
+- `gateway` (default)
+  - Enables default interface and default gateway helpers.
+- `apple-system-configuration-extra` (default)
+  - Enables deeper Apple metadata enrichment using `SystemConfiguration` APIs.
+  - On Apple targets, this adds metadata such as interface display names, DHCP hints, and iOS DNS resolver lookup when the platform exposes them.
+
+To opt out of the deeper Apple enrichment while keeping gateway helpers:
+
+```toml
+[dependencies]
+netdev = { version = "0.43", default-features = false, features = ["gateway"] }
+```
+
+## Apple behavior
+`netdev` links `SystemConfiguration.framework` automatically on `macOS` and `iOS` through the crate's own build script.
+If your final app link is performed by Xcode, you may still need to add `SystemConfiguration.framework` to the app target manually.
 
 ## Project History
 This crate was originally published as [default-net][default-net-crates-io-url] 

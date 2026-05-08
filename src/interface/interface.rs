@@ -71,7 +71,7 @@ pub struct Interface {
     pub oper_state: OperState,
     /// Transmit link speed in bits per second.
     ///
-    /// This field is usually available on Linux, Android, BSD, macOS and Windows.
+    /// This field is usually available on Linux, Android, BSD, Apple targets, and Windows.
     /// It may be `None` for virtual adapters, unsupported drivers, or platforms that do not
     /// expose link speed.
     pub transmit_speed: Option<u64>,

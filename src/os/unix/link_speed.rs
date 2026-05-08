@@ -1,5 +1,6 @@
 #![cfg(any(
     target_os = "macos",
+    target_os = "ios",
     target_os = "freebsd",
     target_os = "openbsd",
     target_os = "netbsd"
@@ -9,7 +10,7 @@
 use libc::{AF_INET, IFNAMSIZ, SOCK_DGRAM, close, ioctl, socket};
 use std::ffi::CString;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 use macos_subtypes::{ifm_subtype, map_subtype_to_bps};
 
 #[cfg(target_os = "freebsd")]
@@ -21,7 +22,7 @@ use openbsd_subtypes::{ifm_subtype, map_subtype_to_bps};
 #[cfg(target_os = "netbsd")]
 use netbsd_subtypes::{ifm_subtype, map_subtype_to_bps};
 
-/// Returns the unix/BSD/macOS network interface link speed in bps for the given interface name.
+/// Returns the unix/BSD/Apple network interface link speed in bps for the given interface name.
 pub(crate) fn get_link_speed(iface_name: &str) -> std::io::Result<LinkSpeed> {
     Ok(get_ifmediareq(iface_name)?.into())
 }
@@ -75,7 +76,7 @@ impl From<ifmediareq> for LinkSpeed {
 
 // OpenBSD uses uint64_t instead of int for their ifmediareq struct, see
 // https://github.com/openbsd/src/blob/master/sys/net/if.h#L456 .
-// Other BSD and macOS use int. Furthermore, OpenBSD uses an u64 TMASK
+// Other BSD and Apple targets use int. Furthermore, OpenBSD uses an u64 TMASK
 // and OpenBSD and NetBSD use different values for the subtypes.
 #[cfg(target_os = "openbsd")]
 type ifmediareq_int = u64;
@@ -99,7 +100,7 @@ struct ifmediareq {
 // extended types. However, some BSD variants (OpenBSD and NetBSD) don't define SIOCGIFXMEDIA.
 // This code uses SIOCGIFXMEDIA where available, otherwise SIOCGIFMEDIA.
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 // #define SIOCGIFXMEDIA   _IOWR('i', 72, struct ifmediareq)
 const SIOCGIFXMEDIA: u64 = 0xc02c6948;
 // #define SIOCGIFMEDIA    _IOWR('i', 56, struct ifmediareq)
@@ -121,7 +122,7 @@ const SIOCGIFXMEDIA: u32 = 0xc030698b;
 // #define	SIOCGIFMEDIA	_IOWR('i', 56, struct ifmediareq)
 const SIOCGIFXMEDIA: u64 = 0xc02c6938;
 
-// The following constants are the same across all BSD variants and macOS
+// The following constants are the same across all BSD variants and Apple targets.
 
 const IFM_AUTO: i32 = 0;
 //const IFM_MANUAL: i32 = 1;
@@ -148,7 +149,7 @@ const IFM_HPNA_1: i32 = 17; // HomePNA 1.0 (1Mb/s)
 
 // The following constants are different on every BSD variant and macOS
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 mod macos_subtypes {
     // https://github.com/apple/darwin-xnu/blob/main/bsd/net/if_media.h
     // MacOSX.sdk/usr/include/net/if_media.h
