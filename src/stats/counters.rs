@@ -50,8 +50,29 @@ pub(crate) fn get_stats(_ifa: Option<&libc::ifaddrs>, name: &str) -> Option<Inte
     get_stats_from_name(name)
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(target_os = "linux")]
 pub(crate) fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
+    use std::fs::read_to_string;
+    let rx_path = format!("/sys/class/net/{}/statistics/rx_bytes", name);
+    let tx_path = format!("/sys/class/net/{}/statistics/tx_bytes", name);
+
+    let rx_bytes = read_to_string(rx_path).ok()?.trim().parse::<u64>().ok()?;
+    let tx_bytes = read_to_string(tx_path).ok()?.trim().parse::<u64>().ok()?;
+
+    Some(InterfaceStats {
+        rx_bytes,
+        tx_bytes,
+        timestamp: Some(SystemTime::now()),
+    })
+}
+
+#[cfg(target_os = "android")]
+pub(crate) fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
+    #[cfg(feature = "android-extra")]
+    if let Some(stats) = crate::os::android::api::get_interface_stats(name) {
+        return Some(stats);
+    }
+
     use std::fs::read_to_string;
     let rx_path = format!("/sys/class/net/{}/statistics/rx_bytes", name);
     let tx_path = format!("/sys/class/net/{}/statistics/tx_bytes", name);

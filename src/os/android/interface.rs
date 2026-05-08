@@ -91,6 +91,65 @@ fn type_is_more_specific(current: InterfaceType, candidate: InterfaceType) -> bo
     }
 }
 
+#[cfg(feature = "android-extra")]
+fn finalize_interface(iface: &mut Interface, extras: Option<&super::api::InterfaceExtras>) {
+    if let Some(sysfs_type) = super::sysfs::get_interface_type(&iface.name) {
+        if type_is_more_specific(iface.if_type, sysfs_type) {
+            iface.if_type = sysfs_type;
+        }
+    }
+
+    if type_is_ambiguous(iface.if_type)
+        && let Some(guessed_type) = super::types::guess_type_by_name(&iface.name)
+    {
+        iface.if_type = guessed_type;
+    }
+
+    if let Some(extra) = extras {
+        if iface.transmit_speed.is_none() {
+            iface.transmit_speed = extra.transmit_speed;
+        }
+        if iface.receive_speed.is_none() {
+            iface.receive_speed = extra.receive_speed;
+        }
+        if iface.auto_negotiate.is_none() {
+            iface.auto_negotiate = extra.auto_negotiate;
+        }
+        if iface.stats.is_none() {
+            iface.stats = extra.stats.clone();
+        }
+        if iface.dhcp_v4_enabled.is_none() {
+            iface.dhcp_v4_enabled = extra.dhcp_v4_enabled;
+        }
+        if iface.dhcp_v6_enabled.is_none() {
+            iface.dhcp_v6_enabled = extra.dhcp_v6_enabled;
+        }
+        #[cfg(feature = "gateway")]
+        if iface.dns_servers.is_empty() {
+            iface.dns_servers = extra.dns_servers.clone();
+        }
+    }
+
+    if iface.transmit_speed.is_none() || iface.receive_speed.is_none() {
+        let speed = super::sysfs::get_interface_speed(&iface.name);
+        if iface.transmit_speed.is_none() {
+            iface.transmit_speed = speed;
+        }
+        if iface.receive_speed.is_none() {
+            iface.receive_speed = speed;
+        }
+    }
+
+    if iface.stats.is_none() {
+        iface.stats = crate::stats::counters::get_stats_from_name(&iface.name);
+    }
+
+    if iface.mtu.is_none() {
+        iface.mtu = crate::os::linux::mtu::get_mtu(&iface.name);
+    }
+}
+
+#[cfg(not(feature = "android-extra"))]
 fn finalize_interface(iface: &mut Interface) {
     if let Some(sysfs_type) = super::sysfs::get_interface_type(&iface.name) {
         if type_is_more_specific(iface.if_type, sysfs_type) {
@@ -184,8 +243,21 @@ pub fn interfaces() -> Vec<Interface> {
         }
     }
 
-    for iface in &mut ifaces {
-        finalize_interface(iface);
+    #[cfg(feature = "android-extra")]
+    {
+        let interface_names: Vec<String> = ifaces.iter().map(|iface| iface.name.clone()).collect();
+        let extras = super::api::collect_interface_extras(&interface_names);
+
+        for iface in &mut ifaces {
+            finalize_interface(iface, extras.get(&iface.name));
+        }
+    }
+
+    #[cfg(not(feature = "android-extra"))]
+    {
+        for iface in &mut ifaces {
+            finalize_interface(iface);
+        }
     }
 
     // Fill gateway info
@@ -210,7 +282,9 @@ pub fn interfaces() -> Vec<Interface> {
             if let Some(idx) = crate::interface::pick_default_iface_index(&ifaces, local_ip) {
                 if let Some(iface) = ifaces.iter_mut().find(|it| it.index == idx) {
                     iface.default = true;
-                    iface.dns_servers = get_system_dns_conf();
+                    if iface.dns_servers.is_empty() {
+                        iface.dns_servers = get_system_dns_conf();
+                    }
                 }
             }
         }
