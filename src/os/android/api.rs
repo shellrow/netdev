@@ -3,7 +3,8 @@ use jni::JavaVM;
 use jni::objects::{JByteArray, JObject, JObjectArray, JString, JValue};
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::panic;
+use std::panic::{self, PanicHookInfo};
+use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
 
 #[derive(Clone, Debug, Default)]
@@ -68,7 +69,7 @@ fn with_android_env<T, F>(f: F) -> Option<T>
 where
     F: FnOnce(&mut jni::AttachGuard<'_>, &JObject<'static>) -> Option<T>,
 {
-    let ctx = panic::catch_unwind(ndk_context::android_context).ok()?;
+    let ctx = try_android_context()?;
     let vm = unsafe { JavaVM::from_raw(ctx.vm().cast()) }.ok()?;
     let mut env = vm.attach_current_thread().ok()?;
     let context = unsafe { JObject::from_raw(ctx.context().cast()) };
@@ -77,6 +78,31 @@ where
     }
     f(&mut env, &context)
 }
+
+fn try_android_context() -> Option<ndk_context::AndroidContext> {
+    static ANDROID_CONTEXT_AVAILABLE: OnceLock<bool> = OnceLock::new();
+
+    if *ANDROID_CONTEXT_AVAILABLE.get_or_init(try_init_android_context) {
+        Some(ndk_context::android_context())
+    } else {
+        None
+    }
+}
+
+fn try_init_android_context() -> bool {
+    static PANIC_HOOK_GUARD: Mutex<()> = Mutex::new(());
+
+    let Ok(_guard) = PANIC_HOOK_GUARD.lock() else {
+        return false;
+    };
+    let previous_hook = panic::take_hook();
+    panic::set_hook(Box::new(silent_panic_hook));
+    let result = panic::catch_unwind(ndk_context::android_context).is_ok();
+    panic::set_hook(previous_hook);
+    result
+}
+
+fn silent_panic_hook(_info: &PanicHookInfo<'_>) {}
 
 fn populate_traffic_stats(
     env: &mut jni::AttachGuard<'_>,
