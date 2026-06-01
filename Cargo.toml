@@ -42,6 +42,7 @@ objc2-system-configuration = { version = "0.3", features = ["SCNetworkConfigurat
 plist = "1.8"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.6" }
 objc2-core-wlan = { version = "0.3" }
 objc2-foundation = { version = "0.3" }
 
