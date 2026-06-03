@@ -25,9 +25,9 @@ and retrieving commonly used metadata across platforms.
 - Native traffic statistics (RX/TX bytes) for each interface
 - Designed for **cross-platform**
 
-See the [Interface][doc-interface-url] struct documentation for detail.
+See the [Interface][doc-interface-url] struct documentation for more details.
 
-## Supported platform
+## Supported platforms
 - Linux
 - macOS
 - Windows
@@ -36,10 +36,10 @@ See the [Interface][doc-interface-url] struct documentation for detail.
 - BSDs
 
 ## Usage
-Add `netdev` to your `Cargo.toml`
+Add `netdev` to your `Cargo.toml`:
 ```toml
 [dependencies]
-netdev = "0.43"
+netdev = "0.44"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
@@ -54,23 +54,23 @@ For more details, see [examples][examples-url] or [doc][doc-url].
   - Enables deeper Android metadata enrichment using Android platform APIs through JNI bindings.
   - On Android, this can add metadata such as traffic stats, DNS servers, DHCP hints, and Wi-Fi link speed when the app provides the required Android context and permissions.
 
-To opt out of the deeper Apple enrichment while keeping gateway helpers:
+To opt out of the additional Apple metadata enrichment while keeping gateway helpers:
 
 ```toml
 [dependencies]
-netdev = { version = "0.43", default-features = false, features = ["gateway"] }
+netdev = { version = "0.44", default-features = false, features = ["gateway"] }
 ```
 
 ## Apple behavior
-`netdev` links `SystemConfiguration.framework` automatically on `macOS` and `iOS` through the crate's own build script.
-If your final app link is performed by Xcode, you may still need to add `SystemConfiguration.framework` to the app target manually.
+`netdev` links `SystemConfiguration.framework` automatically on `macOS` and `iOS` through its build script.
+If your app is ultimately linked by Xcode, you may still need to add `SystemConfiguration.framework` to the app target manually.
 
 ## Android behavior
 If you want Android-specific values such as DNS servers, DHCP hints, or Wi-Fi link speed, your app may still need to initialize the Android context for Rust and declare Android permissions such as `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE`.
 
 ## Project History
-This crate was originally published as [default-net][default-net-crates-io-url] 
-and later rebranded to `netdev` by the author myself for future expansion, clearer naming, and long-term maintenance.
+This crate was originally published as [default-net][default-net-crates-io-url]
+and was later rebranded to `netdev` by the author for future expansion, clearer naming, and long-term maintenance.
 
 ## Tested on
 - Linux
