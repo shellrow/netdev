@@ -23,4 +23,3 @@ pub(crate) fn get_wifi_transmit_rate(iface_name: &str) -> Option<u64> {
         })
     })
 }
-
