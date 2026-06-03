@@ -58,7 +58,7 @@ To opt out of the additional Apple metadata enrichment while keeping gateway hel
 
 ```toml
 [dependencies]
-netdev = { version = "0.43", default-features = false, features = ["gateway"] }
+netdev = { version = "0.44", default-features = false, features = ["gateway"] }
 ```
 
 ## Apple behavior
