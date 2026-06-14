@@ -314,7 +314,7 @@ fn neigh_extract(n: &NeighbourMessage) -> (Option<IpAddr>, Option<[u8; 6]>, Opti
                 ip = neigh_addr_to_ip(a);
             }
             // Link-layer address (MAC)
-            NeighbourAttribute::LinkLocalAddress(v) => {
+            NeighbourAttribute::LinkLayerAddress(v) => {
                 if v.len() == 6 {
                     mac = Some([v[0], v[1], v[2], v[3], v[4], v[5]]);
                 }
