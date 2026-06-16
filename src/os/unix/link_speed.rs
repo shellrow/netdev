@@ -114,6 +114,19 @@ const SIOCGIFXMEDIA: u64 = 0xc030698b;
 #[cfg(all(target_os = "freebsd", target_arch = "x86"))]
 const SIOCGIFXMEDIA: u32 = 0xc030698b;
 
+#[cfg(all(target_os = "freebsd", target_arch = "arm"))]
+// FreeBSD armv7 uses a 64-bit time_t and has a distinct ioctl value from i386.
+const SIOCGIFXMEDIA: u32 = 0xc028698b;
+
+#[cfg(all(
+    target_os = "freebsd",
+    not(target_pointer_width = "64"),
+    not(target_arch = "x86"),
+    not(target_arch = "arm")
+))]
+// Fallback for unknown 32-bit FreeBSD architectures to keep builds working.
+const SIOCGIFXMEDIA: u32 = 0xc028698b;
+
 #[cfg(any(target_os = "openbsd", target_os = "netbsd"))]
 // OpenBSD and netbsd don't define SIOCGIFXMEDIA.
 // Still using SIOCGIFXMEDIA as the variable name here.
