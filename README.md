@@ -39,7 +39,7 @@ See the [Interface][doc-interface-url] struct documentation for more details.
 Add `netdev` to your `Cargo.toml`:
 ```toml
 [dependencies]
-netdev = "0.44"
+netdev = "0.45"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
@@ -58,7 +58,7 @@ To opt out of the additional Apple metadata enrichment while keeping gateway hel
 
 ```toml
 [dependencies]
-netdev = { version = "0.44", default-features = false, features = ["gateway"] }
+netdev = { version = "0.45", default-features = false, features = ["gateway"] }
 ```
 
 ## Apple behavior
