@@ -1,11 +1,10 @@
 use crate::os::darwin::types::{get_functional_type, interface_type_by_name};
 use crate::os::macos::sc::{get_sc_interface_map, read_sc_plist_interface_map};
+#[cfg(feature = "apple-wifi-extra")]
+use crate::os::macos::wifi::get_wifi_transmit_rate;
 use crate::{
     interface::interface::Interface,
-    os::{
-        macos::sc::SCInterface, macos::wifi::get_wifi_transmit_rate,
-        unix::interface::unix_interfaces,
-    },
+    os::{macos::sc::SCInterface, unix::interface::unix_interfaces},
     prelude::InterfaceType,
 };
 
@@ -44,7 +43,8 @@ pub fn interfaces() -> Vec<Interface> {
             iface.dhcp_v6_enabled = sc_inface.dhcp_v6_enabled;
         }
 
-        if iface.if_type == InterfaceType::Wireless80211 {
+        #[cfg(feature = "apple-wifi-extra")]
+        if iface.if_type == InterfaceType::Wireless80211 && iface.is_up() {
             iface.transmit_speed = get_wifi_transmit_rate(&iface.name);
         }
 

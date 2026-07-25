@@ -53,6 +53,9 @@ For more details, see [examples][examples-url] or [doc][doc-url].
 - `android-extra` (default)
   - Enables deeper Android metadata enrichment using Android platform APIs through JNI bindings.
   - On Android, this can add metadata such as traffic stats, DNS servers, DHCP hints, and Wi-Fi link speed when the app provides the required Android context and permissions.
+- `apple-wifi-extra`
+  - Enables macOS Wi-Fi transmit-speed collection through CoreWLAN.
+  - This feature is disabled by default because CoreWLAN metadata collection may perform synchronous IPC during interface enumeration.
 
 To opt out of the additional Apple metadata enrichment while keeping gateway helpers:
 
@@ -64,6 +67,17 @@ netdev = { version = "0.45", default-features = false, features = ["gateway"] }
 ## Apple behavior
 `netdev` links `SystemConfiguration.framework` automatically on `macOS` and `iOS` through its build script.
 If your app is ultimately linked by Xcode, you may still need to add `SystemConfiguration.framework` to the app target manually.
+
+macOS Wi-Fi transmit-speed collection is disabled by default. To enable it, opt in to the
+`apple-wifi-extra` feature:
+
+```toml
+[dependencies]
+netdev = { version = "0.45", features = ["apple-wifi-extra"] }
+```
+
+This uses CoreWLAN, whose metadata lookup may perform synchronous IPC while interfaces are
+being enumerated.
 
 ## Android behavior
 If you want Android-specific values such as DNS servers, DHCP hints, or Wi-Fi link speed, your app may still need to initialize the Android context for Rust and declare Android permissions such as `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE`.
