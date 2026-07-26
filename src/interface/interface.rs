@@ -74,6 +74,9 @@ pub struct Interface {
     /// This field is usually available on Linux, Android, BSD, Apple targets, and Windows.
     /// It may be `None` for virtual adapters, unsupported drivers, or platforms that do not
     /// expose link speed.
+    ///
+    /// On macOS, collecting Wi-Fi transmit speed through CoreWLAN requires the
+    /// `apple-wifi-extra` feature, which is disabled by default.
     pub transmit_speed: Option<u64>,
     /// Reported receive link speed in bits per second.
     ///
