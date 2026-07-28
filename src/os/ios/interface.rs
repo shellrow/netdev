@@ -62,13 +62,17 @@ pub fn interfaces() -> Vec<Interface> {
         }
 
         if let Some(nw_iface) = nw_iface_map.get(&iface.name) {
-            iface.if_type = nw_iface.if_type;
+            if iface.if_type.should_replace_with(nw_iface.if_type) {
+                iface.if_type = nw_iface.if_type;
+            }
         }
 
         #[cfg(feature = "apple-system-configuration-extra")]
         if let Some(sc_iface) = sc_iface_map.get(&iface.name) {
             if let Some(sc_type) = sc_iface.if_type() {
-                iface.if_type = sc_type;
+                if iface.if_type.should_replace_with(sc_type) {
+                    iface.if_type = sc_type;
+                }
             }
             iface.friendly_name = sc_iface.friendly_name.clone();
             iface.dhcp_v4_enabled = sc_iface.dhcp_v4_enabled;
