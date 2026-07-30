@@ -80,6 +80,52 @@ pub enum InterfaceType {
 }
 
 impl InterfaceType {
+    #[cfg(any(target_vendor = "apple", target_os = "android", test))]
+    pub(crate) fn should_replace_with(self, candidate: InterfaceType) -> bool {
+        if candidate == self {
+            return false;
+        }
+
+        match (self, candidate) {
+            (InterfaceType::Unknown, candidate) => candidate != InterfaceType::Unknown,
+            (InterfaceType::UnknownWithValue(_), candidate) => !matches!(
+                candidate,
+                InterfaceType::Unknown | InterfaceType::UnknownWithValue(_)
+            ),
+            (InterfaceType::Ethernet, candidate) => {
+                matches!(
+                    candidate,
+                    InterfaceType::Loopback
+                        | InterfaceType::Wireless80211
+                        | InterfaceType::Tunnel
+                        | InterfaceType::Wwan
+                        | InterfaceType::Wwanpp
+                        | InterfaceType::Wwanpp2
+                        | InterfaceType::Bridge
+                        | InterfaceType::PeerToPeerWireless
+                        | InterfaceType::ProprietaryVirtual
+                )
+            }
+            (InterfaceType::Wwan, candidate) => {
+                matches!(candidate, InterfaceType::Wwanpp | InterfaceType::Wwanpp2)
+            }
+            _ => false,
+        }
+    }
+
+    pub(crate) fn is_known_virtual(self) -> bool {
+        matches!(
+            self,
+            InterfaceType::Loopback
+                | InterfaceType::Ppp
+                | InterfaceType::Slip
+                | InterfaceType::ProprietaryVirtual
+                | InterfaceType::Tunnel
+                | InterfaceType::Bridge
+                | InterfaceType::PeerToPeerWireless
+        )
+    }
+
     /// Returns the native numeric type identifier for the current target platform.
     ///
     /// For variants that have no direct mapping on the current platform, this method returns
@@ -266,5 +312,36 @@ impl TryFrom<u32> for InterfaceType {
             x if x == InterfaceType::Can.value() => Ok(InterfaceType::Can),
             _ => Ok(InterfaceType::UnknownWithValue(v)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InterfaceType;
+
+    #[test]
+    fn replaces_ambiguous_types_with_more_specific_types() {
+        assert!(InterfaceType::Unknown.should_replace_with(InterfaceType::Ethernet));
+        assert!(InterfaceType::Ethernet.should_replace_with(InterfaceType::Wireless80211));
+        assert!(InterfaceType::Ethernet.should_replace_with(InterfaceType::Bridge));
+        assert!(InterfaceType::Wwan.should_replace_with(InterfaceType::Wwanpp));
+    }
+
+    #[test]
+    fn preserves_specific_types_from_generic_candidates() {
+        assert!(!InterfaceType::Bridge.should_replace_with(InterfaceType::Ethernet));
+        assert!(
+            !InterfaceType::PeerToPeerWireless.should_replace_with(InterfaceType::Wireless80211)
+        );
+        assert!(!InterfaceType::Tunnel.should_replace_with(InterfaceType::Unknown));
+    }
+
+    #[test]
+    fn identifies_known_virtual_types() {
+        assert!(InterfaceType::Bridge.is_known_virtual());
+        assert!(InterfaceType::Tunnel.is_known_virtual());
+        assert!(InterfaceType::PeerToPeerWireless.is_known_virtual());
+        assert!(!InterfaceType::Ethernet.is_known_virtual());
+        assert!(!InterfaceType::Wireless80211.is_known_virtual());
     }
 }

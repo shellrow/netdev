@@ -199,6 +199,11 @@ impl Interface {
     /// Returns `true` when the interface appears to be backed by physical hardware.
     pub fn is_physical(&self) -> bool {
         use crate::net::db::oui;
+
+        if self.if_type.is_known_virtual() {
+            return false;
+        }
+
         super::flags::is_physical_interface(&self)
             && !oui::is_virtual_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
             && !oui::is_known_loopback_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))

@@ -63,38 +63,10 @@ fn type_is_ambiguous(if_type: InterfaceType) -> bool {
     )
 }
 
-fn type_is_more_specific(current: InterfaceType, candidate: InterfaceType) -> bool {
-    if candidate == current {
-        return false;
-    }
-
-    match (current, candidate) {
-        (InterfaceType::Unknown, _) | (InterfaceType::UnknownWithValue(_), _) => true,
-        (InterfaceType::Ethernet, candidate) => {
-            matches!(
-                candidate,
-                InterfaceType::Loopback
-                    | InterfaceType::Wireless80211
-                    | InterfaceType::Tunnel
-                    | InterfaceType::Wwan
-                    | InterfaceType::Wwanpp
-                    | InterfaceType::Wwanpp2
-                    | InterfaceType::Bridge
-                    | InterfaceType::PeerToPeerWireless
-                    | InterfaceType::ProprietaryVirtual
-            )
-        }
-        (InterfaceType::Wwan, candidate) => {
-            matches!(candidate, InterfaceType::Wwanpp | InterfaceType::Wwanpp2)
-        }
-        _ => false,
-    }
-}
-
 #[cfg(feature = "android-extra")]
 fn finalize_interface(iface: &mut Interface, extras: Option<&super::api::InterfaceExtras>) {
     if let Some(sysfs_type) = super::sysfs::get_interface_type(&iface.name) {
-        if type_is_more_specific(iface.if_type, sysfs_type) {
+        if iface.if_type.should_replace_with(sysfs_type) {
             iface.if_type = sysfs_type;
         }
     }
@@ -152,7 +124,7 @@ fn finalize_interface(iface: &mut Interface, extras: Option<&super::api::Interfa
 #[cfg(not(feature = "android-extra"))]
 fn finalize_interface(iface: &mut Interface) {
     if let Some(sysfs_type) = super::sysfs::get_interface_type(&iface.name) {
-        if type_is_more_specific(iface.if_type, sysfs_type) {
+        if iface.if_type.should_replace_with(sysfs_type) {
             iface.if_type = sysfs_type;
         }
     }
@@ -295,7 +267,7 @@ pub fn interfaces() -> Vec<Interface> {
 
 #[cfg(test)]
 mod tests {
-    use super::{calc_v6_scope_id, push_ipv4, push_ipv6, type_is_ambiguous, type_is_more_specific};
+    use super::{calc_v6_scope_id, push_ipv4, push_ipv6, type_is_ambiguous};
     use crate::interface::ipv6_addr_flags::Ipv6AddrFlags;
     use crate::interface::types::InterfaceType;
     use crate::ipnet::{Ipv4Net, Ipv6Net};
@@ -369,22 +341,6 @@ mod tests {
         assert_eq!(addr_flags.len(), 2);
         assert!(addr_flags[0].temporary);
         assert!(addr_flags[1].permanent);
-    }
-
-    #[test]
-    fn prefers_more_specific_sysfs_types() {
-        assert!(type_is_more_specific(
-            InterfaceType::Ethernet,
-            InterfaceType::Wireless80211
-        ));
-        assert!(type_is_more_specific(
-            InterfaceType::Wwan,
-            InterfaceType::Wwanpp
-        ));
-        assert!(!type_is_more_specific(
-            InterfaceType::Tunnel,
-            InterfaceType::Wireless80211
-        ));
     }
 
     #[test]

@@ -1,20 +1,15 @@
 use crate::interface::types::InterfaceType;
 use crate::stats::counters::InterfaceStats;
-use netlink_packet_core::{NLM_F_DUMP, NLM_F_REQUEST, NetlinkMessage, NetlinkPayload};
+use netlink_packet_core::NetlinkPayload;
 use netlink_packet_route::{
     RouteNetlinkMessage,
     address::{AddressAttribute, AddressFlags, AddressMessage},
     link::{LinkAttribute, LinkMessage},
 };
-use netlink_sys::{Socket, SocketAddr, protocols::NETLINK_ROUTE};
-use std::io::ErrorKind;
+use netlink_sys::{Socket, protocols::NETLINK_ROUTE};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::SystemTime;
-use std::{
-    collections::HashMap,
-    io, thread,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, io};
 
 #[cfg(feature = "gateway")]
 use netlink_packet_route::AddressFamily;
@@ -24,133 +19,25 @@ use netlink_packet_route::neighbour::{NeighbourAddress, NeighbourAttribute, Neig
 use netlink_packet_route::route::{RouteAddress, RouteAttribute, RouteMessage};
 
 const SEQ_BASE: u32 = 0x6E_64_65_76; // "ndev"
-const RECV_BUFSZ: usize = 1 << 20; // 1MB
-const RECV_TIMEOUT: Duration = Duration::from_secs(2);
-const NLMSG_ALIGNTO: usize = 4;
-const MIN_NLMSG_HEADER_LEN: usize = 16;
-
-#[inline]
-fn nlmsg_align(n: usize) -> usize {
-    (n + NLMSG_ALIGNTO - 1) & !(NLMSG_ALIGNTO - 1)
-}
 
 fn open_route_socket() -> io::Result<Socket> {
     let sock = Socket::new(NETLINK_ROUTE)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("netlink open: {e}")))?;
     // On Android 11+, bind is denied by SELinux
     //sock.bind_auto().map_err(|e| io::Error::new(io::ErrorKind::Other, format!("bind_auto: {e}")))?;
-    sock.set_non_blocking(true).ok();
+    crate::os::linux::netlink_io::set_non_blocking(&sock)?;
     Ok(sock)
-}
-
-fn send_dump(sock: &mut Socket, msg: RouteNetlinkMessage, seq: u32) -> io::Result<()> {
-    let mut nl = NetlinkMessage::from(msg);
-    nl.header.flags = NLM_F_REQUEST | NLM_F_DUMP;
-    nl.header.sequence_number = seq;
-    nl.header.port_number = 0;
-
-    // Finalize to set length
-    nl.finalize();
-
-    let blen = nl.buffer_len();
-    if blen < MIN_NLMSG_HEADER_LEN {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("netlink message too short: buffer_len={}", blen),
-        ));
-    }
-
-    let mut buf = vec![0; blen];
-    nl.serialize(&mut buf);
-
-    let kernel = SocketAddr::new(0, 0);
-    sock.send_to(&buf, &kernel, 0)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("netlink send: {e}")))?;
-    Ok(())
-}
-
-fn recv_multi(
-    sock: &mut Socket,
-    expect_seq: u32,
-) -> io::Result<Vec<NetlinkMessage<RouteNetlinkMessage>>> {
-    let mut out = Vec::new();
-    let mut buf = vec![0u8; RECV_BUFSZ];
-    let kernel = SocketAddr::new(0, 0);
-    let deadline = Instant::now() + RECV_TIMEOUT;
-
-    loop {
-        match sock.recv_from(&mut &mut buf[..], 0) {
-            Ok((size, from)) => {
-                let _ = from == kernel;
-                let mut offset = 0usize;
-
-                while offset < size {
-                    if size - offset < MIN_NLMSG_HEADER_LEN {
-                        break;
-                    }
-
-                    let bytes = &buf[offset..size];
-
-                    let msg =
-                        NetlinkMessage::<RouteNetlinkMessage>::deserialize(bytes).map_err(|e| {
-                            io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                format!("deserialize: {e:?}"),
-                            )
-                        })?;
-
-                    let consumed = msg.header.length as usize;
-                    if consumed < MIN_NLMSG_HEADER_LEN || offset + consumed > size {
-                        break;
-                    }
-
-                    if msg.header.sequence_number != expect_seq {
-                        offset += nlmsg_align(consumed);
-                        continue;
-                    }
-
-                    match &msg.payload {
-                        NetlinkPayload::Done(_) => {
-                            return Ok(out);
-                        }
-                        NetlinkPayload::Error(e) => {
-                            if let Some(code) = e.code {
-                                return Err(io::Error::new(
-                                    io::ErrorKind::Other,
-                                    format!("netlink error: code={}", code),
-                                ));
-                            }
-                            // code==None: possibly ACK ... ignore
-                        }
-                        NetlinkPayload::Noop | NetlinkPayload::Overrun(_) => { /* skip */ }
-                        _ => out.push(msg),
-                    }
-
-                    // Align to 4-byte boundary
-                    offset += nlmsg_align(consumed);
-                }
-            }
-            Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                if Instant::now() >= deadline {
-                    // timeout
-                    return Ok(out);
-                }
-                thread::sleep(Duration::from_millis(5));
-            }
-            Err(e) => return Err(e),
-        }
-    }
 }
 
 pub fn dump_links() -> io::Result<Vec<LinkMessage>> {
     let mut sock = open_route_socket()?;
     let seq = SEQ_BASE ^ 0x01;
-    send_dump(
+    crate::os::linux::netlink_io::send_dump(
         &mut sock,
         RouteNetlinkMessage::GetLink(LinkMessage::default()),
         seq,
     )?;
-    let msgs = recv_multi(&mut sock, seq)?;
+    let msgs = crate::os::linux::netlink_io::recv_multi(&mut sock, seq)?;
     let mut out = Vec::new();
     for m in msgs {
         if let NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewLink(link)) = m.payload {
@@ -163,12 +50,12 @@ pub fn dump_links() -> io::Result<Vec<LinkMessage>> {
 pub fn dump_addrs() -> io::Result<Vec<AddressMessage>> {
     let mut sock = open_route_socket()?;
     let seq = SEQ_BASE ^ 0x02;
-    send_dump(
+    crate::os::linux::netlink_io::send_dump(
         &mut sock,
         RouteNetlinkMessage::GetAddress(AddressMessage::default()),
         seq,
     )?;
-    let msgs = recv_multi(&mut sock, seq)?;
+    let msgs = crate::os::linux::netlink_io::recv_multi(&mut sock, seq)?;
     let mut out = Vec::new();
     for m in msgs {
         if let NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewAddress(addr)) = m.payload {
@@ -182,12 +69,12 @@ pub fn dump_addrs() -> io::Result<Vec<AddressMessage>> {
 pub fn dump_routes() -> io::Result<Vec<RouteMessage>> {
     let mut sock = open_route_socket()?;
     let seq = SEQ_BASE ^ 0x03;
-    send_dump(
+    crate::os::linux::netlink_io::send_dump(
         &mut sock,
         RouteNetlinkMessage::GetRoute(RouteMessage::default()),
         seq,
     )?;
-    let msgs = recv_multi(&mut sock, seq)?;
+    let msgs = crate::os::linux::netlink_io::recv_multi(&mut sock, seq)?;
     let mut out = Vec::new();
     for m in msgs {
         if let NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(rt)) = m.payload {
@@ -201,12 +88,12 @@ pub fn dump_routes() -> io::Result<Vec<RouteMessage>> {
 pub fn dump_neigh() -> io::Result<Vec<NeighbourMessage>> {
     let mut sock = open_route_socket()?;
     let seq = SEQ_BASE ^ 0x04;
-    send_dump(
+    crate::os::linux::netlink_io::send_dump(
         &mut sock,
         RouteNetlinkMessage::GetNeighbour(NeighbourMessage::default()),
         seq,
     )?;
-    let msgs = recv_multi(&mut sock, seq)?;
+    let msgs = crate::os::linux::netlink_io::recv_multi(&mut sock, seq)?;
     let mut out = Vec::new();
     for m in msgs {
         if let NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewNeighbour(n)) = m.payload {

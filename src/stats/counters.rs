@@ -22,12 +22,12 @@ pub struct InterfaceStats {
     pub timestamp: Option<SystemTime>,
 }
 
-#[cfg(any(
-    target_vendor = "apple",
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd"
-))]
+#[cfg(target_vendor = "apple")]
+pub(crate) fn get_stats(_ifa: Option<&libc::ifaddrs>, name: &str) -> Option<InterfaceStats> {
+    get_stats_from_name(name)
+}
+
+#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 pub(crate) fn get_stats(ifa: Option<&libc::ifaddrs>, _name: &str) -> Option<InterfaceStats> {
     if let Some(ifa) = ifa {
         if !ifa.ifa_data.is_null() {
@@ -87,12 +87,52 @@ pub(crate) fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
     })
 }
 
-#[cfg(any(
-    target_vendor = "apple",
-    target_os = "openbsd",
-    target_os = "freebsd",
-    target_os = "netbsd"
-))]
+#[cfg(target_vendor = "apple")]
+fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
+    use std::ffi::CString;
+    use std::mem::{MaybeUninit, size_of};
+
+    let name = CString::new(name).ok()?;
+    let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
+    let index = libc::c_int::try_from(index).ok()?;
+    if index == 0 {
+        return None;
+    }
+
+    let mut mib = [
+        libc::CTL_NET,
+        libc::PF_LINK,
+        libc::NETLINK_GENERIC,
+        libc::IFMIB_IFDATA,
+        index,
+        libc::IFDATA_GENERAL,
+    ];
+    let mut data = MaybeUninit::<libc::ifmibdata>::uninit();
+    let mut data_len = size_of::<libc::ifmibdata>();
+
+    let result = unsafe {
+        libc::sysctl(
+            mib.as_mut_ptr(),
+            mib.len() as libc::c_uint,
+            data.as_mut_ptr().cast(),
+            &mut data_len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if result != 0 || data_len < size_of::<libc::ifmibdata>() {
+        return None;
+    }
+
+    let data = unsafe { data.assume_init() };
+    Some(InterfaceStats {
+        rx_bytes: data.ifmd_data.ifi_ibytes,
+        tx_bytes: data.ifmd_data.ifi_obytes,
+        timestamp: Some(SystemTime::now()),
+    })
+}
+
+#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
     use std::ffi::CStr;
     let mut ifap: *mut libc::ifaddrs = std::ptr::null_mut();

@@ -36,7 +36,9 @@ pub fn interfaces() -> Vec<Interface> {
 
         if let Some(sc_inface) = if_extra_map.get(&iface.name) {
             if let Some(sc_type) = sc_inface.if_type() {
-                iface.if_type = sc_type;
+                if iface.if_type.should_replace_with(sc_type) {
+                    iface.if_type = sc_type;
+                }
             }
             iface.friendly_name = sc_inface.friendly_name.clone();
             iface.dhcp_v4_enabled = sc_inface.dhcp_v4_enabled;
