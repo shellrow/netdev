@@ -215,10 +215,10 @@ fn roundup(len: usize) -> usize {
 #[inline]
 fn normalize_scoped_v6(gw: Ipv6Addr) -> Ipv6Addr {
     // Unicast link-local: fe80::/10 (in practice often fe80::/64)
-    let is_unicast_ll = gw.segments()[0] == 0xfe80;
+    let oct = gw.octets();
+    let is_unicast_ll = oct[0] == 0xfe && (oct[1] & 0xc0) == 0x80;
 
     // Multicast check (ff00::/8) and local scopes: 0x1 (node-local) or 0x2 (link-local).
-    let oct = gw.octets();
     let is_multicast = oct[0] == 0xff;
     let mscope = oct[1] & 0x0f;
     let is_local_scope_mc = is_multicast && (mscope == 0x1 || mscope == 0x2);
@@ -246,18 +246,22 @@ fn ip_from_sockaddr(sa: &sockaddr) -> Option<IpAddr> {
     unsafe {
         match sa.sa_family as c_int {
             AF_INET => {
+                let want = core::mem::size_of::<libc::sockaddr_in>();
+                if (sa.sa_len as usize) < want {
+                    return None;
+                }
                 let sin = &*(sa as *const _ as *const libc::sockaddr_in);
                 let n = u32::from_be(sin.sin_addr.s_addr as u32);
                 Some(IpAddr::V4(Ipv4Addr::from(n)))
             }
             AF_INET6 => {
                 // Require the full `sockaddr_in6` to be present.
-                let sin6 = &*(sa as *const _ as *const libc::sockaddr_in6);
                 let want = core::mem::size_of::<libc::sockaddr_in6>();
                 if (sa.sa_len as usize) < want {
                     // prevent reading a truncated variable-length sockaddr
                     return None;
                 }
+                let sin6 = &*(sa as *const _ as *const libc::sockaddr_in6);
                 // `s6_addr` is raw big-endian bytes; `Ipv6Addr::from([u8;16])` expects octets.
                 let addr_bytes = (*sin6).sin6_addr.s6_addr;
                 Some(IpAddr::V6(Ipv6Addr::from(addr_bytes)))
@@ -295,11 +299,36 @@ fn code_to_error(err: i32) -> io::Error {
     io::Error::new(kind, format!("rtm_errno {}", err))
 }
 
-/// Extract `(IP, MAC)` pair from a routing message's address block.
-fn message_to_arppair(msg: &[u8]) -> Option<(IpAddr, MacAddr)> {
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+struct NeighborEntry {
+    ip: IpAddr,
+    ifindex: u32,
+    mac: MacAddr,
+}
+
+/// Extract a neighbor entry from a routing message's address block.
+fn message_to_neighbor(msg: &[u8], header_ifindex: u32) -> Option<NeighborEntry> {
     let mut off = 0usize;
-    let mut ip: Option<Ipv4Addr> = None;
+    let mut ip: Option<IpAddr> = None;
+    let mut scope_id = 0u32;
+    let mut link_ifindex = 0u32;
     let mut mac: Option<MacAddr> = None;
+
+    let make_entry =
+        |ip: Option<IpAddr>, mac: Option<MacAddr>, link_ifindex: u32, scope_id: u32| {
+            Some(NeighborEntry {
+                ip: normalize_gateway(ip?),
+                ifindex: if link_ifindex != 0 {
+                    link_ifindex
+                } else if scope_id != 0 {
+                    scope_id
+                } else {
+                    header_ifindex
+                },
+                mac: mac?,
+            })
+        };
+
     // Walk `sockaddr` records while there is room for a header.
     while off + core::mem::size_of::<sockaddr>() <= msg.len() {
         // Read the sockaddr header
@@ -322,19 +351,32 @@ fn message_to_arppair(msg: &[u8]) -> Option<(IpAddr, MacAddr)> {
             AF_INET => {
                 // Target IPv4 of ARP. `sockaddr_in` and `sockaddr_inarp` share the initial layout,
                 // so `sin_addr` sits at the same position.
-                if let Some(IpAddr::V4(v4)) = ip_from_sockaddr(sa) {
-                    ip = Some(v4);
-                    if let (Some(v4), Some(m)) = (ip, mac) {
-                        return Some((IpAddr::V4(v4), m));
+                ip = ip_from_sockaddr(sa);
+                if let Some(entry) = make_entry(ip, mac, link_ifindex, scope_id) {
+                    return Some(entry);
+                }
+            }
+            AF_INET6 => {
+                if let Some(parsed_ip @ IpAddr::V6(_)) = ip_from_sockaddr(sa) {
+                    let sin6 = unsafe { &*(sa as *const _ as *const libc::sockaddr_in6) };
+                    scope_id = sin6.sin6_scope_id;
+                    ip = Some(parsed_ip);
+                    if let Some(entry) = make_entry(ip, mac, link_ifindex, scope_id) {
+                        return Some(entry);
                     }
                 }
             }
             AF_LINK => {
+                if sa_len < core::mem::size_of::<libc::sockaddr_dl>() {
+                    off += roundup(sa_len);
+                    continue;
+                }
                 // Extract LLADDR from `sockaddr_dl`.
                 let sdl = unsafe { &*(sa as *const _ as *const libc::sockaddr_dl) };
                 let nlen = sdl.sdl_nlen as usize;
                 let alen = sdl.sdl_alen as usize;
                 let total = sdl.sdl_len as usize;
+                link_ifindex = sdl.sdl_index as u32;
 
                 // Validate against the *actual* struct length (`sdl_len`), and also
                 // make sure the caller-provided `sa_len` is at least that long.
@@ -360,8 +402,8 @@ fn message_to_arppair(msg: &[u8]) -> Option<(IpAddr, MacAddr)> {
                             ]
                         });
                         mac = Some(m);
-                        if let (Some(v4), Some(m)) = (ip, mac) {
-                            return Some((IpAddr::V4(v4), m));
+                        if let Some(entry) = make_entry(ip, mac, link_ifindex, scope_id) {
+                            return Some(entry);
                         }
                     }
                 }
@@ -447,15 +489,14 @@ fn parse_one_route(hdr: &rt_msghdr, addr_block: &[u8]) -> Option<RawRoute> {
     })
 }
 
-/// Build an ARP/Neighbor table from the BSD/Darwin routing socket via `sysctl`.
-fn get_arp_table() -> io::Result<HashMap<IpAddr, MacAddr>> {
-    let mut arp_map: HashMap<IpAddr, MacAddr> = HashMap::new();
-    // sysctl net.route dump for ARP/neighbor entries (IPv4 only here).
+/// Read ARP or NDP entries from the Darwin routing table via `sysctl`.
+fn get_neighbor_entries(address_family: c_int) -> io::Result<Vec<NeighborEntry>> {
+    let mut entries = Vec::new();
     let mut mib = [
-        CTL_NET,      // net
-        PF_ROUTE,     // route
-        0,            // 0
-        AF_INET,      // IPv4
+        CTL_NET,  // net
+        PF_ROUTE, // route
+        0,        // 0
+        address_family,
         NET_RT_FLAGS, // flags
         RTF_LLINFO,   // ARP/neighbor entries
     ];
@@ -483,14 +524,39 @@ fn get_arp_table() -> io::Result<HashMap<IpAddr, MacAddr>> {
 
         // Parse the sockaddr block right after the header.
         let addr_block = &buf[off + mem::size_of::<rt_msghdr>()..off + msglen];
-        if let Some((ip, mac)) = message_to_arppair(addr_block) {
-            arp_map.insert(ip, mac);
+        if let Some(entry) = message_to_neighbor(addr_block, hdr.rtm_index as u32) {
+            entries.push(entry);
         }
 
         off += msglen;
     }
 
-    Ok(arp_map)
+    Ok(entries)
+}
+
+#[derive(Default)]
+struct NeighborTables {
+    ipv4: HashMap<Ipv4Addr, MacAddr>,
+    ipv6: HashMap<(u32, Ipv6Addr), MacAddr>,
+}
+
+fn get_neighbor_tables() -> NeighborTables {
+    let mut tables = NeighborTables::default();
+
+    // Read the two families independently so an NDP failure cannot discard valid ARP data,
+    // and an ARP failure cannot prevent IPv6-only gateways from being resolved.
+    for entry in get_neighbor_entries(AF_INET).unwrap_or_default() {
+        if let IpAddr::V4(ip) = entry.ip {
+            tables.ipv4.insert(ip, entry.mac);
+        }
+    }
+    for entry in get_neighbor_entries(AF_INET6).unwrap_or_default() {
+        if let IpAddr::V6(ip) = entry.ip {
+            tables.ipv6.insert((entry.ifindex, ip), entry.mac);
+        }
+    }
+
+    tables
 }
 
 /// Dump the routing table via `sysctl` on BSD/Darwin and parse each `rt_msghdr`.
@@ -548,13 +614,20 @@ pub fn get_gateway_map() -> HashMap<u32, NetworkDevice> {
         Ok(v) => v,
         Err(_) => return HashMap::new(),
     };
-    // ARP cache: IP -> MAC (empty if ARP cannot be read)
-    let arp_map = get_arp_table().unwrap_or_default();
+    let neighbor_tables = get_neighbor_tables();
 
+    build_gateway_map(routes, &neighbor_tables)
+}
+
+fn build_gateway_map(
+    routes: Vec<RawRoute>,
+    neighbor_tables: &NeighborTables,
+) -> HashMap<u32, NetworkDevice> {
     // Accumulator: ifindex -> (optional MAC candidate, v4 list, v6 list)
     #[derive(Default)]
     struct Acc {
-        mac: Option<MacAddr>,
+        ipv4_mac: Option<MacAddr>,
+        ipv6_mac: Option<MacAddr>,
         v4: Vec<Ipv4Addr>,
         v6: Vec<Ipv6Addr>,
     }
@@ -585,16 +658,17 @@ pub fn get_gateway_map() -> HashMap<u32, NetworkDevice> {
 
         let entry = acc.entry(r.ifindex).or_default();
 
-        // If this is an IPv4 gateway and ARP has the MAC, record it.
-        if let Some(mac) = arp_map.get(&gw).copied() {
-            entry.mac = Some(mac);
-        }
-
         match gw {
             IpAddr::V4(v4) => {
+                if let Some(mac) = neighbor_tables.ipv4.get(&v4).copied() {
+                    entry.ipv4_mac = Some(mac);
+                }
                 push_v4(&mut entry.v4, v4);
             }
             IpAddr::V6(v6) => {
+                if let Some(mac) = neighbor_tables.ipv6.get(&(r.ifindex, v6)).copied() {
+                    entry.ipv6_mac = Some(mac);
+                }
                 push_v6(&mut entry.v6, v6);
             }
         }
@@ -603,9 +677,8 @@ pub fn get_gateway_map() -> HashMap<u32, NetworkDevice> {
     // Shape the final output: ifindex -> NetworkDevice
     let mut out: HashMap<u32, NetworkDevice> = HashMap::new();
     for (ifindex, a) in acc {
-        // If MAC is still unknown, use a zero MAC
-        // TODO: Implement NDP lookup for IPv6
-        let mac = a.mac.unwrap_or_else(|| MacAddr::zero());
+        // Preserve the existing IPv4 result when both families resolve to different addresses.
+        let mac = a.ipv4_mac.or(a.ipv6_mac).unwrap_or_else(MacAddr::zero);
         out.insert(
             ifindex,
             NetworkDevice {
@@ -617,4 +690,199 @@ pub fn get_gateway_map() -> HashMap<u32, NetworkDevice> {
     }
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_IFINDEX: u32 = 14;
+    const TEST_MAC: [u8; 6] = [0x54, 0x9b, 0x49, 0x87, 0xe3, 0x48];
+
+    fn push_sockaddr_in(buf: &mut Vec<u8>, ip: Ipv4Addr) {
+        let mut sa = [0u8; 16];
+        sa[0] = sa.len() as u8;
+        sa[1] = AF_INET as u8;
+        sa[4..8].copy_from_slice(&ip.octets());
+        buf.extend_from_slice(&sa);
+    }
+
+    fn push_sockaddr_in6(buf: &mut Vec<u8>, ip: Ipv6Addr, scope_id: u32) {
+        let mut sa = [0u8; 28];
+        sa[0] = sa.len() as u8;
+        sa[1] = AF_INET6 as u8;
+        sa[8..24].copy_from_slice(&ip.octets());
+        sa[24..28].copy_from_slice(&scope_id.to_ne_bytes());
+        buf.extend_from_slice(&sa);
+    }
+
+    fn push_sockaddr_dl(buf: &mut Vec<u8>, ifindex: u16, mac: Option<[u8; 6]>) {
+        let mut sa = [0u8; 20];
+        sa[0] = sa.len() as u8;
+        sa[1] = AF_LINK as u8;
+        sa[2..4].copy_from_slice(&ifindex.to_ne_bytes());
+        if let Some(mac) = mac {
+            sa[6] = mac.len() as u8;
+            sa[8..14].copy_from_slice(&mac);
+        }
+        buf.extend_from_slice(&sa);
+    }
+
+    fn default_route(gateway: IpAddr, ifindex: u32) -> RawRoute {
+        RawRoute {
+            dst: match gateway {
+                IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+            },
+            prefix: 0,
+            gateway: Some(gateway),
+            ifindex,
+            flags: RTF_GATEWAY,
+        }
+    }
+
+    #[test]
+    fn parses_ipv4_arp_entry() {
+        let ip = Ipv4Addr::new(192, 168, 10, 1);
+        let mut msg = Vec::new();
+        push_sockaddr_in(&mut msg, ip);
+        push_sockaddr_dl(&mut msg, TEST_IFINDEX as u16, Some(TEST_MAC));
+
+        assert_eq!(
+            message_to_neighbor(&msg, 0),
+            Some(NeighborEntry {
+                ip: IpAddr::V4(ip),
+                ifindex: TEST_IFINDEX,
+                mac: MacAddr::from_octets(TEST_MAC),
+            })
+        );
+    }
+
+    #[test]
+    fn parses_scoped_ipv6_ndp_entry() {
+        let embedded_scope: Ipv6Addr = "fe80:e::1".parse().unwrap();
+        let mut msg = Vec::new();
+        push_sockaddr_in6(&mut msg, embedded_scope, 0);
+        push_sockaddr_dl(&mut msg, TEST_IFINDEX as u16, Some(TEST_MAC));
+
+        assert_eq!(
+            message_to_neighbor(&msg, 0),
+            Some(NeighborEntry {
+                ip: IpAddr::V6("fe80::1".parse().unwrap()),
+                ifindex: TEST_IFINDEX,
+                mac: MacAddr::from_octets(TEST_MAC),
+            })
+        );
+    }
+
+    #[test]
+    fn uses_scope_id_when_link_index_is_missing() {
+        let ip: Ipv6Addr = "fe80::1".parse().unwrap();
+        let mut msg = Vec::new();
+        push_sockaddr_in6(&mut msg, ip, TEST_IFINDEX);
+        push_sockaddr_dl(&mut msg, 0, Some(TEST_MAC));
+
+        assert_eq!(message_to_neighbor(&msg, 2).unwrap().ifindex, TEST_IFINDEX);
+    }
+
+    #[test]
+    fn normalizes_the_full_ipv6_link_local_prefix() {
+        let scoped: Ipv6Addr = "febf:e::1".parse().unwrap();
+        assert_eq!(
+            normalize_scoped_v6(scoped),
+            "febf::1".parse::<Ipv6Addr>().unwrap()
+        );
+    }
+
+    #[test]
+    fn rejects_incomplete_and_truncated_neighbor_entries() {
+        let ip: Ipv6Addr = "fe80::1".parse().unwrap();
+        let mut incomplete = Vec::new();
+        push_sockaddr_in6(&mut incomplete, ip, TEST_IFINDEX);
+        push_sockaddr_dl(&mut incomplete, TEST_IFINDEX as u16, None);
+        assert_eq!(message_to_neighbor(&incomplete, TEST_IFINDEX), None);
+
+        let mut truncated = vec![16, AF_INET6 as u8];
+        truncated.resize(16, 0);
+        assert_eq!(message_to_neighbor(&truncated, TEST_IFINDEX), None);
+
+        let mut truncated_link = Vec::new();
+        push_sockaddr_in(&mut truncated_link, Ipv4Addr::new(192, 168, 10, 1));
+        truncated_link.extend_from_slice(&[16, AF_LINK as u8, 0, 0, 0, 0, 6, 0]);
+        truncated_link.resize(32, 0);
+        assert_eq!(message_to_neighbor(&truncated_link, TEST_IFINDEX), None);
+    }
+
+    #[test]
+    fn keeps_link_local_neighbors_separate_by_interface() {
+        let ip: Ipv6Addr = "fe80::1".parse().unwrap();
+        let other_mac = MacAddr::from_octets([0, 1, 2, 3, 4, 5]);
+        let mut tables = NeighborTables::default();
+        tables
+            .ipv6
+            .insert((TEST_IFINDEX, ip), MacAddr::from_octets(TEST_MAC));
+        tables.ipv6.insert((15, ip), other_mac);
+
+        let gateways = build_gateway_map(
+            vec![
+                default_route(IpAddr::V6(ip), TEST_IFINDEX),
+                default_route(IpAddr::V6(ip), 15),
+            ],
+            &tables,
+        );
+
+        assert_eq!(
+            gateways.get(&TEST_IFINDEX).unwrap().mac_addr,
+            MacAddr::from_octets(TEST_MAC)
+        );
+        assert_eq!(gateways.get(&15).unwrap().mac_addr, other_mac);
+    }
+
+    #[test]
+    fn resolves_ipv6_only_gateway_and_preserves_zero_fallback() {
+        let resolved_ip: Ipv6Addr = "fe80::1".parse().unwrap();
+        let unresolved_ip: Ipv6Addr = "fe80::2".parse().unwrap();
+        let mut tables = NeighborTables::default();
+        tables
+            .ipv6
+            .insert((TEST_IFINDEX, resolved_ip), MacAddr::from_octets(TEST_MAC));
+
+        let gateways = build_gateway_map(
+            vec![
+                default_route(IpAddr::V6(resolved_ip), TEST_IFINDEX),
+                default_route(IpAddr::V6(unresolved_ip), 15),
+            ],
+            &tables,
+        );
+
+        assert_eq!(
+            gateways.get(&TEST_IFINDEX).unwrap().mac_addr,
+            MacAddr::from_octets(TEST_MAC)
+        );
+        assert_eq!(gateways.get(&15).unwrap().mac_addr, MacAddr::zero());
+    }
+
+    #[test]
+    fn prefers_existing_ipv4_mac_when_both_families_resolve() {
+        let ipv4 = Ipv4Addr::new(192, 168, 10, 1);
+        let ipv6: Ipv6Addr = "fe80::1".parse().unwrap();
+        let ipv4_mac = MacAddr::from_octets(TEST_MAC);
+        let ipv6_mac = MacAddr::from_octets([0, 1, 2, 3, 4, 5]);
+        let mut tables = NeighborTables::default();
+        tables.ipv4.insert(ipv4, ipv4_mac);
+        tables.ipv6.insert((TEST_IFINDEX, ipv6), ipv6_mac);
+
+        let gateways = build_gateway_map(
+            vec![
+                default_route(IpAddr::V4(ipv4), TEST_IFINDEX),
+                default_route(IpAddr::V6(ipv6), TEST_IFINDEX),
+            ],
+            &tables,
+        );
+
+        let gateway = gateways.get(&TEST_IFINDEX).unwrap();
+        assert_eq!(gateway.mac_addr, ipv4_mac);
+        assert_eq!(gateway.ipv4, vec![ipv4]);
+        assert_eq!(gateway.ipv6, vec![ipv6]);
+    }
 }
