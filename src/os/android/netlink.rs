@@ -376,23 +376,30 @@ pub fn collect_routes() -> io::Result<HashMap<u32, GwRow>> {
         }
     }
 
+    let mut mac_candidates = crate::os::linux::gateway::GatewayMacCandidates::default();
     for n in neighs {
         let (ip, mac, ifi) = neigh_extract(&n);
         let ifi = match ifi {
             Some(i) => i,
             None => continue,
         };
-        if let Some(row) = m.get_mut(&ifi) {
-            if let (Some(m6), Some(ip)) = (mac, ip) {
-                let hit = match ip {
-                    IpAddr::V4(v4) => row.gw_v4.contains(&v4),
-                    IpAddr::V6(v6) => row.gw_v6.contains(&v6),
-                };
-                if hit {
-                    row.mac = Some(m6);
-                }
+        let (Some(row), Some(m6), Some(ip)) = (m.get_mut(&ifi), mac, ip) else {
+            continue;
+        };
+        match ip {
+            IpAddr::V4(v4) if row.gw_v4.contains(&v4) => {
+                mac_candidates.record_ipv4(ifi, m6);
             }
+            IpAddr::V6(v6) if row.gw_v6.contains(&v6) => {
+                mac_candidates.record_ipv6(ifi, m6);
+            }
+            _ => {}
         }
+    }
+
+    for (ifindex, row) in &mut m {
+        // Preserve the established IPv4 result when both families use different routers.
+        row.mac = mac_candidates.get(*ifindex);
     }
 
     Ok(m)
