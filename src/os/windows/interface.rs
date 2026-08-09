@@ -7,7 +7,7 @@ use windows_sys::Win32::NetworkManagement::IpHelper::{
 use windows_sys::Win32::NetworkManagement::Ndis::NET_IF_OPER_STATUS_UP;
 use windows_sys::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, AF_UNSPEC, IpDadStateDeprecated, IpDadStateDuplicate, IpDadStateTentative,
-    IpSuffixOriginRandom, SOCKADDR_INET, SOCKET_ADDRESS,
+    IpSuffixOriginRandom, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET, SOCKET_ADDRESS,
 };
 
 use super::flags;
@@ -30,14 +30,16 @@ use std::mem::MaybeUninit;
 #[cfg(feature = "gateway")]
 use std::net::Ipv4Addr;
 #[cfg(feature = "gateway")]
-use windows_sys::Win32::NetworkManagement::IpHelper::SendARP;
+use windows_sys::Win32::NetworkManagement::IpHelper::{GetIpNetEntry2, MIB_IPNET_ROW2, SendARP};
+#[cfg(feature = "gateway")]
+use windows_sys::Win32::NetworkManagement::Ndis::NET_LUID_LH;
 
 fn sanitize_u64(val: u64) -> Option<u64> {
     if val == u64::MAX { None } else { Some(val) }
 }
 
 #[cfg(feature = "gateway")]
-fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
+fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> Option<MacAddr> {
     let src_ip_int = u32::from_ne_bytes(src_ip.octets());
     let dst_ip_int = u32::from_ne_bytes(dst_ip.octets());
     let mut out_buf_len = 6;
@@ -51,31 +53,128 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> MacAddr {
         )
     };
     if res == NO_ERROR && out_buf_len == 6 {
-        MacAddr::from_octets(unsafe { target_mac_addr.assume_init() })
+        Some(MacAddr::from_octets(unsafe {
+            target_mac_addr.assume_init()
+        }))
     } else {
-        MacAddr::zero()
+        None
     }
 }
 
-// Convert a socket address into a Rust IpAddr object and also a scope ID if it's an
-// IPv6 address
+#[derive(Clone, Copy)]
+struct ParsedSocketAddress {
+    ip_addr: IpAddr,
+    ipv6_scope_id: Option<u32>,
+    sockaddr: SOCKADDR_INET,
+}
+
+// Copy the family-specific value because an IPv4 SOCKET_ADDRESS can be shorter than
+// SOCKADDR_INET, while an IPv6 gateway also needs to retain its scope ID.
+unsafe fn parse_socket_address(addr: &SOCKET_ADDRESS) -> Option<ParsedSocketAddress> {
+    if addr.lpSockaddr.is_null()
+        || addr.iSockaddrLength < std::mem::size_of::<u16>().try_into().unwrap()
+    {
+        return None;
+    }
+
+    let family = unsafe { std::ptr::read_unaligned(addr.lpSockaddr.cast::<u16>()) };
+    match family {
+        AF_INET
+            if usize::try_from(addr.iSockaddrLength).ok()?
+                >= std::mem::size_of::<SOCKADDR_IN>() =>
+        {
+            let ipv4 = unsafe { std::ptr::read_unaligned(addr.lpSockaddr.cast::<SOCKADDR_IN>()) };
+            Some(ParsedSocketAddress {
+                ip_addr: IpAddr::V4(unsafe { ipv4.sin_addr.S_un.S_addr }.to_ne_bytes().into()),
+                ipv6_scope_id: None,
+                sockaddr: SOCKADDR_INET { Ipv4: ipv4 },
+            })
+        }
+        AF_INET6
+            if usize::try_from(addr.iSockaddrLength).ok()?
+                >= std::mem::size_of::<SOCKADDR_IN6>() =>
+        {
+            let ipv6 = unsafe { std::ptr::read_unaligned(addr.lpSockaddr.cast::<SOCKADDR_IN6>()) };
+            Some(ParsedSocketAddress {
+                ip_addr: IpAddr::V6(unsafe { ipv6.sin6_addr.u.Byte }.into()),
+                ipv6_scope_id: Some(unsafe { ipv6.Anonymous.sin6_scope_id }),
+                sockaddr: SOCKADDR_INET { Ipv6: ipv6 },
+            })
+        }
+        _ => None,
+    }
+}
+
 unsafe fn socket_address_to_ipaddr(addr: &SOCKET_ADDRESS) -> (Option<IpAddr>, Option<u32>) {
-    match unsafe { addr.lpSockaddr.cast::<SOCKADDR_INET>().as_ref() } {
+    match unsafe { parse_socket_address(addr) } {
+        Some(parsed) => (Some(parsed.ip_addr), parsed.ipv6_scope_id),
         None => (None, None),
-        Some(sockaddr) => match unsafe { sockaddr.si_family } {
-            AF_INET => {
-                let addr: IpAddr = unsafe { sockaddr.Ipv4.sin_addr.S_un.S_addr }
-                    .to_ne_bytes()
-                    .into();
-                (Some(addr), None)
-            }
-            AF_INET6 => {
-                let addr: IpAddr = unsafe { sockaddr.Ipv6.sin6_addr.u.Byte }.into();
-                let scope_id = unsafe { sockaddr.Ipv6.Anonymous.sin6_scope_id };
-                (Some(addr), Some(scope_id))
-            }
-            _ => (None, None),
-        },
+    }
+}
+
+#[cfg(feature = "gateway")]
+fn physical_address_to_mac(address: &[u8], length: u32) -> Option<MacAddr> {
+    if length != 6 || address.len() < 6 {
+        return None;
+    }
+    Some(MacAddr::from_octets(address[..6].try_into().unwrap()))
+}
+
+#[cfg(feature = "gateway")]
+fn get_neighbor_mac(address: SOCKADDR_INET, interface_luid: NET_LUID_LH) -> Option<MacAddr> {
+    let mut row = MIB_IPNET_ROW2 {
+        Address: address,
+        InterfaceLuid: interface_luid,
+        ..Default::default()
+    };
+    let result = unsafe { GetIpNetEntry2(&mut row) };
+    if result != NO_ERROR {
+        return None;
+    }
+    physical_address_to_mac(&row.PhysicalAddress, row.PhysicalAddressLength)
+}
+
+#[cfg(feature = "gateway")]
+#[derive(Default)]
+struct GatewayCandidates {
+    ipv4: Vec<Ipv4Addr>,
+    ipv6: Vec<std::net::Ipv6Addr>,
+    ipv4_mac: Option<MacAddr>,
+    ipv6_mac: Option<MacAddr>,
+}
+
+#[cfg(feature = "gateway")]
+impl GatewayCandidates {
+    fn add_ipv4(&mut self, address: Ipv4Addr, mac: Option<MacAddr>) {
+        if !self.ipv4.contains(&address) {
+            self.ipv4.push(address);
+        }
+        if self.ipv4_mac.is_none() {
+            self.ipv4_mac = mac;
+        }
+    }
+
+    fn add_ipv6(&mut self, address: std::net::Ipv6Addr, mac: Option<MacAddr>) {
+        if !self.ipv6.contains(&address) {
+            self.ipv6.push(address);
+        }
+        if self.ipv6_mac.is_none() {
+            self.ipv6_mac = mac;
+        }
+    }
+
+    fn into_device(self) -> Option<NetworkDevice> {
+        if self.ipv4.is_empty() && self.ipv6.is_empty() {
+            return None;
+        }
+        Some(NetworkDevice {
+            mac_addr: self
+                .ipv4_mac
+                .or(self.ipv6_mac)
+                .unwrap_or_else(MacAddr::zero),
+            ipv4: self.ipv4,
+            ipv6: self.ipv6,
+        })
     }
 }
 
@@ -219,30 +318,33 @@ pub fn interfaces() -> Vec<Interface> {
             }
             // Gateway
             #[cfg(feature = "gateway")]
-            let gateway_ips: Vec<IpAddr> = unsafe { linked_list_iter!(&cur.FirstGatewayAddress) }
-                .filter_map(|cur_g| unsafe { socket_address_to_ipaddr(&cur_g.Address).0 })
-                .collect();
+            let gateway_addresses: Vec<ParsedSocketAddress> =
+                unsafe { linked_list_iter!(&cur.FirstGatewayAddress) }
+                    .filter_map(|cur_g| unsafe { parse_socket_address(&cur_g.Address) })
+                    .collect();
             #[cfg(feature = "gateway")]
-            let mut default_gateway: NetworkDevice = NetworkDevice::new();
+            let mut gateway_candidates = GatewayCandidates::default();
             #[cfg(feature = "gateway")]
             if flags & flags::IFF_UP != 0 {
-                for gateway_ip in gateway_ips {
-                    match gateway_ip {
+                for gateway in gateway_addresses {
+                    let neighbor_mac = get_neighbor_mac(gateway.sockaddr, cur.Luid);
+                    match gateway.ip_addr {
                         IpAddr::V4(ipv4) => {
-                            if let Some(ip_net) = ipv4_vec.first() {
-                                let mac_addr = get_mac_through_arp(ip_net.addr(), ipv4);
-                                default_gateway.mac_addr = mac_addr;
-                                default_gateway.ipv4.push(ipv4);
-                            }
+                            let mac = neighbor_mac.or_else(|| {
+                                ipv4_vec
+                                    .first()
+                                    .and_then(|source| get_mac_through_arp(source.addr(), ipv4))
+                            });
+                            gateway_candidates.add_ipv4(ipv4, mac);
                         }
                         IpAddr::V6(ipv6) => {
-                            if !ipv6_vec.is_empty() {
-                                default_gateway.ipv6.push(ipv6);
-                            }
+                            gateway_candidates.add_ipv6(ipv6, neighbor_mac);
                         }
                     }
                 }
             }
+            #[cfg(feature = "gateway")]
+            let default_gateway = gateway_candidates.into_device();
             // DNS Servers
             #[cfg(feature = "gateway")]
             let dns_servers: Vec<IpAddr> = unsafe { linked_list_iter!(&cur.FirstDnsServerAddress) }
@@ -276,11 +378,7 @@ pub fn interfaces() -> Vec<Interface> {
                 dhcp_v6_enabled: None,
                 stats,
                 #[cfg(feature = "gateway")]
-                gateway: if default_gateway.mac_addr == MacAddr::zero() {
-                    None
-                } else {
-                    Some(default_gateway)
-                },
+                gateway: default_gateway,
                 #[cfg(feature = "gateway")]
                 dns_servers,
                 mtu: Some(cur.Mtu),
@@ -290,4 +388,118 @@ pub fn interfaces() -> Vec<Interface> {
             Some(interface)
         })
         .collect()
+}
+
+#[cfg(all(test, feature = "gateway"))]
+mod tests {
+    use super::*;
+    use std::net::{Ipv4Addr, Ipv6Addr};
+    use windows_sys::Win32::Networking::WinSock::{IN6_ADDR, SOCKADDR, SOCKADDR_IN6_0};
+
+    const IPV4_MAC: [u8; 6] = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55];
+    const IPV6_MAC: [u8; 6] = [0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb];
+
+    #[test]
+    fn builds_ipv6_only_gateway_with_resolved_mac() {
+        let address = "fe80::1".parse().unwrap();
+        let mac = MacAddr::from_octets(IPV6_MAC);
+        let mut candidates = GatewayCandidates::default();
+        candidates.add_ipv6(address, Some(mac));
+
+        let gateway = candidates.into_device().unwrap();
+        assert_eq!(gateway.mac_addr, mac);
+        assert!(gateway.ipv4.is_empty());
+        assert_eq!(gateway.ipv6, vec![address]);
+    }
+
+    #[test]
+    fn preserves_unresolved_ipv6_only_gateway() {
+        let address = "fe80::1".parse().unwrap();
+        let mut candidates = GatewayCandidates::default();
+        candidates.add_ipv6(address, None);
+
+        let gateway = candidates.into_device().unwrap();
+        assert_eq!(gateway.mac_addr, MacAddr::zero());
+        assert!(gateway.ipv4.is_empty());
+        assert_eq!(gateway.ipv6, vec![address]);
+    }
+
+    #[test]
+    fn prefers_ipv4_mac_regardless_of_enumeration_order() {
+        let ipv4 = Ipv4Addr::new(192, 0, 2, 1);
+        let ipv6 = "fe80::1".parse().unwrap();
+        let ipv4_mac = MacAddr::from_octets(IPV4_MAC);
+        let ipv6_mac = MacAddr::from_octets(IPV6_MAC);
+        let mut candidates = GatewayCandidates::default();
+        candidates.add_ipv6(ipv6, Some(ipv6_mac));
+        candidates.add_ipv4(ipv4, Some(ipv4_mac));
+
+        let gateway = candidates.into_device().unwrap();
+        assert_eq!(gateway.mac_addr, ipv4_mac);
+        assert_eq!(gateway.ipv4, vec![ipv4]);
+        assert_eq!(gateway.ipv6, vec![ipv6]);
+    }
+
+    #[test]
+    fn builds_ipv4_only_gateway() {
+        let address = Ipv4Addr::new(192, 0, 2, 1);
+        let mac = MacAddr::from_octets(IPV4_MAC);
+        let mut candidates = GatewayCandidates::default();
+        candidates.add_ipv4(address, Some(mac));
+
+        let gateway = candidates.into_device().unwrap();
+        assert_eq!(gateway.mac_addr, mac);
+        assert_eq!(gateway.ipv4, vec![address]);
+        assert!(gateway.ipv6.is_empty());
+    }
+
+    #[test]
+    fn deduplicates_gateway_addresses() {
+        let ipv4 = Ipv4Addr::new(192, 0, 2, 1);
+        let ipv6 = "fe80::1".parse().unwrap();
+        let mut candidates = GatewayCandidates::default();
+        candidates.add_ipv4(ipv4, None);
+        candidates.add_ipv4(ipv4, None);
+        candidates.add_ipv6(ipv6, None);
+        candidates.add_ipv6(ipv6, None);
+
+        let gateway = candidates.into_device().unwrap();
+        assert_eq!(gateway.ipv4, vec![ipv4]);
+        assert_eq!(gateway.ipv6, vec![ipv6]);
+    }
+
+    #[test]
+    fn rejects_invalid_physical_address_lengths() {
+        assert_eq!(physical_address_to_mac(&IPV4_MAC, 5), None);
+        assert_eq!(physical_address_to_mac(&IPV4_MAC, 7), None);
+        assert_eq!(physical_address_to_mac(&IPV4_MAC[..5], 6), None);
+        assert_eq!(
+            physical_address_to_mac(&IPV4_MAC, 6),
+            Some(MacAddr::from_octets(IPV4_MAC))
+        );
+    }
+
+    #[test]
+    fn retains_scoped_link_local_ipv6_sockaddr() {
+        let address: Ipv6Addr = "fe80::1".parse().unwrap();
+        let mut sockaddr = SOCKADDR_IN6 {
+            sin6_family: AF_INET6,
+            sin6_addr: IN6_ADDR {
+                u: windows_sys::Win32::Networking::WinSock::IN6_ADDR_0 {
+                    Byte: address.octets(),
+                },
+            },
+            Anonymous: SOCKADDR_IN6_0 { sin6_scope_id: 17 },
+            ..Default::default()
+        };
+        let socket_address = SOCKET_ADDRESS {
+            lpSockaddr: (&mut sockaddr as *mut SOCKADDR_IN6).cast::<SOCKADDR>(),
+            iSockaddrLength: std::mem::size_of::<SOCKADDR_IN6>() as i32,
+        };
+
+        let parsed = unsafe { parse_socket_address(&socket_address) }.unwrap();
+        assert_eq!(parsed.ip_addr, IpAddr::V6(address));
+        assert_eq!(parsed.ipv6_scope_id, Some(17));
+        assert_eq!(unsafe { parsed.sockaddr.Ipv6.Anonymous.sin6_scope_id }, 17);
+    }
 }

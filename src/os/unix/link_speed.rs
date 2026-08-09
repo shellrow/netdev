@@ -538,8 +538,8 @@ mod openbsd_subtypes {
 
     const IFM_TMASK: u64 = 0x00000000000000ff;
 
-    pub(crate) fn ifm_subtype(x: i32) -> u64 {
-        (x as u64) & IFM_TMASK
+    pub(crate) fn ifm_subtype(x: u64) -> i32 {
+        (x & IFM_TMASK) as i32
     }
 
     const IFM_10G_LR: i32 = 18; // 10GBase-LR - single-mode fiber
@@ -631,6 +631,16 @@ mod openbsd_subtypes {
                     subtype
                 ),
             )),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::ifm_subtype;
+
+        #[test]
+        fn extracts_subtype_from_openbsd_media_word() {
+            assert_eq!(ifm_subtype(0xffff_ffff_ffff_ff10), 0x10);
         }
     }
 }

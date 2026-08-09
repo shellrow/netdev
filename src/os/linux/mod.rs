@@ -3,6 +3,8 @@ pub mod arp;
 mod dhcp;
 #[cfg(not(target_os = "android"))]
 pub mod flags;
+#[cfg(feature = "gateway")]
+pub(crate) mod gateway;
 #[cfg(not(target_os = "android"))]
 pub mod interface;
 pub mod ipv6_addr_flags;

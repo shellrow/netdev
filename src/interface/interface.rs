@@ -105,8 +105,9 @@ pub struct Interface {
     /// Default gateway associated with this interface, when known.
     ///
     /// This field is available only with the `gateway` feature. It may be `None` when the
-    /// interface is not the default route, when the gateway has no link-layer address available,
-    /// or when the platform cannot resolve gateway information.
+    /// interface has no gateway addresses or when the platform cannot obtain gateway
+    /// information. If the gateway addresses are known but the link-layer address cannot be
+    /// resolved, the device contains a zero MAC address.
     #[cfg(feature = "gateway")]
     pub gateway: Option<NetworkDevice>,
     /// DNS resolver addresses associated with this interface.
