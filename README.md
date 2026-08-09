@@ -39,7 +39,7 @@ See the [Interface][doc-interface-url] struct documentation for more details.
 Add `netdev` to your `Cargo.toml`:
 ```toml
 [dependencies]
-netdev = "0.45"
+netdev = "0.46"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
@@ -61,7 +61,7 @@ To opt out of the additional Apple metadata enrichment while keeping gateway hel
 
 ```toml
 [dependencies]
-netdev = { version = "0.45", default-features = false, features = ["gateway"] }
+netdev = { version = "0.46", default-features = false, features = ["gateway"] }
 ```
 
 ## Apple behavior
@@ -73,7 +73,7 @@ macOS Wi-Fi transmit-speed collection is disabled by default. To enable it, opt 
 
 ```toml
 [dependencies]
-netdev = { version = "0.45", features = ["apple-wifi-extra"] }
+netdev = { version = "0.46", features = ["apple-wifi-extra"] }
 ```
 
 This uses CoreWLAN, whose metadata lookup may perform synchronous IPC while interfaces are
