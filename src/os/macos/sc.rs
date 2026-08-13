@@ -71,7 +71,9 @@ pub(crate) fn get_sc_interface_map() -> HashMap<String, SCInterface> {
 
         let sc_if_type: Option<String> = sc_iface.interface_type().map(|s| s.to_string());
 
-        let friendly_name = sc_iface.localized_display_name().map(|s| s.to_string());
+        // SCNetworkInterfaceGetLocalizedDisplayName can seg fault for some reason.
+        // let friendly_name = sc_iface.localized_display_name().map(|s| s.to_string());
+        let friendly_name = None;
 
         let mac: Option<MacAddr> = sc_iface
             .hardware_address_string()
