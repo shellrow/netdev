@@ -44,7 +44,6 @@ pub(crate) struct NWPathSnapshot {
     pub has_dns: bool,
     pub is_expensive: bool,
     pub is_constrained: bool,
-    pub is_ultra_constrained: bool,
 }
 
 impl NWPathSnapshot {
@@ -76,7 +75,6 @@ impl Default for NWPathSnapshot {
             has_dns: false,
             is_expensive: false,
             is_constrained: false,
-            is_ultra_constrained: false,
         }
     }
 }
@@ -134,7 +132,6 @@ unsafe extern "C" {
     fn nw_path_has_dns(path: nw_path_t) -> bool;
     fn nw_path_is_expensive(path: nw_path_t) -> bool;
     fn nw_path_is_constrained(path: nw_path_t) -> bool;
-    fn nw_path_is_ultra_constrained(path: nw_path_t) -> bool;
     fn nw_path_enumerate_interfaces(path: nw_path_t, enumerate_block: *mut c_void);
     fn nw_path_enumerate_gateways(path: nw_path_t, enumerate_block: *mut c_void);
 
@@ -203,7 +200,6 @@ fn collect_path_snapshot(path: nw_path_t) -> NWPathSnapshot {
         has_dns: unsafe { nw_path_has_dns(path) },
         is_expensive: unsafe { nw_path_is_expensive(path) },
         is_constrained: unsafe { nw_path_is_constrained(path) },
-        is_ultra_constrained: unsafe { nw_path_is_ultra_constrained(path) },
         ..NWPathSnapshot::default()
     };
 
