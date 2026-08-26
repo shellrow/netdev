@@ -30,9 +30,15 @@ use std::mem::MaybeUninit;
 #[cfg(feature = "gateway")]
 use std::net::Ipv4Addr;
 #[cfg(feature = "gateway")]
-use windows_sys::Win32::NetworkManagement::IpHelper::{GetIpNetEntry2, MIB_IPNET_ROW2, SendARP};
+use std::sync::OnceLock;
+#[cfg(feature = "gateway")]
+use windows_sys::Win32::Foundation::WIN32_ERROR;
+#[cfg(feature = "gateway")]
+use windows_sys::Win32::NetworkManagement::IpHelper::{MIB_IPNET_ROW2, SendARP};
 #[cfg(feature = "gateway")]
 use windows_sys::Win32::NetworkManagement::Ndis::NET_LUID_LH;
+#[cfg(feature = "gateway")]
+use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
 
 fn sanitize_u64(val: u64) -> Option<u64> {
     if val == u64::MAX { None } else { Some(val) }
@@ -121,13 +127,35 @@ fn physical_address_to_mac(address: &[u8], length: u32) -> Option<MacAddr> {
 }
 
 #[cfg(feature = "gateway")]
+type GetIpNetEntry2 = unsafe extern "system" fn(*mut MIB_IPNET_ROW2) -> WIN32_ERROR;
+
+/// Resolve `GetIpNetEntry2`, which some `iphlpapi.dll` implementations do not export.
+#[cfg(feature = "gateway")]
+fn get_ip_net_entry2() -> Option<GetIpNetEntry2> {
+    static ENTRY: OnceLock<Option<GetIpNetEntry2>> = OnceLock::new();
+    *ENTRY.get_or_init(|| {
+        // `iphlpapi.dll` is already loaded: this module statically imports `GetAdaptersAddresses`.
+        let module = unsafe { GetModuleHandleA(c"iphlpapi.dll".as_ptr().cast()) };
+        if module.is_null() {
+            return None;
+        }
+        let proc = unsafe { GetProcAddress(module, c"GetIpNetEntry2".as_ptr().cast()) }?;
+        // SAFETY: the export matches the `GetIpNetEntry2` signature.
+        Some(unsafe {
+            std::mem::transmute::<unsafe extern "system" fn() -> isize, GetIpNetEntry2>(proc)
+        })
+    })
+}
+
+#[cfg(feature = "gateway")]
 fn get_neighbor_mac(address: SOCKADDR_INET, interface_luid: NET_LUID_LH) -> Option<MacAddr> {
+    let get_ip_net_entry2 = get_ip_net_entry2()?;
     let mut row = MIB_IPNET_ROW2 {
         Address: address,
         InterfaceLuid: interface_luid,
         ..Default::default()
     };
-    let result = unsafe { GetIpNetEntry2(&mut row) };
+    let result = unsafe { get_ip_net_entry2(&mut row) };
     if result != NO_ERROR {
         return None;
     }
