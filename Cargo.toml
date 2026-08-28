@@ -19,9 +19,9 @@ ipnet = { version = "2.12" }
 libc = "0.2"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-netlink-packet-core = "0.8"
-netlink-packet-route = "0.31"
-netlink-sys = "0.8.8"
+netlink-packet-core = "0.9"
+netlink-packet-route = "0.33"
+netlink-sys = "0.9"
 
 [target.'cfg(target_os = "android")'.dependencies]
 dlopen2 = { version = "0.8.2", default-features = false }
