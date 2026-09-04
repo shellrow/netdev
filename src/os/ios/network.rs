@@ -134,7 +134,6 @@ unsafe extern "C" {
     fn nw_path_has_dns(path: nw_path_t) -> bool;
     fn nw_path_is_expensive(path: nw_path_t) -> bool;
     fn nw_path_is_constrained(path: nw_path_t) -> bool;
-    fn nw_path_is_ultra_constrained(path: nw_path_t) -> bool;
     fn nw_path_enumerate_interfaces(path: nw_path_t, enumerate_block: *mut c_void);
     fn nw_path_enumerate_gateways(path: nw_path_t, enumerate_block: *mut c_void);
 
@@ -203,7 +202,8 @@ fn collect_path_snapshot(path: nw_path_t) -> NWPathSnapshot {
         has_dns: unsafe { nw_path_has_dns(path) },
         is_expensive: unsafe { nw_path_is_expensive(path) },
         is_constrained: unsafe { nw_path_is_constrained(path) },
-        is_ultra_constrained: unsafe { nw_path_is_ultra_constrained(path) },
+        // This API is unavailable before iOS 26, so avoid referencing its symbol.
+        is_ultra_constrained: false,
         ..NWPathSnapshot::default()
     };
 
