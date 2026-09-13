@@ -99,6 +99,7 @@ pub struct Interface {
     /// Traffic counters captured when the interface snapshot was collected.
     ///
     /// The counters are cumulative totals reported by the OS, typically since boot.
+    /// See [`InterfaceStats`] for details.
     /// This field may be `None` when the current platform or adapter does not expose statistics.
     /// Use `Interface::update_stats` to refresh the snapshot in place.
     pub stats: Option<InterfaceStats>,
@@ -285,6 +286,7 @@ impl Interface {
     /// Refreshes `Interface::stats` for this interface.
     ///
     /// On supported platforms this updates the byte counters and timestamp with a new snapshot.
+    /// Unavailable statistics replace the previous snapshot with `None`.
     pub fn update_stats(&mut self) -> std::io::Result<()> {
         crate::stats::counters::update_interface_stats(self)
     }
