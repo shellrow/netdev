@@ -294,3 +294,69 @@ mod tests {
         }
     }
 }
+
+#[cfg(all(test, target_vendor = "apple"))]
+mod apple_stats_tests {
+    use super::unix_interfaces_inner;
+    use std::{mem::zeroed, ptr};
+
+    // The first field allows the fake freeifaddrs to recover the owned fixture.
+    #[repr(C)]
+    struct Fixture {
+        entries: [libc::ifaddrs; 3],
+        addresses: [libc::sockaddr_storage; 3],
+        data: libc::if_data,
+    }
+
+    unsafe fn make_list(out: *mut *mut libc::ifaddrs, link_first: bool) -> libc::c_int {
+        let mut fixture: Box<Fixture> = Box::new(unsafe { zeroed() });
+        fixture.data.ifi_ibytes = 123;
+        fixture.data.ifi_obytes = 0;
+        let families = if link_first {
+            [libc::AF_LINK, libc::AF_INET, libc::AF_INET6]
+        } else {
+            [libc::AF_INET, libc::AF_INET6, libc::AF_LINK]
+        };
+        for (i, family) in families.into_iter().enumerate() {
+            fixture.addresses[i].ss_family = family as _;
+            fixture.addresses[i].ss_len = match family {
+                libc::AF_LINK => size_of::<libc::sockaddr_dl>(),
+                libc::AF_INET => size_of::<libc::sockaddr_in>(),
+                _ => size_of::<libc::sockaddr_in6>(),
+            } as _;
+            fixture.entries[i].ifa_name = c"netdev-test".as_ptr().cast_mut();
+            fixture.entries[i].ifa_addr = ptr::from_mut(&mut fixture.addresses[i]).cast();
+            if family == libc::AF_LINK {
+                fixture.entries[i].ifa_data = ptr::from_mut(&mut fixture.data).cast();
+            }
+            if i + 1 < fixture.entries.len() {
+                fixture.entries[i].ifa_next = &mut fixture.entries[i + 1];
+            }
+        }
+        unsafe { *out = Box::into_raw(fixture).cast() };
+        0
+    }
+
+    unsafe extern "C" fn link_first(out: *mut *mut libc::ifaddrs) -> libc::c_int {
+        unsafe { make_list(out, true) }
+    }
+
+    unsafe extern "C" fn link_last(out: *mut *mut libc::ifaddrs) -> libc::c_int {
+        unsafe { make_list(out, false) }
+    }
+
+    unsafe extern "C" fn free_list(addrs: *mut libc::ifaddrs) {
+        drop(unsafe { Box::from_raw(addrs.cast::<Fixture>()) });
+    }
+
+    #[test]
+    fn enumeration_preserves_link_stats_in_both_address_orders() {
+        for get_list in [link_first, link_last] {
+            let ifaces = unix_interfaces_inner(get_list, free_list);
+            assert_eq!(ifaces.len(), 1);
+            let stats = ifaces[0].stats.as_ref().unwrap();
+            assert_eq!((stats.rx_bytes, stats.tx_bytes), (123, 0));
+            assert!(stats.timestamp.is_some());
+        }
+    }
+}
