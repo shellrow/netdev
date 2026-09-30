@@ -8,3 +8,6 @@ pub(crate) use crate::os::darwin::mtu::*;
 
 #[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 pub(crate) use crate::os::bsd::mtu::*;
+
+#[cfg(target_os = "illumos")]
+pub(crate) use crate::os::illumos::mtu::*;

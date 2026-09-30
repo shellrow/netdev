@@ -15,3 +15,6 @@ pub use crate::os::windows::flags::*;
 
 #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
 pub use crate::os::bsd::flags::*;
+
+#[cfg(target_os = "illumos")]
+pub use crate::os::illumos::flags::*;

@@ -116,6 +116,10 @@ pub fn operstate(if_name: &str) -> OperState {
     {
         crate::os::bsd::state::operstate(if_name)
     }
+    #[cfg(target_os = "illumos")]
+    {
+        crate::os::illumos::state::operstate(if_name)
+    }
     #[cfg(target_os = "windows")]
     {
         crate::os::windows::state::operstate(if_name)

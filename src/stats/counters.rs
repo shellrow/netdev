@@ -68,6 +68,14 @@ pub(crate) fn get_stats(_ifa: Option<&libc::ifaddrs>, name: &str) -> Option<Inte
     get_stats_from_name(name)
 }
 
+// illumos doesn't attach byte counters to the getifaddrs entry the way BSD/Darwin do via
+// if_data, and reading them natively means talking to kstat(3KSTAT) (walking the
+// "link"/"<driver>" kstat chain via /dev/kstat), which hasn't been ported yet.
+#[cfg(target_os = "illumos")]
+pub(crate) fn get_stats(_ifa: Option<&libc::ifaddrs>, _name: &str) -> Option<InterfaceStats> {
+    None
+}
+
 #[cfg(target_os = "linux")]
 pub(crate) fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
     use std::fs::read_to_string;
@@ -212,6 +220,9 @@ pub(crate) fn get_stats_from_index(index: u32) -> Option<InterfaceStats> {
     }
 }
 
+// On illumos, none of the branches below touch `iface` yet (no kstat integration), so it's
+// otherwise unused there.
+#[cfg_attr(target_os = "illumos", allow(unused_variables))]
 pub(crate) fn update_interface_stats(iface: &mut Interface) -> std::io::Result<()> {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     {

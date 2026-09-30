@@ -3,6 +3,9 @@ use std::net::IpAddr;
 use std::net::ToSocketAddrs;
 
 #[cfg_attr(target_os = "ios", allow(dead_code))]
+// Not yet called on illumos: DNS/gateway discovery isn't implemented there (see
+// crate::os::illumos::interface).
+#[cfg_attr(target_os = "illumos", allow(dead_code))]
 pub fn get_system_dns_conf() -> Vec<IpAddr> {
     const PATH_RESOLV_CONF: &str = "/etc/resolv.conf";
     let r = read_to_string(PATH_RESOLV_CONF);

@@ -12,6 +12,26 @@ use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::os::unix::types::{get_interface_type, interface_name_from_ptr};
 use crate::stats::counters::{InterfaceStats, get_stats};
 
+// `libc::ifaddrs::ifa_flags` is `u64` on illumos but `u32` on every other unix target this
+// crate supports (Linux, Android, Apple, the BSDs). `Interface::flags` and
+// `OperState::from_if_flags` are both `u32`, so this normalizes at the one call site below
+// rather than widening those public types for one platform. Truncation only drops
+// illumos's extended (>31-bit) flag bits (e.g. `IFF_TEMPORARY`, `IFF_DUPLICATE`), which
+// `Interface::flags` was never able to represent on any platform anyway; illumos code that
+// needs those reads full 64-bit flags directly via `SIOCGLIFFLAGS` instead (see
+// `crate::os::illumos::ipv6_addr_flags` and `crate::os::illumos::state`).
+#[cfg(target_os = "illumos")]
+#[inline]
+fn ifa_flags_u32(f: u64) -> u32 {
+    f as u32
+}
+
+#[cfg(not(target_os = "illumos"))]
+#[inline]
+fn ifa_flags_u32(f: u32) -> u32 {
+    f
+}
+
 #[cfg(target_os = "android")]
 pub fn unix_interfaces() -> Vec<Interface> {
     use crate::os::android;
@@ -160,8 +180,8 @@ fn unix_interfaces_inner(
                     None => Vec::new(),
                 },
                 ipv6_addr_flags: ini_ipv6_flags,
-                flags: addr_ref.ifa_flags,
-                oper_state: OperState::from_if_flags(addr_ref.ifa_flags),
+                flags: ifa_flags_u32(addr_ref.ifa_flags),
+                oper_state: OperState::from_if_flags(ifa_flags_u32(addr_ref.ifa_flags)),
                 transmit_speed: None,
                 receive_speed: None,
                 auto_negotiate: None,
