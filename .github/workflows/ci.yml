@@ -48,6 +48,27 @@ jobs:
       - name: Run cargo check with all features
         run: cargo check --all-features
 
+  apple-mobile:
+    name: Check iOS
+    runs-on: macOS-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-apple-ios
+          - aarch64-apple-ios-sim
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        run: rustup toolchain install stable --profile minimal --no-self-update --target ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+
+      - name: Run cargo check
+        run: cargo check --target ${{ matrix.target }}
+
   cross:
     name: Cross compile
     runs-on: ubuntu-latest
