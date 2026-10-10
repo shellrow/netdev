@@ -9,6 +9,23 @@ const IN6_IFF_DUPLICATED: u32 = 0x04;
 const IN6_IFF_DEPRECATED: u32 = 0x10;
 const IN6_IFF_TEMPORARY: u32 = 0x80;
 
+// `libc` only exposes `in6_ifreq` on macOS (`<netinet6/in6_var.h>` is not part of the
+// iOS SDK), so define it here to build for every Apple target. `SIOCGIFAFLAG_IN6` encodes
+// `sizeof(struct in6_ifreq)` (0x120 = 288 bytes), so the union is padded to 272 bytes.
+#[repr(C)]
+struct In6Ifreq {
+    ifr_name: [libc::c_char; libc::IFNAMSIZ],
+    ifr_ifru: In6IfreqUnion,
+}
+
+#[repr(C)]
+union In6IfreqUnion {
+    ifru_addr: libc::sockaddr_in6,
+    ifru_flags6: libc::c_int,
+    // 8-byte aligned, as `in6_ifstat` holds u64 counters.
+    _size: [u64; 34],
+}
+
 pub(crate) fn get_ipv6_addr_flags(ifname: &str, addr: &Ipv6Addr) -> Ipv6AddrFlags {
     unsafe {
         let fd = libc::socket(libc::AF_INET6, libc::SOCK_DGRAM, 0);
@@ -16,7 +33,8 @@ pub(crate) fn get_ipv6_addr_flags(ifname: &str, addr: &Ipv6Addr) -> Ipv6AddrFlag
             return Ipv6AddrFlags::default();
         }
 
-        let mut req: libc::in6_ifreq = std::mem::zeroed();
+        let mut req: In6Ifreq = std::mem::zeroed();
+        const _: () = assert!(std::mem::size_of::<In6Ifreq>() == 0x120);
 
         let name_bytes = ifname.as_bytes();
         let copy_len = name_bytes.len().min(libc::IFNAMSIZ - 1);
