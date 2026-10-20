@@ -6,8 +6,8 @@
 //! `usr/src/uts/common/sys/sockio.h` (ioctl numbers, as `_IOWR('i', num, struct lifreq)`)
 //! and `usr/src/uts/common/sys/if.h` / `if_tcp(7P)` (the `lifreq` layout). Only the union
 //! members this crate actually reads (`lifru_flags`, `lifru_mtu`) are given real names; the
-//! rest of `lifr_lifru` is represented as a `[u8; 256]` sized to match its largest member
-//! (`struct sockaddr_storage`), so `size_of::<Lifreq>()` -- which feeds directly into the
+//! rest of `lifr_lifru` is represented as a `[u8; 336]` sized to match its largest member
+//! (`struct lif_nd_req`), so `size_of::<Lifreq>()` -- which feeds directly into the
 //! ioctl command numbers below, per illumos' `_IOWR` macro -- matches what the kernel
 //! expects.
 //!
@@ -24,10 +24,10 @@ const LIFNAMSIZ: usize = 32;
 
 #[repr(C)]
 union LifrLifru {
-    /// Stand-in for the union's largest member (`struct sockaddr_storage`), so the union
+    /// Stand-in for the union's largest member (`struct lif_nd_req`), so the union
     /// -- and therefore the enclosing `Lifreq` -- has the right size and alignment even
     /// though we never read this variant directly.
-    _addr: [u8; 256],
+    _addr: [u8; 336],
     /// `SIOC[GS]LIFFLAGS`.
     flags: u64,
     /// `SIOC[GS]LIFMTU`.
@@ -40,6 +40,8 @@ pub(crate) struct Lifreq {
     /// `lifr_lifru1` union (`lifru_addrlen` / `lifru_ppa`); unused by the ioctls we issue,
     /// kept only so later fields land at the right offset.
     _lifr_lifru1: c_int,
+    /// `lifr_type` (`IFT_ETHER`, ...); unused, kept so the union lands at offset 40.
+    _lifr_type: u32,
     lifr_lifru: LifrLifru,
 }
 
@@ -102,4 +104,17 @@ pub(crate) fn get_lifreq(af: c_int, name: &str, cmd: c_int) -> Option<Lifreq> {
     let res = unsafe { libc::ioctl(fd, cmd, &mut req as *mut Lifreq) };
     unsafe { libc::close(fd) };
     if res < 0 { None } else { Some(req) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn layout_matches_illumos_header() {
+        // sizeof(struct lifreq) == 376 on LP64 illumos, per <net/if.h>.
+        assert_eq!(size_of::<Lifreq>(), 376);
+        assert_eq!(SIOCGLIFFLAGS, 0xc078_6975u32 as c_int);
+        assert_eq!(SIOCGLIFMTU, 0xc078_697au32 as c_int);
+    }
 }
