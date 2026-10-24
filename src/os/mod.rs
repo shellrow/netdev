@@ -21,3 +21,6 @@ pub mod windows;
 
 #[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 pub mod bsd;
+
+#[cfg(target_os = "illumos")]
+pub mod illumos;

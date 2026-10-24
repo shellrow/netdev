@@ -111,6 +111,10 @@ pub(crate) fn interfaces() -> Vec<Interface> {
     {
         crate::os::bsd::interface::interfaces()
     }
+    #[cfg(target_os = "illumos")]
+    {
+        crate::os::illumos::interface::interfaces()
+    }
 }
 
 #[cfg(test)]

@@ -29,3 +29,6 @@ pub use crate::os::darwin::types::get_interface_type;
 
 #[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
 pub use crate::os::bsd::types::get_interface_type;
+
+#[cfg(target_os = "illumos")]
+pub use crate::os::illumos::types::get_interface_type;

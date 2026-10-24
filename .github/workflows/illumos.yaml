@@ -1,0 +1,121 @@
+# illumos tests in an OmniOS VM (vmactions/omnios-vm).
+#
+# The build happens on the Linux host inside the cross-rs illumos image
+# (sccache via the GHA cache): `cargo nextest archive` packs the test
+# binaries, and the OmniOS VM only needs the standalone nextest binary to
+# run them -- no Rust toolchain in the VM.
+
+name: illumos
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: illumos-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: -Dwarnings
+  RUST_TARGET: x86_64-unknown-illumos
+  # Builds the archive (taiki-e/install-action below) and runs it in the VM
+  # (prebuilt illumos binary). Keep both on the same version.
+  NEXTEST_VERSION: "0.9.80"
+  # Plain image: the VM only runs prebuilt binaries. Switch to
+  # r151058-build if anything in `prepare` turns out to need a compiler.
+  OMNIOS_RELEASE: r151058
+
+# Default to read-only; jobs that need more grant it explicitly.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: illumos cross build
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    container:
+      # Provides the illumos sysroot and gcc.
+      image: ghcr.io/cross-rs/x86_64-unknown-illumos:main@sha256:cef932f2e49ca7ee4fce3c62ad8bdf069eacea016467e55404d807d8b130bb0f
+    env:
+      RUSTC_WRAPPER: "sccache"
+      SCCACHE_GHA_ENABLED: "on"
+      # The image also sets this (plus CC/AR) in its ENV; repeated here with
+      # an absolute path so the job doesn't depend on the image ENV
+      # surviving into the job container.
+      CARGO_TARGET_X86_64_UNKNOWN_ILLUMOS_LINKER: /usr/local/x86_64-unknown-illumos/bin/x86_64-unknown-illumos-gcc
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+      with:
+        toolchain: stable
+        targets: x86_64-unknown-illumos
+
+    - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+
+    - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
+      with:
+        tool: nextest@0.9.80
+
+    - name: build test archive
+      run: >
+        cargo nextest archive
+        --all-features
+        --lib --bins --tests
+        --target "$RUST_TARGET"
+        --archive-file illumos-tests.tar.zst
+
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: illumos-tests
+        path: illumos-tests.tar.zst
+        retention-days: 1
+        compression-level: 0
+
+  test:
+    name: illumos test (OmniOS VM)
+    needs: build
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+    # The archive is remapped onto this checkout, for tests that read files
+    # from the source tree.
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: illumos-tests
+
+    - name: run tests in OmniOS
+      uses: vmactions/omnios-vm@9576f0b6d15e7696548409baa533bc0a339caf42 # v1.3.7
+      env:
+        RUST_LOG: ${{ runner.debug && 'TRACE' || 'DEBUG' }}
+      with:
+        release: ${{ env.OMNIOS_RELEASE }}
+        envs: 'RUST_BACKTRACE RUST_LOG NEXTEST_VERSION'
+        # Nothing to copy back out of the VM.
+        copyback: false
+        prepare: |
+          set -e
+          mkdir -p /usr/local/bin
+          # illumos tar can't decompress from stdin, hence gunzip
+          # (https://www.illumos.org/issues/15228).
+          curl -LsSf "https://get.nexte.st/$NEXTEST_VERSION/illumos" | gunzip | tar xf - -C /usr/local/bin
+        run: |
+          set -e
+          uname -a
+          psrinfo | wc -l
+          /usr/local/bin/cargo-nextest nextest run \
+            --archive-file illumos-tests.tar.zst \
+            --workspace-remap "$PWD" \
+            --no-fail-fast

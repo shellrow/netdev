@@ -196,11 +196,15 @@ impl InterfaceType {
     ///
     /// For variants that have no direct mapping on the current platform, this method returns
     /// `u32::MAX`.
+    // These are the IANA-standard SNMP ifType numbers (RFC1573,
+    // iana.org/assignments/smi-numbers), not a BSD-specific scheme, so illumos' own
+    // <net/if_types.h> uses the same values for the entries below.
     #[cfg(any(
         target_vendor = "apple",
         target_os = "openbsd",
         target_os = "freebsd",
-        target_os = "netbsd"
+        target_os = "netbsd",
+        target_os = "illumos"
     ))]
     pub fn value(&self) -> u32 {
         match *self {

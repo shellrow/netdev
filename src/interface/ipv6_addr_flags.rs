@@ -54,6 +54,9 @@ pub(crate) use crate::os::darwin::ipv6_addr_flags::*;
 #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
 pub(crate) use crate::os::bsd::ipv6_addr_flags::*;
 
+#[cfg(target_os = "illumos")]
+pub(crate) use crate::os::illumos::ipv6_addr_flags::*;
+
 // On Linux/Android flags come from netlink; this is only reached via the
 // `unix_interfaces()` fallback when netlink is unavailable.
 #[cfg(any(target_os = "linux", target_os = "android"))]

@@ -279,6 +279,50 @@ pub(crate) unsafe fn try_mac_from_raw(
     }
 }
 
+// illumos has `AF_LINK`/`sockaddr_dl` like the BSD family, but its `sockaddr` has no
+// `sa_len` field, and `libc`'s `sockaddr_dl` for this target is a proper named struct
+// rather than an opaque byte blob, so this reads the fields directly instead of doing
+// BSD's raw offset arithmetic above.
+#[cfg(target_os = "illumos")]
+pub(crate) unsafe fn try_mac_from_raw(
+    sa: *const libc::sockaddr,
+    len: libc::socklen_t,
+) -> Option<MacAddr> {
+    if sa.is_null() || (len as usize) < core::mem::size_of::<libc::sa_family_t>() {
+        return None;
+    }
+
+    let family = unsafe { (*sa).sa_family as libc::c_int };
+    if family != libc::AF_LINK {
+        return None;
+    }
+    if (len as usize) < core::mem::size_of::<libc::sockaddr_dl>() {
+        return None;
+    }
+
+    let sdl = unsafe { &*(sa as *const libc::sockaddr_dl) };
+    let nlen = sdl.sdl_nlen as usize;
+    let alen = sdl.sdl_alen as usize;
+    if alen < 6 {
+        return None;
+    }
+    // `sdl_data` holds the interface name (`sdl_nlen` bytes) immediately followed by the
+    // link-layer address (`sdl_alen` bytes).
+    if nlen + 6 > sdl.sdl_data.len() {
+        return None;
+    }
+
+    let octet = |i: usize| sdl.sdl_data[nlen + i] as u8;
+    Some(MacAddr::from_octets([
+        octet(0),
+        octet(1),
+        octet(2),
+        octet(3),
+        octet(4),
+        octet(5),
+    ]))
+}
+
 /// Computes the effective length of a `sockaddr` structure
 #[inline]
 pub(crate) unsafe fn compute_sockaddr_len(
@@ -366,11 +410,23 @@ fn guess_len_from_family(family: libc::c_int) -> Option<libc::socklen_t> {
         return Some(core::mem::size_of::<libc::sockaddr_dl>() as libc::socklen_t);
     }
 
+    // illumos: Layer 2 (AF_LINK). Its `sockaddr_dl` has no variable-length trailer to
+    // worry about the way BSD's comment above does -- `sdl_data` is a fixed-size array --
+    // and there's no `sa_len` to read a truer length from, so the struct size is the
+    // whole story.
+    #[cfg(target_os = "illumos")]
+    if family == libc::AF_LINK {
+        return Some(core::mem::size_of::<libc::sockaddr_dl>() as libc::socklen_t);
+    }
+
     // Unknown or unsupported family
     None
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+// illumos' `struct sockaddr` has no `sa_len` field either (it's SVR4-derived, not
+// 4.4BSD-derived), so it shares this family-only implementation with Linux/Android rather
+// than the sa_len-based one below.
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "illumos"))]
 #[inline]
 pub(crate) unsafe fn netmask_ip_autolen(sa: *const libc::sockaddr) -> Option<IpAddr> {
     if sa.is_null() {
@@ -461,7 +517,7 @@ pub(crate) unsafe fn netmask_ip_autolen(sa: *const libc::sockaddr) -> Option<IpA
 }
 
 #[allow(dead_code)]
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "illumos"))]
 #[inline]
 pub(crate) unsafe fn netmask_prefix_autolen(sa: *const libc::sockaddr) -> Option<u8> {
     if sa.is_null() {
