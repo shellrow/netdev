@@ -68,7 +68,6 @@ jobs:
     - name: build test archive
       run: >
         cargo nextest archive
-        --locked
         --all-features
         --lib --bins --tests
         --target "$RUST_TARGET"
