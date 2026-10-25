@@ -48,8 +48,8 @@ For more details, see [examples][examples-url] or [doc][doc-url].
 - `gateway` (default)
   - Enables default interface and default gateway helpers.
 - `apple-system-configuration-extra` (default)
-  - Enables deeper Apple metadata enrichment using `SystemConfiguration` APIs.
-  - On macOS, this adds metadata such as interface display names and DHCP hints. iOS does not offer these APIs (`API_UNAVAILABLE(ios)`), so the feature has no effect there; iOS reads DNS resolvers through libresolv.
+  - Enables additional `objc2-system-configuration` dependency bindings on macOS.
+  - Currently, this flag does not change metadata collection: macOS reads interface names and DHCP hints from SystemConfiguration plist files, with a basic SystemConfiguration API fallback, regardless of this flag. It has no effect on iOS.
 - `android-extra` (default)
   - Enables deeper Android metadata enrichment using Android platform APIs through JNI bindings.
   - On Android, this can add metadata such as traffic stats, DNS servers, DHCP hints, and Wi-Fi link speed when the app provides the required Android context and permissions.
@@ -57,7 +57,7 @@ For more details, see [examples][examples-url] or [doc][doc-url].
   - Enables macOS Wi-Fi transmit-speed collection through CoreWLAN.
   - This feature is disabled by default because CoreWLAN metadata collection may perform synchronous IPC during interface enumeration.
 
-To opt out of the additional Apple metadata enrichment while keeping gateway helpers:
+To disable default feature flags while keeping gateway helpers (macOS metadata collection remains enabled):
 
 ```toml
 [dependencies]
