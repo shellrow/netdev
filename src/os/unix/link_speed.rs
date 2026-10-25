@@ -133,7 +133,25 @@ const SIOCGIFXMEDIA: u32 = 0xc028698b;
 // https://github.com/openbsd/src/blob/master/sys/sys/sockio.h#L70
 // https://github.com/NetBSD/src/blob/trunk/sys/sys/sockio.h#L94
 // #define	SIOCGIFMEDIA	_IOWR('i', 56, struct ifmediareq)
-const SIOCGIFXMEDIA: u64 = 0xc02c6938;
+const SIOCGIFXMEDIA: libc::c_ulong =
+    0xc0006938 | ((std::mem::size_of::<ifmediareq>() as libc::c_ulong) << 16);
+
+#[cfg(all(test, target_pointer_width = "64"))]
+mod abi_tests {
+    #[cfg(target_os = "openbsd")]
+    #[test]
+    fn openbsd_media_request_matches_native_headers() {
+        assert_eq!(std::mem::size_of::<super::ifmediareq>(), 64);
+        assert_eq!(super::SIOCGIFXMEDIA, 0xc0406938);
+    }
+
+    #[cfg(target_os = "netbsd")]
+    #[test]
+    fn netbsd_media_request_matches_native_headers() {
+        assert_eq!(std::mem::size_of::<super::ifmediareq>(), 48);
+        assert_eq!(super::SIOCGIFXMEDIA, 0xc0306938);
+    }
+}
 
 // The following constants are the same across all BSD variants and Apple targets.
 
