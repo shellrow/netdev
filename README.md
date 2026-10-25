@@ -90,7 +90,7 @@ and was later rebranded to `netdev` by the author for future expansion, clearer 
 ## Tested on
 - Linux
     - Ubuntu 
-        - 24.04
+        - 24.04.5
         - 22.04
         - 21.10 
         - 20.04 
@@ -107,20 +107,20 @@ and was later rebranded to `netdev` by the author for future expansion, clearer 
     - 14.7.6
 - macOS (Intel)
     - 13.4.1
-    - 11.6
 - Windows 
-    - 11 25H2 26200.8037
+    - 11 25H2 26200.9711
     - 11 24H2 26100.6584
-    - 11 23H2 22631.4602
-    - 11 Pro 22H2 22621.3155
-    - 11 22H2 22621.3155
-    - 10 21H2 19044.1586
 - FreeBSD
-    - 14
+    - 14.4
+- OpenBSD
+    - 7.9
+- NetBSD
+    - 10.1
 - Android (arm64)
-    - 16.0
+    - 17
+    - 16
 - Android (x86_64)
-    - 16.0
+    - 16
 - iOS
+    - 26.6.2
     - 18.6.2
-    - 18.1.1
