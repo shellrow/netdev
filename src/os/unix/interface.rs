@@ -90,7 +90,7 @@ fn unix_interfaces_inner(
             None => (None, None, None),
         };
         let netmask: Option<IpAddr> =
-            unsafe { netmask_ip_autolen(addr_ref.ifa_netmask as *const libc::sockaddr) };
+            unsafe { netmask_ip_autolen(addr_ref.ifa_netmask as *const libc::sockaddr, ip) };
         let stats: Option<InterfaceStats> = get_stats(Some(addr_ref), &name);
         let mut ini_ipv4: Option<Ipv4Net> = None;
         let mut ini_ipv6: Option<Ipv6Net> = None;
