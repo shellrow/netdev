@@ -1,14 +1,15 @@
 use crate::interface::types::InterfaceType;
+use crate::os::linux::netlink_data::ip_from_addr;
+use crate::os::linux::netlink_data::stats_from_link;
 use crate::stats::counters::InterfaceStats;
 use netlink_packet_core::NetlinkPayload;
 use netlink_packet_route::{
     RouteNetlinkMessage,
-    address::{AddressAttribute, AddressFlags, AddressMessage},
+    address::AddressMessage,
     link::{LinkAttribute, LinkMessage},
 };
 use netlink_sys::{Socket, protocols::NETLINK_ROUTE};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::time::SystemTime;
 use std::{collections::HashMap, io};
 
 #[cfg(feature = "gateway")]
@@ -123,27 +124,6 @@ fn name_from_link(link: &LinkMessage) -> Option<String> {
     None
 }
 
-fn ip_from_addr(addr: &AddressMessage) -> Option<(IpAddr, u8, u32)> {
-    let pfx = addr.header.prefix_len;
-    let mut ip_out = None;
-    let mut flags: Option<AddressFlags> = None;
-    for nla in &addr.attributes {
-        match nla {
-            AddressAttribute::Local(ip) | AddressAttribute::Address(ip) => {
-                ip_out = Some(*ip);
-            }
-            AddressAttribute::Flags(f) => {
-                flags = Some(*f);
-            }
-            _ => {}
-        }
-    }
-    let addr_flags = flags
-        .map(|f| f.bits())
-        .unwrap_or(addr.header.flags.bits() as u32);
-    ip_out.map(|ip| (ip, pfx, addr_flags))
-}
-
 #[cfg(feature = "gateway")]
 fn route_addr_to_ip(a: &RouteAddress) -> Option<IpAddr> {
     match a {
@@ -228,29 +208,6 @@ fn mtu_from_link(link: &LinkMessage) -> Option<u32> {
 fn if_type_from_link(link: &LinkMessage, _name: &str) -> InterfaceType {
     let arphrd = link.header.link_layer_type as u32;
     InterfaceType::try_from(arphrd).unwrap_or(InterfaceType::UnknownWithValue(arphrd))
-}
-
-fn stats_from_link(link: &LinkMessage) -> Option<InterfaceStats> {
-    for nla in &link.attributes {
-        match nla {
-            LinkAttribute::Stats64(s) => {
-                return Some(InterfaceStats {
-                    rx_bytes: s.rx_bytes,
-                    tx_bytes: s.tx_bytes,
-                    timestamp: Some(SystemTime::now()),
-                });
-            }
-            LinkAttribute::Stats(s) => {
-                return Some(InterfaceStats {
-                    rx_bytes: s.rx_bytes as u64,
-                    tx_bytes: s.tx_bytes as u64,
-                    timestamp: Some(SystemTime::now()),
-                });
-            }
-            _ => {}
-        }
-    }
-    None
 }
 
 pub fn get_flags_by_name(name: &str) -> io::Result<Option<u32>> {

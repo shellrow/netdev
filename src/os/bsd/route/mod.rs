@@ -183,65 +183,36 @@ fn normalize_gateway(ip: IpAddr) -> IpAddr {
     }
 }
 
-/// Parse an IP address from a `sockaddr`
-fn ip_from_sockaddr(sa: &libc::sockaddr) -> Option<IpAddr> {
-    unsafe {
-        match sa.sa_family as libc::c_int {
-            x if x == libc::AF_INET => {
-                let want = core::mem::size_of::<libc::sockaddr_in>();
-                if (sa.sa_len as usize) < want {
-                    return None;
-                }
-                let sin = &*(sa as *const _ as *const libc::sockaddr_in);
-                let n = u32::from_be(sin.sin_addr.s_addr as u32);
-                Some(IpAddr::V4(Ipv4Addr::from(n)))
-            }
-            x if x == libc::AF_INET6 => {
-                let want = core::mem::size_of::<libc::sockaddr_in6>();
-                if (sa.sa_len as usize) < want {
-                    return None;
-                }
-                let sin6 = &*(sa as *const _ as *const libc::sockaddr_in6);
-                // `s6_addr` is raw big-endian bytes; `Ipv6Addr::from([u8;16])` expects octets.
-                Some(IpAddr::V6(Ipv6Addr::from(sin6.sin6_addr.s6_addr)))
-            }
-            _ => None,
-        }
+/// Parse a bounded routing-socket address without requiring aligned storage.
+fn ip_from_sockaddr(sa: &[u8]) -> Option<IpAddr> {
+    match i32::from(*sa.get(1)?) {
+        libc::AF_INET if sa.len() >= mem::size_of::<libc::sockaddr_in>() => Some(IpAddr::V4(
+            Ipv4Addr::from(<[u8; 4]>::try_from(sa.get(4..8)?).ok()?),
+        )),
+        libc::AF_INET6 if sa.len() >= mem::size_of::<libc::sockaddr_in6>() => Some(IpAddr::V6(
+            Ipv6Addr::from(<[u8; 16]>::try_from(sa.get(8..24)?).ok()?),
+        )),
+        _ => None,
     }
 }
 
-fn masklen_from_sockaddr(dst: IpAddr, mask_sa: &libc::sockaddr) -> u8 {
-    unsafe {
-        let sa_len = mask_sa.sa_len as usize;
-        if sa_len == 0 {
-            return 0;
+fn masklen_from_sockaddr(dst: IpAddr, mask: &[u8]) -> u8 {
+    // Routing sockets omit trailing zero bytes from masks, including all bytes
+    // except the length byte for a default-route mask.
+    match dst {
+        IpAddr::V4(_) => {
+            let mut bytes = [0u8; 4];
+            for (out, value) in bytes.iter_mut().zip(mask.get(4..).unwrap_or_default()) {
+                *out = *value;
+            }
+            u32::from_be_bytes(bytes).leading_ones() as u8
         }
-
-        match dst {
-            IpAddr::V4(_) => {
-                const OFF: usize = 4;
-                if sa_len <= OFF {
-                    return 0;
-                }
-                let n = (sa_len - OFF).min(4);
-
-                let base = (mask_sa as *const _ as *const u8).add(OFF);
-                let mut bytes = [0u8; 4];
-                core::ptr::copy_nonoverlapping(base, bytes.as_mut_ptr(), n);
-                u32::from_be_bytes(bytes).leading_ones() as u8
+        IpAddr::V6(_) => {
+            let mut bytes = [0u8; 16];
+            for (out, value) in bytes.iter_mut().zip(mask.get(8..).unwrap_or_default()) {
+                *out = *value;
             }
-            IpAddr::V6(_) => {
-                const OFF: usize = 8;
-                if sa_len <= OFF {
-                    return 0;
-                }
-                let n = (sa_len - OFF).min(16);
-
-                let base = (mask_sa as *const _ as *const u8).add(OFF);
-                let mut bytes = [0u8; 16];
-                core::ptr::copy_nonoverlapping(base, bytes.as_mut_ptr(), n);
-                u128::from_be_bytes(bytes).leading_ones() as u8
-            }
+            u128::from_be_bytes(bytes).leading_ones() as u8
         }
     }
 }
@@ -288,9 +259,8 @@ fn message_to_neighbor(msg: &[u8], header_ifindex: u32) -> Option<NeighborEntry>
             })
         };
 
-    while off + core::mem::size_of::<libc::sockaddr>() <= msg.len() {
-        let sa = unsafe { &*(msg[off..].as_ptr() as *const libc::sockaddr) };
-        let sa_len = sa.sa_len as usize;
+    while off + 2 <= msg.len() {
+        let sa_len = msg[off] as usize;
 
         if sa_len == 0 {
             off += roundup(0);
@@ -301,7 +271,11 @@ fn message_to_neighbor(msg: &[u8], header_ifindex: u32) -> Option<NeighborEntry>
             continue;
         }
 
-        match sa.sa_family as c_int {
+        let sa = &msg[off..off + sa_len];
+        if sa.len() < 2 {
+            return None;
+        }
+        match sa[1] as c_int {
             x if x == libc::AF_INET => {
                 ip = ip_from_sockaddr(sa);
                 if let Some(entry) = make_entry(ip, mac, link_ifindex, scope_id) {
@@ -310,8 +284,8 @@ fn message_to_neighbor(msg: &[u8], header_ifindex: u32) -> Option<NeighborEntry>
             }
             x if x == libc::AF_INET6 => {
                 if let Some(IpAddr::V6(v6)) = ip_from_sockaddr(sa) {
-                    let sin6 = unsafe { &*(sa as *const _ as *const libc::sockaddr_in6) };
-                    let (v6, normalized_scope) = normalize_scoped_v6(v6, sin6.sin6_scope_id);
+                    let scope = u32::from_ne_bytes(sa.get(24..28)?.try_into().ok()?);
+                    let (v6, normalized_scope) = normalize_scoped_v6(v6, scope);
                     scope_id = normalized_scope;
                     ip = Some(IpAddr::V6(v6));
                     if let Some(entry) = make_entry(ip, mac, link_ifindex, scope_id) {
@@ -368,53 +342,30 @@ struct RawRoute {
 }
 
 fn parse_one_route(hdr: &rt_msghdr, addr_block: &[u8]) -> Option<RawRoute> {
-    let mut addrs: [Option<*const libc::sockaddr>; RTAX_MAX] = [None; RTAX_MAX];
+    let mut addrs: [Option<&[u8]>; RTAX_MAX] = [None; RTAX_MAX];
     let mut off = 0usize;
-
-    for idx in 0..RTAX_MAX {
+    for (idx, entry) in addrs.iter_mut().enumerate() {
         if (hdr.rtm_addrs & (1 << idx)) != 0 {
-            if off + mem::size_of::<libc::sockaddr>() > addr_block.len() {
-                return None;
-            }
-            let sa = unsafe { &*(addr_block[off..].as_ptr() as *const libc::sockaddr) };
-            addrs[idx] = Some(sa as *const libc::sockaddr);
-
-            let sa_len = sa.sa_len as usize;
-            let step = roundup(if sa_len == 0 { 0 } else { sa_len });
-            if off + step > addr_block.len() {
-                return None;
-            }
+            let len = usize::from(*addr_block.get(off)?);
+            let step = roundup(len);
+            let bytes = addr_block.get(off..off + step)?;
+            *entry = Some(&bytes[..len]);
             off += step;
         }
     }
 
-    let dptr = addrs[RTAX_DST]? as *const libc::sockaddr;
-    let dst_sa = unsafe { &*dptr };
-    let dst_ip = ip_from_sockaddr(dst_sa)?;
-    let mut prefix: u8 = match dst_ip {
-        IpAddr::V4(_) => 32,
-        IpAddr::V6(_) => 128,
-    };
-    if let Some(mptr) = addrs[RTAX_NETMASK] {
-        let m_sa = unsafe { &*mptr };
-        prefix = if m_sa.sa_len == 0 {
-            0
-        } else {
-            masklen_from_sockaddr(dst_ip, m_sa)
-        };
-    } else if (hdr.rtm_flags & libc::RTF_HOST) != 0 {
-        prefix = match dst_ip {
-            IpAddr::V4(_) => 32,
-            _ => 128,
-        };
-    }
-
-    let gateway = if let Some(gptr) = addrs[RTAX_GATEWAY] {
-        let g_sa = unsafe { &*gptr };
-        ip_from_sockaddr(g_sa).map(normalize_gateway)
+    let dst_ip = ip_from_sockaddr(addrs[RTAX_DST]?)?;
+    let prefix = if let Some(mask) = addrs[RTAX_NETMASK] {
+        masklen_from_sockaddr(dst_ip, mask)
     } else {
-        None
+        match dst_ip {
+            IpAddr::V4(_) => 32,
+            IpAddr::V6(_) => 128,
+        }
     };
+    let gateway = addrs[RTAX_GATEWAY]
+        .and_then(ip_from_sockaddr)
+        .map(normalize_gateway);
 
     Some(RawRoute {
         dst: dst_ip,
@@ -464,7 +415,7 @@ fn get_neighbor_entries(address_family: c_int) -> io::Result<Vec<NeighborEntry>>
 
     let mut off = 0usize;
     while off + mem::size_of::<rt_msghdr>() <= buf.len() {
-        let hdr = unsafe { &*(buf[off..].as_ptr() as *const rt_msghdr) };
+        let hdr = unsafe { std::ptr::read_unaligned(buf[off..].as_ptr().cast::<rt_msghdr>()) };
         let msglen = hdr.rtm_msglen as usize;
         if msglen == 0 || off + msglen > buf.len() {
             break;
@@ -478,7 +429,7 @@ fn get_neighbor_entries(address_family: c_int) -> io::Result<Vec<NeighborEntry>>
             return Err(code_to_error(hdr.rtm_errno));
         }
 
-        let hdrlen = message_header_len(hdr);
+        let hdrlen = message_header_len(&hdr);
         if hdrlen < mem::size_of::<rt_msghdr>() || off + hdrlen > off + msglen {
             break;
         }
@@ -495,7 +446,7 @@ fn get_neighbor_entries(address_family: c_int) -> io::Result<Vec<NeighborEntry>>
 
 #[derive(Default)]
 struct NeighborTables {
-    ipv4: HashMap<Ipv4Addr, MacAddr>,
+    ipv4: HashMap<(u32, Ipv4Addr), MacAddr>,
     ipv6: HashMap<(u32, Ipv6Addr), MacAddr>,
 }
 
@@ -505,7 +456,7 @@ fn get_neighbor_tables() -> NeighborTables {
     // Fetch each family independently so failure of one table does not discard the other.
     for entry in get_neighbor_entries(libc::AF_INET).unwrap_or_default() {
         if let IpAddr::V4(ip) = entry.ip {
-            tables.ipv4.insert(ip, entry.mac);
+            tables.ipv4.insert((entry.ifindex, ip), entry.mac);
         }
     }
     for entry in get_neighbor_entries(libc::AF_INET6).unwrap_or_default() {
@@ -547,7 +498,7 @@ fn list_routes() -> io::Result<Vec<RawRoute>> {
     let mut off = 0usize;
 
     while off + mem::size_of::<rt_msghdr>() <= buf.len() {
-        let hdr = unsafe { &*(buf[off..].as_ptr() as *const rt_msghdr) };
+        let hdr = unsafe { std::ptr::read_unaligned(buf[off..].as_ptr().cast::<rt_msghdr>()) };
         let msglen = hdr.rtm_msglen as usize;
         if msglen == 0 || off + msglen > buf.len() {
             break;
@@ -561,12 +512,12 @@ fn list_routes() -> io::Result<Vec<RawRoute>> {
             return Err(code_to_error(hdr.rtm_errno));
         }
 
-        let hdrlen = message_header_len(hdr);
+        let hdrlen = message_header_len(&hdr);
         if hdrlen < mem::size_of::<rt_msghdr>() || off + hdrlen > off + msglen {
             break;
         }
         let addr_block = &buf[off + hdrlen..off + msglen];
-        if let Some(rr) = parse_one_route(hdr, addr_block) {
+        if let Some(rr) = parse_one_route(&hdr, addr_block) {
             out.push(rr);
         }
 
@@ -629,7 +580,7 @@ fn build_gateway_map(
 
         match gw {
             IpAddr::V4(v4) => {
-                if let Some(mac) = neighbor_tables.ipv4.get(&v4).copied() {
+                if let Some(mac) = neighbor_tables.ipv4.get(&(r.ifindex, v4)).copied() {
                     entry.ipv4_mac = Some(mac);
                 }
                 push_v4(&mut entry.v4, v4);
@@ -707,6 +658,45 @@ mod tests {
     }
 
     #[test]
+    fn rejects_truncated_ip_sockaddrs() {
+        for (family, length) in [(libc::AF_INET, 16usize), (libc::AF_INET6, 28usize)] {
+            for truncated_length in 2..length {
+                let mut bytes = vec![0; truncated_length];
+                bytes[0] = truncated_length as u8;
+                bytes[1] = family as u8;
+                assert_eq!(
+                    ip_from_sockaddr(&bytes),
+                    None,
+                    "family={family}, length={truncated_length}"
+                );
+            }
+            let mut bytes = vec![0; length];
+            bytes[0] = length as u8;
+            bytes[1] = family as u8;
+            assert!(ip_from_sockaddr(&bytes).is_some());
+        }
+    }
+
+    #[test]
+    fn parses_default_route_with_short_zero_mask() {
+        let mut header: rt_msghdr = unsafe { mem::zeroed() };
+        header.rtm_addrs = (1 << RTAX_DST) | (1 << RTAX_GATEWAY) | (1 << RTAX_NETMASK);
+        header.rtm_index = 2;
+        let mut bytes = vec![0; roundup(16) * 2 + roundup(0)];
+        bytes[0] = 16;
+        bytes[1] = libc::AF_INET as u8;
+        let gateway_offset = roundup(16);
+        bytes[gateway_offset] = 16;
+        bytes[gateway_offset + 1] = libc::AF_INET as u8;
+        bytes[gateway_offset + 4..gateway_offset + 8].copy_from_slice(&[192, 0, 2, 1]);
+        let route = parse_one_route(&header, &bytes).unwrap();
+        assert_eq!(route.prefix, 0);
+        assert_eq!(route.gateway, Some("192.0.2.1".parse().unwrap()));
+        bytes.pop();
+        assert!(parse_one_route(&header, &bytes).is_none());
+    }
+
+    #[test]
     fn parses_ipv6_ndp_entry() {
         let ip: Ipv6Addr = "fe80::1".parse().unwrap();
         let mut message = Vec::new();
@@ -734,6 +724,45 @@ mod tests {
         let entry = message_to_neighbor(&message, 2).unwrap();
         assert_eq!(entry.ip, IpAddr::V6("fe80::1".parse().unwrap()));
         assert_eq!(entry.ifindex, TEST_IFINDEX);
+    }
+
+    #[test]
+    fn keeps_ipv4_neighbors_separate_by_interface() {
+        let ip = Ipv4Addr::new(192, 168, 1, 1);
+        let first_mac = MacAddr::from_octets([0, 1, 2, 3, 4, 5]);
+        let second_mac = MacAddr::from_octets([6, 7, 8, 9, 10, 11]);
+        let mut tables = NeighborTables::default();
+        tables.ipv4.insert((2, ip), first_mac);
+        tables.ipv4.insert((3, ip), second_mac);
+        let gateways = build_gateway_map(
+            vec![
+                default_route(IpAddr::V4(ip), 2),
+                default_route(IpAddr::V4(ip), 3),
+                default_route(IpAddr::V4(ip), 4),
+            ],
+            &tables,
+        );
+        assert_eq!(gateways[&2].mac_addr, first_mac);
+        assert_eq!(gateways[&3].mac_addr, second_mac);
+        assert_eq!(gateways[&4].mac_addr, MacAddr::zero());
+    }
+
+    #[test]
+    fn parses_short_nonzero_masks() {
+        assert_eq!(
+            masklen_from_sockaddr(
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                &[7, 0, 0, 0, 255, 255, 255]
+            ),
+            24
+        );
+        assert_eq!(
+            masklen_from_sockaddr(
+                IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+                &[10, 0, 0, 0, 0, 0, 0, 0, 255, 255]
+            ),
+            16
+        );
     }
 
     #[test]
@@ -792,7 +821,7 @@ mod tests {
         let ipv4_mac = MacAddr::from_octets(TEST_MAC);
         let ipv6_mac = MacAddr::from_octets([0, 1, 2, 3, 4, 5]);
         let mut tables = NeighborTables::default();
-        tables.ipv4.insert(ipv4, ipv4_mac);
+        tables.ipv4.insert((TEST_IFINDEX, ipv4), ipv4_mac);
         tables.ipv6.insert((TEST_IFINDEX, ipv6), ipv6_mac);
 
         let gateways = build_gateway_map(

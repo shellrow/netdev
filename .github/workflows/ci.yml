@@ -45,6 +45,22 @@ jobs:
       - name: Run cargo test
         run: cargo test
 
+      - name: Test with all features
+        run: cargo test --all-features
+
+      - name: Test without default features
+        run: cargo test --no-default-features
+
+      - name: Check documentation links with all features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --no-deps --all-features
+
+      - name: Check documentation links without default features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --no-deps --no-default-features
+
       - name: Run cargo check with all features
         run: cargo check --all-features
 

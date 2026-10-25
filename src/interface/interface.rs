@@ -80,11 +80,12 @@ pub struct Interface {
     pub transmit_speed: Option<u64>,
     /// Reported receive link speed in bits per second.
     ///
-    /// This field follows the same availability rules as `Interface::transmit_speed`.
+    /// Availability is platform- and driver-dependent. On macOS, CoreWLAN supplies
+    /// only transmit speed, so enabling `apple-wifi-extra` does not add receive speed.
     pub receive_speed: Option<u64>,
     /// Whether this interface was configured to auto-negotiate the link speed.
     ///
-    /// It may `None` if reading this information has not been implemented for a specific OS.
+    /// It may be `None` if reading this information has not been implemented for a specific OS.
     pub auto_negotiate: Option<bool>,
     /// Whether this interface is configured to use DHCP for IPv4.
     ///
@@ -113,7 +114,9 @@ pub struct Interface {
     pub gateway: Option<NetworkDevice>,
     /// DNS resolver addresses associated with this interface.
     ///
-    /// This field is available only with the `gateway` feature.
+    /// This field is available only with the `gateway` feature. On platforms without
+    /// per-interface resolver information, system resolvers are attached to the default
+    /// interface and may include local stub resolver addresses.
     #[cfg(feature = "gateway")]
     pub dns_servers: Vec<IpAddr>,
     /// Maximum transmission unit in bytes, when available.

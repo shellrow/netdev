@@ -58,14 +58,6 @@ pub(crate) fn pick_default_iface_index(ifaces: &[Interface], local_ip: IpAddr) -
 }
 
 #[cfg(feature = "gateway")]
-pub(crate) fn iface_has_ip(iface: &Interface, local_ip: IpAddr) -> bool {
-    match local_ip {
-        IpAddr::V4(ipv4) => iface.ipv4.iter().any(|x| x.addr() == ipv4),
-        IpAddr::V6(ipv6) => iface.ipv6.iter().any(|x| x.addr() == ipv6),
-    }
-}
-
-#[cfg(feature = "gateway")]
 pub(crate) fn resolve_default_interface(mut ifaces: Vec<Interface>) -> Result<Interface, String> {
     use crate::net::ip::get_local_ipaddr;
 

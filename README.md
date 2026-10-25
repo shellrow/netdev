@@ -39,7 +39,7 @@ See the [Interface][doc-interface-url] struct documentation for more details.
 Add `netdev` to your `Cargo.toml`:
 ```toml
 [dependencies]
-netdev = "0.46"
+netdev = "0.47"
 ```
 
 For more details, see [examples][examples-url] or [doc][doc-url].  
@@ -48,8 +48,8 @@ For more details, see [examples][examples-url] or [doc][doc-url].
 - `gateway` (default)
   - Enables default interface and default gateway helpers.
 - `apple-system-configuration-extra` (default)
-  - Enables deeper Apple metadata enrichment using `SystemConfiguration` APIs.
-  - On macOS, this adds metadata such as interface display names and DHCP hints. iOS does not offer these APIs (`API_UNAVAILABLE(ios)`), so the feature has no effect there; iOS reads DNS resolvers through libresolv.
+  - Enables additional `objc2-system-configuration` dependency bindings on macOS.
+  - Currently, this flag does not change metadata collection: macOS reads interface names and DHCP hints from SystemConfiguration plist files, with a basic SystemConfiguration API fallback, regardless of this flag. It has no effect on iOS.
 - `android-extra` (default)
   - Enables deeper Android metadata enrichment using Android platform APIs through JNI bindings.
   - On Android, this can add metadata such as traffic stats, DNS servers, DHCP hints, and Wi-Fi link speed when the app provides the required Android context and permissions.
@@ -57,11 +57,11 @@ For more details, see [examples][examples-url] or [doc][doc-url].
   - Enables macOS Wi-Fi transmit-speed collection through CoreWLAN.
   - This feature is disabled by default because CoreWLAN metadata collection may perform synchronous IPC during interface enumeration.
 
-To opt out of the additional Apple metadata enrichment while keeping gateway helpers:
+To disable default feature flags while keeping gateway helpers (macOS metadata collection remains enabled):
 
 ```toml
 [dependencies]
-netdev = { version = "0.46", default-features = false, features = ["gateway"] }
+netdev = { version = "0.47", default-features = false, features = ["gateway"] }
 ```
 
 ## Apple behavior
@@ -74,7 +74,7 @@ macOS Wi-Fi transmit-speed collection is disabled by default. To enable it, opt 
 
 ```toml
 [dependencies]
-netdev = { version = "0.46", features = ["apple-wifi-extra"] }
+netdev = { version = "0.47", features = ["apple-wifi-extra"] }
 ```
 
 This uses CoreWLAN, whose metadata lookup may perform synchronous IPC while interfaces are
@@ -90,7 +90,7 @@ and was later rebranded to `netdev` by the author for future expansion, clearer 
 ## Tested on
 - Linux
     - Ubuntu 
-        - 24.04
+        - 24.04.5
         - 22.04
         - 21.10 
         - 20.04 
@@ -107,20 +107,20 @@ and was later rebranded to `netdev` by the author for future expansion, clearer 
     - 14.7.6
 - macOS (Intel)
     - 13.4.1
-    - 11.6
 - Windows 
-    - 11 25H2 26200.8037
+    - 11 25H2 26200.9711
     - 11 24H2 26100.6584
-    - 11 23H2 22631.4602
-    - 11 Pro 22H2 22621.3155
-    - 11 22H2 22621.3155
-    - 10 21H2 19044.1586
 - FreeBSD
-    - 14
+    - 14.4
+- OpenBSD
+    - 7.9
+- NetBSD
+    - 10.1
 - Android (arm64)
-    - 16.0
+    - 17
+    - 16
 - Android (x86_64)
-    - 16.0
+    - 16
 - iOS
+    - 26.6.2
     - 18.6.2
-    - 18.1.1

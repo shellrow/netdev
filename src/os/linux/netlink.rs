@@ -1,7 +1,8 @@
+use crate::os::linux::netlink_data::ip_from_addr;
 use netlink_packet_core::NetlinkPayload;
 use netlink_packet_route::{
     RouteNetlinkMessage,
-    address::{AddressAttribute, AddressFlags, AddressMessage},
+    address::AddressMessage,
     link::{LinkAttribute, LinkMessage},
 };
 use netlink_sys::{Socket, protocols::NETLINK_ROUTE};
@@ -118,27 +119,6 @@ fn name_from_link(link: &LinkMessage) -> Option<String> {
         }
     }
     None
-}
-
-fn ip_from_addr(addr: &AddressMessage) -> Option<(IpAddr, u8, u32)> {
-    let pfx = addr.header.prefix_len;
-    let mut ip_out = None;
-    let mut flags: Option<AddressFlags> = None;
-    for nla in &addr.attributes {
-        match nla {
-            AddressAttribute::Local(ip) | AddressAttribute::Address(ip) => {
-                ip_out = Some(*ip);
-            }
-            AddressAttribute::Flags(f) => {
-                flags = Some(*f);
-            }
-            _ => {}
-        }
-    }
-    let addr_flags = flags
-        .map(|f| f.bits())
-        .unwrap_or(addr.header.flags.bits() as u32);
-    ip_out.map(|ip| (ip, pfx, addr_flags))
 }
 
 #[cfg(feature = "gateway")]

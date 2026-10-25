@@ -54,7 +54,8 @@ fn try_ipv6() -> Option<IpAddr> {
 /// that would be used to reach a non-routable destination. No application data is sent.
 ///
 /// The returned address is useful for identifying the interface currently preferred for the
-/// default route.
+/// default route. More-specific routes to the probe destinations (10.254.254.254 or
+/// fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff) can select a different interface.
 ///
 /// Returns `None` when socket creation, address selection, or local address inspection fails.
 #[cfg(feature = "gateway")]
@@ -105,8 +106,8 @@ pub(crate) fn is_global_ipv6(ipv6_addr: &Ipv6Addr) -> bool {
         || matches!(ipv6_addr.segments(), [0, 0, 0, 0, 0, 0xffff, _, _])
         // IPv4-IPv6 Translat. (`64:ff9b:1::/48`)
         || matches!(ipv6_addr.segments(), [0x64, 0xff9b, 1, _, _, _, _, _])
-        // Discard-Only Address Block (`100::/64`)
-        || matches!(ipv6_addr.segments(), [0x100, 0, 0, 0, _, _, _, _])
+        // Discard-Only Address Block (`100::/64`) and Dummy IPv6 Prefix (`100:0:0:1::/64`)
+        || matches!(ipv6_addr.segments(), [0x100, 0, 0, 0..=1, _, _, _, _])
         // IETF Protocol Assignments (`2001::/23`)
         || (matches!(ipv6_addr.segments(), [0x2001, b, _, _, _, _, _, _] if b < 0x200)
             && !(
@@ -114,6 +115,8 @@ pub(crate) fn is_global_ipv6(ipv6_addr: &Ipv6Addr) -> bool {
                 u128::from_be_bytes(ipv6_addr.octets()) == 0x2001_0001_0000_0000_0000_0000_0000_0001
                 // Traversal Using Relays around NAT Anycast (`2001:1::2`)
                 || u128::from_be_bytes(ipv6_addr.octets()) == 0x2001_0001_0000_0000_0000_0000_0000_0002
+                // DNS-SD Service Registration Protocol Anycast (`2001:1::3`)
+                || u128::from_be_bytes(ipv6_addr.octets()) == 0x2001_0001_0000_0000_0000_0000_0000_0003
                 // AMT (`2001:3::/32`)
                 || matches!(ipv6_addr.segments(), [0x2001, 3, _, _, _, _, _, _])
                 // AS112-v6 (`2001:4:112::/48`)
@@ -125,6 +128,8 @@ pub(crate) fn is_global_ipv6(ipv6_addr: &Ipv6Addr) -> bool {
         // 6to4 (`2002::/16`) - it's not explicitly documented as globally reachable,
         // IANA says N/A.
         || matches!(ipv6_addr.segments(), [0x2002, _, _, _, _, _, _, _])
+        // Segment Routing (SRv6) SIDs (`5f00::/16`)
+        || ipv6_addr.segments()[0] == 0x5f00
         || is_documentation_ipv6(ipv6_addr)
         || ipv6_addr.is_unique_local()
         || ipv6_addr.is_unicast_link_local())
@@ -191,6 +196,29 @@ mod tests {
         assert!(!is_global_ipv6(&unspecified));
         assert!(!is_global_ipv6(&unique_local));
         assert!(!is_global_ipv6(&doc));
+    }
+
+    #[test]
+    fn special_purpose_ipv6_boundaries() {
+        for address in [
+            "100:0:0:1::",
+            "100:0:0:1:ffff:ffff:ffff:ffff",
+            "5f00::",
+            "5f00:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+            "2001:1::4",
+        ] {
+            assert!(!is_global_ipv6(&address.parse().unwrap()), "{address}");
+        }
+        for address in [
+            "100:0:0:2::",
+            "5eff:ffff::",
+            "5f01::",
+            "2001:1::1",
+            "2001:1::2",
+            "2001:1::3",
+        ] {
+            assert!(is_global_ipv6(&address.parse().unwrap()), "{address}");
+        }
     }
 
     #[test]
