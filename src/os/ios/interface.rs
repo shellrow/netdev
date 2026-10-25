@@ -33,8 +33,6 @@ pub fn interfaces() -> Vec<Interface> {
         .as_ref()
         .map(|snapshot| snapshot.interface_map())
         .unwrap_or_default();
-    #[cfg(feature = "apple-system-configuration-extra")]
-    let sc_iface_map = super::sc::get_sc_interface_map();
 
     #[cfg(feature = "gateway")]
     let gateway_map = crate::os::darwin::route::get_gateway_map();
@@ -67,18 +65,6 @@ pub fn interfaces() -> Vec<Interface> {
             }
         }
 
-        #[cfg(feature = "apple-system-configuration-extra")]
-        if let Some(sc_iface) = sc_iface_map.get(&iface.name) {
-            if let Some(sc_type) = sc_iface.if_type() {
-                if iface.if_type.should_replace_with(sc_type) {
-                    iface.if_type = sc_type;
-                }
-            }
-            iface.friendly_name = sc_iface.friendly_name.clone();
-            iface.dhcp_v4_enabled = sc_iface.dhcp_v4_enabled;
-            iface.dhcp_v6_enabled = sc_iface.dhcp_v6_enabled;
-        }
-
         #[cfg(feature = "gateway")]
         {
             if let Some(gateway) = gateway_map.get(&iface.index) {
@@ -106,15 +92,7 @@ pub fn interfaces() -> Vec<Interface> {
         if let Some(idx) = default_idx {
             if let Some(iface) = ifaces.iter_mut().find(|it| it.index == idx) {
                 iface.default = true;
-
-                #[cfg(feature = "apple-system-configuration-extra")]
-                {
-                    iface.dns_servers = crate::os::ios::dns::get_system_dns_conf();
-                }
-                #[cfg(not(feature = "apple-system-configuration-extra"))]
-                {
-                    iface.dns_servers = crate::os::unix::dns::get_system_dns_conf();
-                }
+                iface.dns_servers = super::dns::get_system_dns_conf();
             }
         }
     }

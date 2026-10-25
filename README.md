@@ -49,7 +49,7 @@ For more details, see [examples][examples-url] or [doc][doc-url].
   - Enables default interface and default gateway helpers.
 - `apple-system-configuration-extra` (default)
   - Enables deeper Apple metadata enrichment using `SystemConfiguration` APIs.
-  - On Apple targets, this adds metadata such as interface display names, DHCP hints, and iOS DNS resolver lookup when the platform exposes them.
+  - On macOS, this adds metadata such as interface display names and DHCP hints. iOS does not offer these APIs (`API_UNAVAILABLE(ios)`), so the feature has no effect there; iOS reads DNS resolvers through libresolv.
 - `android-extra` (default)
   - Enables deeper Android metadata enrichment using Android platform APIs through JNI bindings.
   - On Android, this can add metadata such as traffic stats, DNS servers, DHCP hints, and Wi-Fi link speed when the app provides the required Android context and permissions.
@@ -65,8 +65,9 @@ netdev = { version = "0.46", default-features = false, features = ["gateway"] }
 ```
 
 ## Apple behavior
-`netdev` links `SystemConfiguration.framework` automatically on `macOS` and `iOS` through its build script.
+`netdev` links `SystemConfiguration.framework` automatically on `macOS` through its build script.
 If your app is ultimately linked by Xcode, you may still need to add `SystemConfiguration.framework` to the app target manually.
+On `iOS`, `netdev` uses only public APIs: `getifaddrs`, routing sysctls, `Network.framework` and libresolv.
 
 macOS Wi-Fi transmit-speed collection is disabled by default. To enable it, opt in to the
 `apple-wifi-extra` feature:
