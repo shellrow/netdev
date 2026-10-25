@@ -220,9 +220,6 @@ pub(crate) fn get_stats_from_index(index: u32) -> Option<InterfaceStats> {
     }
 }
 
-// On illumos, none of the branches below touch `iface` yet (no kstat integration), so it's
-// otherwise unused there.
-#[cfg_attr(target_os = "illumos", allow(unused_variables))]
 pub(crate) fn update_interface_stats(iface: &mut Interface) -> std::io::Result<()> {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     {
@@ -240,6 +237,10 @@ pub(crate) fn update_interface_stats(iface: &mut Interface) -> std::io::Result<(
     #[cfg(target_os = "windows")]
     {
         iface.stats = get_stats_from_index(iface.index);
+    }
+    #[cfg(target_os = "illumos")]
+    {
+        iface.stats = None;
     }
     Ok(())
 }
