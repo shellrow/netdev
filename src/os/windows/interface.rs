@@ -25,7 +25,6 @@ use std::ffi::CStr;
 use crate::net::device::NetworkDevice;
 #[cfg(feature = "gateway")]
 use crate::net::ip::get_local_ipaddr;
-#[cfg(feature = "gateway")]
 use std::mem::MaybeUninit;
 #[cfg(feature = "gateway")]
 use std::net::Ipv4Addr;
@@ -49,7 +48,7 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> Option<MacAddr> {
     let src_ip_int = u32::from_ne_bytes(src_ip.octets());
     let dst_ip_int = u32::from_ne_bytes(dst_ip.octets());
     let mut out_buf_len = 6;
-    let mut target_mac_addr = MaybeUninit::<[u8; 6]>::uninit();
+    let mut target_mac_addr = [0u32; 2];
     let res = unsafe {
         SendARP(
             dst_ip_int,
@@ -59,9 +58,11 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> Option<MacAddr> {
         )
     };
     if res == NO_ERROR && out_buf_len == 6 {
-        Some(MacAddr::from_octets(unsafe {
-            target_mac_addr.assume_init()
-        }))
+        let first = target_mac_addr[0].to_ne_bytes();
+        let second = target_mac_addr[1].to_ne_bytes();
+        Some(MacAddr::from_octets([
+            first[0], first[1], first[2], first[3], second[0], second[1],
+        ]))
     } else {
         None
     }
@@ -218,16 +219,16 @@ unsafe fn from_wide_string(ptr: *const u16) -> String {
 // Reference: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
 pub fn interfaces() -> Vec<Interface> {
     #[cfg(feature = "gateway")]
-    let local_ip: IpAddr = match get_local_ipaddr() {
-        Some(local_ip) => local_ip,
-        None => IpAddr::V4(Ipv4Addr::LOCALHOST),
-    };
+    let local_ip = get_local_ipaddr();
     // "The recommended method of calling the GetAdaptersAddresses function is to pre-allocate a 15KB working buffer pointed to by the AdapterAddresses parameter."
     // (c) https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
-    let mut mem = Vec::<u8>::with_capacity(15000);
+    // Keep the allocation aligned for the adapter structures and their linked data.
+    let element_size = std::mem::size_of::<IP_ADAPTER_ADDRESSES_LH>();
+    let mut mem =
+        vec![MaybeUninit::<IP_ADAPTER_ADDRESSES_LH>::uninit(); 15000usize.div_ceil(element_size)];
     let mut retries = 3;
     loop {
-        let mut dwsize = mem.capacity() as u32;
+        let mut dwsize = (mem.len() * element_size) as u32;
         let ret_val = unsafe {
             GetAdaptersAddresses(
                 AF_UNSPEC as u32,
@@ -238,14 +239,12 @@ pub fn interfaces() -> Vec<Interface> {
             )
         };
         match ret_val {
-            NO_ERROR => {
-                unsafe {
-                    mem.set_len(dwsize as usize);
-                }
-                break;
-            }
+            NO_ERROR => break,
             ERROR_BUFFER_OVERFLOW if retries > 0 => {
-                mem.reserve(dwsize as usize);
+                mem.resize_with(
+                    (dwsize as usize).div_ceil(element_size),
+                    MaybeUninit::uninit,
+                );
                 retries -= 1;
             }
             _ => {
@@ -380,8 +379,9 @@ pub fn interfaces() -> Vec<Interface> {
                 .collect();
             #[cfg(feature = "gateway")]
             let default: bool = match local_ip {
-                IpAddr::V4(local_ipv4) => ipv4_vec.iter().any(|x| x.addr() == local_ipv4),
-                IpAddr::V6(local_ipv6) => ipv6_vec.iter().any(|x| x.addr() == local_ipv6),
+                Some(IpAddr::V4(local_ipv4)) => ipv4_vec.iter().any(|x| x.addr() == local_ipv4),
+                Some(IpAddr::V6(local_ipv6)) => ipv6_vec.iter().any(|x| x.addr() == local_ipv6),
+                None => false,
             };
             let stats: Option<InterfaceStats> = super::stats::get_stats_from_index(index);
             let interface: Interface = Interface {
