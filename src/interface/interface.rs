@@ -1,6 +1,6 @@
 use crate::interface::ipv6_addr_flags::Ipv6AddrFlags;
 use crate::interface::state::OperState;
-use crate::ipnet::{Ipv4Net, Ipv6Net};
+use crate::ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use crate::net::ip::{is_global_ip, is_global_ipv4, is_global_ipv6};
 use crate::stats::counters::InterfaceStats;
 use crate::{interface::types::InterfaceType, net::mac::MacAddr};
@@ -238,11 +238,24 @@ impl Interface {
         self.ipv6.iter().map(|net| net.addr()).collect()
     }
     /// Returns all IPv4 and IPv6 host addresses assigned to this interface.
+    ///
+    /// Use [`Self::ip_addrs_with_prefix`] to include their prefix lengths.
     pub fn ip_addrs(&self) -> Vec<IpAddr> {
         self.ipv4_addrs()
             .into_iter()
             .map(IpAddr::V4)
             .chain(self.ipv6_addrs().into_iter().map(IpAddr::V6))
+            .collect()
+    }
+    /// Returns all assigned host addresses with their original prefix lengths.
+    ///
+    /// IPv4 entries come first, preserving the stored order within each address family.
+    pub fn ip_addrs_with_prefix(&self) -> Vec<IpNet> {
+        self.ipv4
+            .iter()
+            .copied()
+            .map(IpNet::V4)
+            .chain(self.ipv6.iter().copied().map(IpNet::V6))
             .collect()
     }
     /// Returns `true` when at least one IPv4 address is present.
@@ -298,6 +311,7 @@ impl Interface {
 #[cfg(test)]
 mod tests {
     use crate::interface::interface::Interface;
+    use crate::prelude::IpNet;
     use ipnet::{Ipv4Net, Ipv6Net};
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -305,6 +319,42 @@ mod tests {
     fn dummy_initializes_dhcp_state_as_unknown() {
         assert_eq!(Interface::dummy().dhcp_v4_enabled, None);
         assert_eq!(Interface::dummy().dhcp_v6_enabled, None);
+    }
+
+    #[test]
+    fn ip_addrs_with_prefix_preserves_hosts_prefixes_and_order() {
+        let mut itf = Interface::dummy();
+        let v4_first = "198.51.100.42/25".parse().unwrap();
+        let v4_second = "192.0.2.17/24".parse().unwrap();
+        let v6_first = "2001:db8:2::abcd/64".parse().unwrap();
+        let v6_second = "2001:db8:1::1234/96".parse().unwrap();
+        itf.ipv4 = vec![v4_first, v4_second];
+        itf.ipv6 = vec![v6_first, v6_second];
+
+        assert_eq!(
+            itf.ip_addrs_with_prefix(),
+            [
+                IpNet::V4(v4_first),
+                IpNet::V4(v4_second),
+                IpNet::V6(v6_first),
+                IpNet::V6(v6_second),
+            ]
+        );
+    }
+
+    #[test]
+    fn ip_addrs_with_prefix_handles_empty_address_families() {
+        let mut itf = Interface::dummy();
+        assert!(itf.ip_addrs_with_prefix().is_empty());
+
+        let v4 = "192.0.2.17/24".parse().unwrap();
+        itf.ipv4.push(v4);
+        assert_eq!(itf.ip_addrs_with_prefix(), [IpNet::V4(v4)]);
+
+        itf.ipv4.clear();
+        let v6 = "2001:db8::1234/64".parse().unwrap();
+        itf.ipv6.push(v6);
+        assert_eq!(itf.ip_addrs_with_prefix(), [IpNet::V6(v6)]);
     }
 
     #[test]
