@@ -6,7 +6,7 @@ pub use crate::interface::types::InterfaceType;
 pub use crate::net::device::NetworkDevice;
 pub use crate::net::mac::MacAddr;
 pub use crate::stats::counters::InterfaceStats;
-pub use ipnet::{Ipv4Net, Ipv6Net};
+pub use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 
 #[cfg(feature = "gateway")]
 pub use crate::interface::get_default_interface;
