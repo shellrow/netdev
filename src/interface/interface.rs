@@ -137,8 +137,6 @@ impl Interface {
         super::resolve_default_interface(super::interfaces())
     }
     /// Returns an empty placeholder interface.
-    ///
-    /// This constructor is mainly useful for tests and internal assembly of interface data.
     pub fn dummy() -> Interface {
         Interface {
             index: 0,
@@ -199,7 +197,7 @@ impl Interface {
     ///
     /// The exact definition depends on the operating system.
     pub fn is_running(&self) -> bool {
-        super::flags::is_running(&self)
+        super::flags::is_running(self)
     }
     /// Returns `true` when the interface appears to be backed by physical hardware.
     pub fn is_physical(&self) -> bool {
@@ -209,7 +207,7 @@ impl Interface {
             return false;
         }
 
-        super::flags::is_physical_interface(&self)
+        super::flags::is_physical_interface(self)
             && !oui::is_virtual_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
             && !oui::is_known_loopback_mac(&self.mac_addr.unwrap_or(MacAddr::zero()))
     }
@@ -241,10 +239,11 @@ impl Interface {
     ///
     /// Use [`Self::ip_addrs_with_prefix`] to include their prefix lengths.
     pub fn ip_addrs(&self) -> Vec<IpAddr> {
-        self.ipv4_addrs()
-            .into_iter()
+        self.ipv4
+            .iter()
+            .map(Ipv4Net::addr)
             .map(IpAddr::V4)
-            .chain(self.ipv6_addrs().into_iter().map(IpAddr::V6))
+            .chain(self.ipv6.iter().map(|net| IpAddr::V6(net.addr())))
             .collect()
     }
     /// Returns all assigned host addresses with their original prefix lengths.
@@ -268,35 +267,39 @@ impl Interface {
     }
     /// Returns `true` when at least one assigned IPv4 address appears globally routable.
     pub fn has_global_ipv4(&self) -> bool {
-        self.ipv4_addrs().iter().any(|ip| is_global_ipv4(ip))
+        self.ipv4.iter().any(|net| is_global_ipv4(&net.addr()))
     }
     /// Returns `true` when at least one assigned IPv6 address appears globally routable.
     pub fn has_global_ipv6(&self) -> bool {
-        self.ipv6_addrs().iter().any(|ip| is_global_ipv6(ip))
+        self.ipv6.iter().any(|net| is_global_ipv6(&net.addr()))
     }
     /// Returns `true` when at least one assigned IPv4 or IPv6 address appears globally routable.
     pub fn has_global_ip(&self) -> bool {
-        self.ip_addrs().iter().any(|ip| is_global_ip(ip))
+        self.has_global_ipv4() || self.has_global_ipv6()
     }
     /// Returns IPv4 addresses that appear globally routable.
     pub fn global_ipv4_addrs(&self) -> Vec<Ipv4Addr> {
-        self.ipv4_addrs()
-            .into_iter()
-            .filter(|ip| is_global_ipv4(ip))
+        self.ipv4
+            .iter()
+            .map(Ipv4Net::addr)
+            .filter(is_global_ipv4)
             .collect()
     }
     /// Returns IPv6 addresses that appear globally routable.
     pub fn global_ipv6_addrs(&self) -> Vec<Ipv6Addr> {
-        self.ipv6_addrs()
-            .into_iter()
-            .filter(|ip| is_global_ipv6(ip))
+        self.ipv6
+            .iter()
+            .map(Ipv6Net::addr)
+            .filter(is_global_ipv6)
             .collect()
     }
     /// Returns IPv4 and IPv6 addresses that appear globally routable.
     pub fn global_ip_addrs(&self) -> Vec<IpAddr> {
-        self.ip_addrs()
-            .into_iter()
-            .filter(|ip| is_global_ip(ip))
+        self.ipv4
+            .iter()
+            .map(|net| IpAddr::V4(net.addr()))
+            .chain(self.ipv6.iter().map(|net| IpAddr::V6(net.addr())))
+            .filter(is_global_ip)
             .collect()
     }
     /// Refreshes `Interface::stats` for this interface.
@@ -369,7 +372,6 @@ mod tests {
             Ipv6Net::new("2606:4700:4700::1111".parse().unwrap(), 128).unwrap(), // global
         ];
 
-        // Check global_ip_addrs() fillters correctly
         let globals = itf.global_ip_addrs();
         assert!(globals.contains(&IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1))));
         assert!(globals.contains(&IpAddr::V6("2606:4700:4700::1111".parse().unwrap())));
