@@ -1,20 +1,18 @@
 use std::net::IpAddr;
 use windows_sys::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
-    GAA_FLAG_INCLUDE_GATEWAYS, GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH,
-    IP_ADAPTER_DHCP_ENABLED,
+    GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_DHCP_ENABLED,
 };
 use windows_sys::Win32::NetworkManagement::Ndis::NET_IF_OPER_STATUS_UP;
 use windows_sys::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, AF_UNSPEC, IpDadStateDeprecated, IpDadStateDuplicate, IpDadStateTentative,
-    IpSuffixOriginRandom, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET, SOCKET_ADDRESS,
+    IpSuffixOriginRandom, SOCKADDR_IN, SOCKADDR_IN6, SOCKET_ADDRESS,
 };
 
 use super::flags;
 use super::macros::linked_list_iter;
 use crate::interface::interface::Interface;
 use crate::interface::ipv6_addr_flags::Ipv6AddrFlags;
-use crate::interface::state::OperState;
 use crate::interface::types::InterfaceType;
 use crate::ipnet::{Ipv4Net, Ipv6Net};
 use crate::net::mac::MacAddr;
@@ -38,6 +36,11 @@ use windows_sys::Win32::NetworkManagement::IpHelper::{MIB_IPNET_ROW2, SendARP};
 use windows_sys::Win32::NetworkManagement::Ndis::NET_LUID_LH;
 #[cfg(feature = "gateway")]
 use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
+
+#[cfg(feature = "gateway")]
+use windows_sys::Win32::NetworkManagement::IpHelper::GAA_FLAG_INCLUDE_GATEWAYS;
+#[cfg(feature = "gateway")]
+use windows_sys::Win32::Networking::WinSock::SOCKADDR_INET;
 
 fn sanitize_u64(val: u64) -> Option<u64> {
     if val == u64::MAX { None } else { Some(val) }
@@ -72,6 +75,7 @@ fn get_mac_through_arp(src_ip: Ipv4Addr, dst_ip: Ipv4Addr) -> Option<MacAddr> {
 struct ParsedSocketAddress {
     ip_addr: IpAddr,
     ipv6_scope_id: Option<u32>,
+    #[cfg(feature = "gateway")]
     sockaddr: SOCKADDR_INET,
 }
 
@@ -94,6 +98,7 @@ unsafe fn parse_socket_address(addr: &SOCKET_ADDRESS) -> Option<ParsedSocketAddr
             Some(ParsedSocketAddress {
                 ip_addr: IpAddr::V4(unsafe { ipv4.sin_addr.S_un.S_addr }.to_ne_bytes().into()),
                 ipv6_scope_id: None,
+                #[cfg(feature = "gateway")]
                 sockaddr: SOCKADDR_INET { Ipv4: ipv4 },
             })
         }
@@ -105,6 +110,7 @@ unsafe fn parse_socket_address(addr: &SOCKET_ADDRESS) -> Option<ParsedSocketAddr
             Some(ParsedSocketAddress {
                 ip_addr: IpAddr::V6(unsafe { ipv6.sin6_addr.u.Byte }.into()),
                 ipv6_scope_id: Some(unsafe { ipv6.Anonymous.sin6_scope_id }),
+                #[cfg(feature = "gateway")]
                 sockaddr: SOCKADDR_INET { Ipv6: ipv6 },
             })
         }
@@ -207,62 +213,85 @@ impl GatewayCandidates {
     }
 }
 
-unsafe fn from_wide_string(ptr: *const u16) -> String {
+unsafe fn from_wide_string(ptr: *const u16) -> Option<String> {
+    if ptr.is_null() {
+        return None;
+    }
     let mut len = 0;
     while unsafe { *ptr.add(len) } != 0 {
         len += 1;
     }
-    String::from_utf16_lossy(unsafe { std::slice::from_raw_parts(ptr, len) })
+    Some(String::from_utf16_lossy(unsafe {
+        std::slice::from_raw_parts(ptr, len)
+    }))
 }
 
-// Get network interfaces using the IP Helper API
-// Reference: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
-pub fn interfaces() -> Vec<Interface> {
-    #[cfg(feature = "gateway")]
-    let local_ip = get_local_ipaddr();
-    // "The recommended method of calling the GetAdaptersAddresses function is to pre-allocate a 15KB working buffer pointed to by the AdapterAddresses parameter."
-    // (c) https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
-    // Keep the allocation aligned for the adapter structures and their linked data.
-    let element_size = std::mem::size_of::<IP_ADAPTER_ADDRESSES_LH>();
-    let mut mem =
-        vec![MaybeUninit::<IP_ADAPTER_ADDRESSES_LH>::uninit(); 15000usize.div_ceil(element_size)];
-    let mut retries = 3;
-    loop {
-        let mut dwsize = (mem.len() * element_size) as u32;
-        let ret_val = unsafe {
-            GetAdaptersAddresses(
-                AF_UNSPEC as u32,
-                GAA_FLAG_INCLUDE_GATEWAYS,
-                std::ptr::null_mut(),
-                mem.as_mut_ptr().cast(),
-                &mut dwsize,
-            )
-        };
-        match ret_val {
-            NO_ERROR => break,
-            ERROR_BUFFER_OVERFLOW if retries > 0 => {
-                mem.resize_with(
-                    (dwsize as usize).div_ceil(element_size),
-                    MaybeUninit::uninit,
-                );
-                retries -= 1;
-            }
-            _ => {
-                // TODO: return errors as a Result someday?
-                return vec![];
+pub(super) struct Adapters(Vec<MaybeUninit<IP_ADAPTER_ADDRESSES_LH>>);
+
+impl Adapters {
+    pub(super) fn read(flags: u32) -> Option<Self> {
+        // Keep the allocation aligned for the adapter structures and their linked data.
+        let element_size = std::mem::size_of::<IP_ADAPTER_ADDRESSES_LH>();
+        let mut mem = vec![
+            MaybeUninit::<IP_ADAPTER_ADDRESSES_LH>::uninit();
+            15000usize.div_ceil(element_size)
+        ];
+        let mut retries = 3;
+        loop {
+            let mut dwsize = (mem.len() * element_size) as u32;
+            let ret_val = unsafe {
+                GetAdaptersAddresses(
+                    AF_UNSPEC as u32,
+                    flags,
+                    std::ptr::null_mut(),
+                    mem.as_mut_ptr().cast(),
+                    &mut dwsize,
+                )
+            };
+            match ret_val {
+                NO_ERROR => return Some(Self(mem)),
+                ERROR_BUFFER_OVERFLOW if retries > 0 => {
+                    mem.resize_with(
+                        (dwsize as usize).div_ceil(element_size),
+                        MaybeUninit::uninit,
+                    );
+                    retries -= 1;
+                }
+                _ => return None,
             }
         }
     }
-    // Enumerate all adapters
-    let mem = mem.as_mut_ptr().cast::<IP_ADAPTER_ADDRESSES_LH>();
-    unsafe { linked_list_iter!(&mem) }
+
+    pub(super) fn iter(&self) -> impl Iterator<Item = &IP_ADAPTER_ADDRESSES_LH> {
+        // The API links records within this allocation, which lives for the iterator's borrow.
+        let first = unsafe { self.0.as_ptr().cast::<IP_ADAPTER_ADDRESSES_LH>().as_ref() };
+        std::iter::successors(first, |adapter| unsafe { adapter.Next.as_ref() })
+    }
+}
+
+pub fn interfaces() -> Vec<Interface> {
+    #[cfg(feature = "gateway")]
+    let flags = GAA_FLAG_INCLUDE_GATEWAYS;
+    #[cfg(not(feature = "gateway"))]
+    let flags = 0;
+    let Some(adapters) = Adapters::read(flags) else {
+        return Vec::new();
+    };
+    #[cfg(feature = "gateway")]
+    let local_ip = get_local_ipaddr();
+    adapters
+        .iter()
         .filter_map(|cur| {
             let if_type = InterfaceType::try_from(cur.IfType).ok()?;
             // Index
             let index = {
                 let anon1 = cur.Anonymous1;
                 let anon = unsafe { &anon1.Anonymous };
-                anon.IfIndex
+                if anon.IfIndex == 0 {
+                    cur.Ipv6IfIndex
+                } else {
+                    anon.IfIndex
+                }
             };
             // Flags and Status
             let mut flags: u32 = 0;
@@ -288,18 +317,12 @@ pub fn interfaces() -> Vec<Interface> {
                 _ => {}
             }
 
-            let oper_state: OperState = match cur.OperStatus {
-                1 => OperState::Up,
-                2 => OperState::Down,
-                3 => OperState::Testing,
-                4 => OperState::Unknown,
-                5 => OperState::Dormant,
-                6 => OperState::NotPresent,
-                7 => OperState::LowerLayerDown,
-                _ => OperState::Unknown,
-            };
+            let oper_state = super::state::from_status(cur.OperStatus);
 
             // Name
+            if cur.AdapterName.is_null() {
+                return None;
+            }
             let adapter_name = unsafe { CStr::from_ptr(cur.AdapterName.cast()) }
                 .to_string_lossy()
                 .into_owned();
@@ -387,8 +410,8 @@ pub fn interfaces() -> Vec<Interface> {
             let interface: Interface = Interface {
                 index,
                 name: adapter_name,
-                friendly_name: Some(unsafe { from_wide_string(cur.FriendlyName) }),
-                description: Some(unsafe { from_wide_string(cur.Description) }),
+                friendly_name: unsafe { from_wide_string(cur.FriendlyName) },
+                description: unsafe { from_wide_string(cur.Description) },
                 if_type,
                 mac_addr,
                 ipv4: ipv4_vec,
