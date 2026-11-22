@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_char;
 
-use super::sockaddr::{SockaddrRef, compute_sockaddr_len, netmask_ip_autolen, try_mac_from_raw};
+use super::sockaddr::{SockaddrRef, netmask_ip_autolen, sockaddr_len, try_mac_from_raw};
 use crate::interface::interface::Interface;
 use crate::interface::ipv6_addr_flags::get_ipv6_addr_flags;
 use crate::interface::mtu::get_mtu;
@@ -60,12 +60,15 @@ fn unix_interfaces_inner(
     let mut addr = addrs;
     while !addr.is_null() {
         let addr_ref: &libc::ifaddrs = unsafe { &*addr };
+        if addr_ref.ifa_name.is_null() {
+            addr = addr_ref.ifa_next;
+            continue;
+        }
         let if_type = get_interface_type(addr_ref);
         let c_str = addr_ref.ifa_name as *const c_char;
         let name = interface_name_from_ptr(c_str);
         let if_index = if_nametoindex_or_zero(&name);
-        let cap: libc::socklen_t = super::sockaddr::sockaddr_storage_cap();
-        let addr_len_opt = unsafe { compute_sockaddr_len(addr_ref.ifa_addr, None, Some(cap)) };
+        let addr_len_opt = unsafe { sockaddr_len(addr_ref.ifa_addr) };
         let (mac, ip, mut ipv6_scope_id) = match addr_len_opt {
             Some(addr_len) => {
                 let mac = unsafe {
@@ -136,6 +139,12 @@ fn unix_interfaces_inner(
             if let Some(mac) = mac {
                 iface.mac_addr = Some(mac);
             }
+            if iface.if_type == crate::prelude::InterfaceType::Unknown {
+                iface.if_type = if_type;
+            }
+            if iface.mtu.is_none() {
+                iface.mtu = get_mtu(addr_ref, &name);
+            }
             if iface.stats.is_none() {
                 iface.stats = stats;
             }
@@ -165,7 +174,7 @@ fn unix_interfaces_inner(
                 name,
                 friendly_name: None,
                 description: None,
-                if_type: if_type,
+                if_type,
                 mac_addr: mac,
                 ipv4: match ini_ipv4 {
                     Some(ipv4_addr) => vec![ipv4_addr],
@@ -175,7 +184,7 @@ fn unix_interfaces_inner(
                     Some(ipv6_addr) => vec![ipv6_addr],
                     None => Vec::new(),
                 },
-                ipv6_scope_ids: match ipv6_scope_id {
+                ipv6_scope_ids: match ini_ipv6.and(ipv6_scope_id) {
                     Some(scope_id) => vec![scope_id],
                     None => Vec::new(),
                 },
@@ -330,6 +339,8 @@ mod apple_stats_tests {
 
     unsafe fn make_list(out: *mut *mut libc::ifaddrs, link_first: bool) -> libc::c_int {
         let mut fixture: Box<Fixture> = Box::new(unsafe { zeroed() });
+        fixture.data.ifi_type = 6;
+        fixture.data.ifi_mtu = 1500;
         fixture.data.ifi_ibytes = 123;
         fixture.data.ifi_obytes = 0;
         let families = if link_first {
@@ -374,6 +385,8 @@ mod apple_stats_tests {
         for get_list in [link_first, link_last] {
             let ifaces = unix_interfaces_inner(get_list, free_list);
             assert_eq!(ifaces.len(), 1);
+            assert_eq!(ifaces[0].if_type, crate::prelude::InterfaceType::Ethernet);
+            assert_eq!(ifaces[0].mtu, Some(1500));
             let stats = ifaces[0].stats.as_ref().unwrap();
             assert_eq!((stats.rx_bytes, stats.tx_bytes), (123, 0));
             assert!(stats.timestamp.is_some());
