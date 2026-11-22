@@ -1,7 +1,5 @@
 use crate::interface::types::InterfaceType;
 use crate::os::darwin::types::{get_functional_type, interface_type_by_name};
-#[cfg(feature = "gateway")]
-use crate::os::ios::network::NWPathStatus;
 use crate::{interface::interface::Interface, os::unix::interface::unix_interfaces};
 #[cfg(feature = "gateway")]
 use crate::{net::device::NetworkDevice, net::mac::MacAddr};
@@ -74,14 +72,15 @@ pub fn interfaces() -> Vec<Interface> {
             if Some(iface.index) == default_idx {
                 iface.default = true;
 
-                if let Some(snapshot) = nw_path_snapshot.as_ref() {
-                    if snapshot.status == NWPathStatus::Satisfied
-                        && (!snapshot.gateways.ipv4.is_empty()
-                            || !snapshot.gateways.ipv6.is_empty())
-                    {
-                        let gateway = iface.gateway.get_or_insert_with(NetworkDevice::new);
-                        merge_gateway(gateway, &snapshot.gateways);
-                    }
+                if let Some(gateways) = nw_path_snapshot
+                    .as_ref()
+                    .filter(|snapshot| snapshot.satisfied)
+                    .and_then(|snapshot| snapshot.gateways.as_ref())
+                {
+                    merge_gateway(
+                        iface.gateway.get_or_insert_with(NetworkDevice::new),
+                        gateways,
+                    );
                 }
             }
         }

@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 use std::ffi::CStr;
+#[cfg(feature = "gateway")]
 use std::net::IpAddr;
 use std::os::raw::{c_char, c_void};
 use std::sync::{Arc, Condvar, Mutex};
@@ -15,6 +16,7 @@ use dispatch2::{
 };
 
 use crate::interface::types::InterfaceType;
+#[cfg(feature = "gateway")]
 use crate::net::device::NetworkDevice;
 
 #[derive(Debug, Clone)]
@@ -25,25 +27,13 @@ pub(crate) struct NWInterface {
     pub index: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum NWPathStatus {
-    Invalid,
-    Satisfied,
-    Unsatisfied,
-    Satisfiable,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct NWPathSnapshot {
-    pub status: NWPathStatus,
     pub interfaces: Vec<NWInterface>,
-    pub gateways: NetworkDevice,
-    pub has_ipv4: bool,
-    pub has_ipv6: bool,
-    pub has_dns: bool,
-    pub is_expensive: bool,
-    pub is_constrained: bool,
+    #[cfg(feature = "gateway")]
+    pub satisfied: bool,
+    #[cfg(feature = "gateway")]
+    pub gateways: Option<NetworkDevice>,
 }
 
 impl NWPathSnapshot {
@@ -57,25 +47,13 @@ impl NWPathSnapshot {
 
     #[cfg(feature = "gateway")]
     pub fn first_non_loopback_interface_index(&self) -> Option<u32> {
+        if !self.satisfied {
+            return None;
+        }
         self.interfaces
             .iter()
             .find(|iface| iface.if_type != InterfaceType::Loopback)
             .map(|iface| iface.index)
-    }
-}
-
-impl Default for NWPathSnapshot {
-    fn default() -> Self {
-        Self {
-            status: NWPathStatus::Invalid,
-            interfaces: Vec::new(),
-            gateways: NetworkDevice::new(),
-            has_ipv4: false,
-            has_ipv6: false,
-            has_dns: false,
-            is_expensive: false,
-            is_constrained: false,
-        }
     }
 }
 
@@ -85,39 +63,8 @@ unsafe extern "C" {}
 type nw_path_monitor_t = *mut c_void;
 type nw_path_t = *mut c_void;
 type nw_interface_t = *mut c_void;
+#[cfg(feature = "gateway")]
 type nw_endpoint_t = *mut c_void;
-
-#[allow(dead_code)]
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-enum nw_interface_type_t {
-    other = 0,
-    wifi = 1,
-    cellular = 2,
-    wired = 3,
-    loopback = 4,
-}
-
-#[allow(dead_code)]
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-enum nw_path_status_t {
-    invalid = 0,
-    satisfied = 1,
-    unsatisfied = 2,
-    satisfiable = 3,
-}
-
-#[allow(dead_code)]
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum nw_endpoint_type_t {
-    invalid = 0,
-    address = 1,
-    host = 2,
-    bonjour_service = 3,
-    url = 4,
-}
 
 unsafe extern "C" {
     fn nw_path_monitor_create() -> nw_path_monitor_t;
@@ -126,83 +73,50 @@ unsafe extern "C" {
     fn nw_path_monitor_start(monitor: nw_path_monitor_t);
     fn nw_path_monitor_cancel(monitor: nw_path_monitor_t);
 
-    fn nw_path_get_status(path: nw_path_t) -> nw_path_status_t;
-    fn nw_path_has_ipv4(path: nw_path_t) -> bool;
-    fn nw_path_has_ipv6(path: nw_path_t) -> bool;
-    fn nw_path_has_dns(path: nw_path_t) -> bool;
-    fn nw_path_is_expensive(path: nw_path_t) -> bool;
-    fn nw_path_is_constrained(path: nw_path_t) -> bool;
+    #[cfg(feature = "gateway")]
+    fn nw_path_get_status(path: nw_path_t) -> libc::c_uint;
     fn nw_path_enumerate_interfaces(path: nw_path_t, enumerate_block: *mut c_void);
+    #[cfg(feature = "gateway")]
     fn nw_path_enumerate_gateways(path: nw_path_t, enumerate_block: *mut c_void);
 
     fn nw_interface_get_name(interface: nw_interface_t) -> *const c_char;
-    fn nw_interface_get_type(interface: nw_interface_t) -> nw_interface_type_t;
+    fn nw_interface_get_type(interface: nw_interface_t) -> libc::c_uint;
     #[cfg(feature = "gateway")]
     fn nw_interface_get_index(interface: nw_interface_t) -> u32;
 
-    fn nw_endpoint_get_type(endpoint: nw_endpoint_t) -> nw_endpoint_type_t;
-    fn nw_endpoint_copy_address_string(endpoint: nw_endpoint_t) -> *mut c_char;
+    #[cfg(feature = "gateway")]
+    fn nw_endpoint_get_address(endpoint: nw_endpoint_t) -> *const libc::sockaddr;
 
     fn nw_release(obj: *mut c_void);
 }
 
-fn map_interface_type(t: nw_interface_type_t) -> InterfaceType {
-    match t {
-        nw_interface_type_t::wifi => InterfaceType::Wireless80211,
-        nw_interface_type_t::cellular => InterfaceType::Wwanpp,
-        nw_interface_type_t::wired => InterfaceType::Ethernet,
-        nw_interface_type_t::loopback => InterfaceType::Loopback,
-        nw_interface_type_t::other => InterfaceType::Unknown,
+fn map_interface_type(value: libc::c_uint) -> InterfaceType {
+    // nw_interface_type_t in Network/interface.h.
+    match value {
+        1 => InterfaceType::Wireless80211,
+        2 => InterfaceType::Wwanpp,
+        3 => InterfaceType::Ethernet,
+        4 => InterfaceType::Loopback,
+        _ => InterfaceType::Unknown,
     }
 }
 
-fn map_path_status(status: nw_path_status_t) -> NWPathStatus {
-    match status {
-        nw_path_status_t::satisfied => NWPathStatus::Satisfied,
-        nw_path_status_t::unsatisfied => NWPathStatus::Unsatisfied,
-        nw_path_status_t::satisfiable => NWPathStatus::Satisfiable,
-        nw_path_status_t::invalid => NWPathStatus::Invalid,
-    }
-}
-
+#[cfg(feature = "gateway")]
 fn parse_gateway_ip(endpoint: nw_endpoint_t) -> Option<IpAddr> {
     if endpoint.is_null() {
         return None;
     }
-
-    let ty = unsafe { nw_endpoint_get_type(endpoint) };
-    if ty != nw_endpoint_type_t::address {
+    let addr = unsafe { nw_endpoint_get_address(endpoint) };
+    if addr.is_null() {
         return None;
     }
-
-    let address = unsafe { nw_endpoint_copy_address_string(endpoint) };
-    if address.is_null() {
-        return None;
-    }
-
-    let ip = unsafe { CStr::from_ptr(address) }
-        .to_string_lossy()
-        .parse::<IpAddr>()
-        .ok();
-
-    unsafe {
-        libc::free(address.cast());
-    }
-
-    ip
+    // The endpoint owns the address for the duration of the enumeration callback.
+    unsafe { crate::os::unix::sockaddr::SockaddrRef::from_raw(addr, (*addr).sa_len.into()) }
+        .map(|address| address.to_ip())
 }
 
 fn collect_path_snapshot(path: nw_path_t) -> NWPathSnapshot {
-    let mut snapshot = NWPathSnapshot {
-        status: map_path_status(unsafe { nw_path_get_status(path) }),
-        has_ipv4: unsafe { nw_path_has_ipv4(path) },
-        has_ipv6: unsafe { nw_path_has_ipv6(path) },
-        has_dns: unsafe { nw_path_has_dns(path) },
-        is_expensive: unsafe { nw_path_is_expensive(path) },
-        is_constrained: unsafe { nw_path_is_constrained(path) },
-        ..NWPathSnapshot::default()
-    };
-
+    let mut snapshot = NWPathSnapshot::default();
     let interfaces: Arc<Mutex<Vec<NWInterface>>> = Arc::new(Mutex::new(Vec::new()));
     let interfaces_ref = Arc::clone(&interfaces);
     type InterfaceEnumBlock = dyn Fn(*mut c_void) -> u8 + 'static;
@@ -244,37 +158,44 @@ fn collect_path_snapshot(path: nw_path_t) -> NWPathSnapshot {
     }
     snapshot.interfaces = std::mem::take(&mut *interfaces.lock().unwrap());
 
-    let gateways: Arc<Mutex<NetworkDevice>> = Arc::new(Mutex::new(NetworkDevice::new()));
-    let gateways_ref = Arc::clone(&gateways);
-    type GatewayEnumBlock = dyn Fn(*mut c_void) -> u8 + 'static;
-    let gateway_block: RcBlock<GatewayEnumBlock> = RcBlock::new(move |endpoint_ptr| -> u8 {
-        if let Some(ip) = parse_gateway_ip(endpoint_ptr as nw_endpoint_t) {
-            let mut gateway = gateways_ref.lock().unwrap();
-            match ip {
-                IpAddr::V4(ipv4) => {
-                    if !gateway.ipv4.contains(&ipv4) {
-                        gateway.ipv4.push(ipv4);
+    #[cfg(feature = "gateway")]
+    {
+        // nw_path_status_satisfied in Network/path.h.
+        snapshot.satisfied = unsafe { nw_path_get_status(path) } == 1;
+        let gateways: Arc<Mutex<NetworkDevice>> = Arc::new(Mutex::new(NetworkDevice::new()));
+        let gateways_ref = Arc::clone(&gateways);
+        type GatewayEnumBlock = dyn Fn(*mut c_void) -> u8 + 'static;
+        let gateway_block: RcBlock<GatewayEnumBlock> = RcBlock::new(move |endpoint_ptr| -> u8 {
+            if let Some(ip) = parse_gateway_ip(endpoint_ptr as nw_endpoint_t) {
+                let mut gateway = gateways_ref.lock().unwrap();
+                match ip {
+                    IpAddr::V4(ipv4) => {
+                        if !gateway.ipv4.contains(&ipv4) {
+                            gateway.ipv4.push(ipv4);
+                        }
                     }
-                }
-                IpAddr::V6(ipv6) => {
-                    if !gateway.ipv6.contains(&ipv6) {
-                        gateway.ipv6.push(ipv6);
+                    IpAddr::V6(ipv6) => {
+                        if !gateway.ipv6.contains(&ipv6) {
+                            gateway.ipv6.push(ipv6);
+                        }
                     }
                 }
             }
+
+            1
+        });
+
+        unsafe {
+            nw_path_enumerate_gateways(
+                path,
+                RcBlock::<GatewayEnumBlock>::as_ptr(&gateway_block) as *mut c_void,
+            );
         }
-
-        1
-    });
-
-    unsafe {
-        nw_path_enumerate_gateways(
-            path,
-            RcBlock::<GatewayEnumBlock>::as_ptr(&gateway_block) as *mut c_void,
-        );
+        let gateway = gateways.lock().unwrap();
+        if !gateway.ipv4.is_empty() || !gateway.ipv6.is_empty() {
+            snapshot.gateways = Some(gateway.clone());
+        }
     }
-    snapshot.gateways = gateways.lock().unwrap().clone();
-
     snapshot
 }
 
@@ -321,14 +242,11 @@ pub(crate) fn current_path_snapshot() -> Option<NWPathSnapshot> {
 
         let (lock, cv) = &*shared;
         let guard = lock.lock().unwrap();
-        let mut guard = if guard.is_none() {
-            cv.wait_timeout(guard, Duration::from_millis(800))
-                .unwrap()
-                .0
-        } else {
-            guard
-        };
+        let (mut guard, _) = cv
+            .wait_timeout_while(guard, Duration::from_millis(800), |value| value.is_none())
+            .unwrap();
         let snapshot = guard.take();
+        drop(guard);
 
         nw_path_monitor_cancel(monitor);
         nw_release(monitor);
