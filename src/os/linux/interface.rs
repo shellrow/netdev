@@ -54,13 +54,12 @@ pub fn interfaces() -> Vec<Interface> {
     match netlink::collect_interfaces() {
         Ok(rows) => {
             for r in rows {
-                let name = r.name.clone();
                 let mut iface = Interface {
                     index: r.index,
-                    name: name.clone(),
+                    name: r.name,
                     friendly_name: None,
                     description: None,
-                    if_type: super::sysfs::get_interface_type(&name),
+                    if_type: crate::prelude::InterfaceType::Unknown,
                     mac_addr: r.mac.map(MacAddr::from_octets),
                     ipv4: Vec::new(),
                     ipv6: Vec::new(),
@@ -73,7 +72,7 @@ pub fn interfaces() -> Vec<Interface> {
                     auto_negotiate: None,
                     dhcp_v4_enabled: None,
                     dhcp_v6_enabled: None,
-                    stats: None,
+                    stats: r.stats,
                     #[cfg(feature = "gateway")]
                     gateway: None,
                     #[cfg(feature = "gateway")]
@@ -107,13 +106,13 @@ pub fn interfaces() -> Vec<Interface> {
 
     // Fill gateway info if feature enabled
     #[cfg(feature = "gateway")]
-    match netlink::collect_routes() {
-        Ok(mut gmap) => {
+    let default_source = match netlink::collect_routes() {
+        Ok(mut routes) => {
             for iface in &mut ifaces {
                 if iface.index == 0 {
                     continue;
                 }
-                if let Some(row) = gmap.remove(&iface.index) {
+                if let Some(row) = routes.gateways.remove(&iface.index) {
                     iface.gateway = Some(NetworkDevice {
                         mac_addr: row.mac.map(MacAddr::from_octets).unwrap_or(MacAddr::zero()),
                         ipv4: row.gw_v4,
@@ -121,6 +120,7 @@ pub fn interfaces() -> Vec<Interface> {
                     });
                 }
             }
+            routes.default_source
         }
         Err(_) => {
             // Fallback: procfs
@@ -130,8 +130,9 @@ pub fn interfaces() -> Vec<Interface> {
                     iface.gateway = Some(gateway);
                 }
             }
+            crate::net::ip::get_local_ipaddr()
         }
-    }
+    };
 
     // Fill other info
     for iface in &mut ifaces {
@@ -153,15 +154,12 @@ pub fn interfaces() -> Vec<Interface> {
         }
     }
     #[cfg(feature = "gateway")]
+    if let Some(local_ip) = default_source
+        && let Some(idx) = crate::interface::pick_default_iface_index(&ifaces, local_ip)
+        && let Some(iface) = ifaces.iter_mut().find(|it| it.index == idx)
     {
-        if let Some(local_ip) = crate::net::ip::get_local_ipaddr() {
-            if let Some(idx) = crate::interface::pick_default_iface_index(&ifaces, local_ip) {
-                if let Some(iface) = ifaces.iter_mut().find(|it| it.index == idx) {
-                    iface.default = true;
-                    iface.dns_servers = get_system_dns_conf();
-                }
-            }
-        }
+        iface.default = true;
+        iface.dns_servers = get_system_dns_conf();
     }
     ifaces
 }

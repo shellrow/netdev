@@ -4,48 +4,21 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::net::{SocketAddr, UdpSocket};
 
 #[cfg(feature = "gateway")]
-fn try_ipv4() -> Option<IpAddr> {
-    // Attempt to bind a UDP socket to an unspecified address and port.
-    let socket = match UdpSocket::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)) {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-    // Attempt to connect the socket to a specific non-routable IP address.
-    // This does not send actual data but is used to determine the routing interface.
-    match socket.connect(SocketAddr::new(
-        IpAddr::V4(Ipv4Addr::new(10, 254, 254, 254)),
-        1,
-    )) {
-        Ok(()) => (),
-        Err(_) => return None,
-    };
-    // Retrieve and return the local IP address from the socket.
-    match socket.local_addr() {
-        Ok(addr) => return Some(addr.ip()),
-        Err(_) => return None,
-    };
-}
+pub(crate) const IPV4_PROBE: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 254, 254, 254));
+#[cfg(feature = "gateway")]
+pub(crate) const IPV6_PROBE: IpAddr = IpAddr::V6(Ipv6Addr::from_bits(
+    0xfdff_ffff_ffff_ffff_ffff_ffff_ffff_ffff,
+));
 
 #[cfg(feature = "gateway")]
-fn try_ipv6() -> Option<IpAddr> {
-    // same thing but for IPv6
-    let socket = match UdpSocket::bind(SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)) {
-        Ok(s) => s,
-        Err(_) => return None,
+pub(crate) fn source_address_for(destination: IpAddr) -> Option<IpAddr> {
+    let bind_address = match destination {
+        IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+        IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
     };
-    match socket.connect(SocketAddr::new(
-        IpAddr::V6(Ipv6Addr::new(
-            0xfdff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff,
-        )),
-        1,
-    )) {
-        Ok(()) => (),
-        Err(_) => return None,
-    };
-    match socket.local_addr() {
-        Ok(addr) => return Some(addr.ip()),
-        Err(_) => return None,
-    };
+    let socket = UdpSocket::bind(SocketAddr::new(bind_address, 0)).ok()?;
+    socket.connect(SocketAddr::new(destination, 1)).ok()?;
+    Some(socket.local_addr().ok()?.ip())
 }
 
 /// Returns the local IP address selected for outbound traffic.
@@ -60,13 +33,7 @@ fn try_ipv6() -> Option<IpAddr> {
 /// Returns `None` when socket creation, address selection, or local address inspection fails.
 #[cfg(feature = "gateway")]
 pub fn get_local_ipaddr() -> Option<IpAddr> {
-    // binding the IPv4 socket can actually succeed but a later step will fail in IPv6-only,
-    // we call `try_ipv6` in any case where `try_ipv4` fails
-    if let Some(addr) = try_ipv4() {
-        Some(addr)
-    } else {
-        try_ipv6()
-    }
+    source_address_for(IPV4_PROBE).or_else(|| source_address_for(IPV6_PROBE))
 }
 
 /// Returns [`true`] if the address appears to be globally routable.
