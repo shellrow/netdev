@@ -115,11 +115,11 @@ fn parse_datagram(
         })?;
 
         if msg.header.sequence_number == expect_seq {
+            if msg.header.flags & NLM_F_DUMP_INTR != 0 {
+                return Err(io::Error::other("netlink dump was interrupted"));
+            }
             match &msg.payload {
                 NetlinkPayload::Done(done) => {
-                    if msg.header.flags & NLM_F_DUMP_INTR != 0 {
-                        return Err(io::Error::other("netlink dump was interrupted"));
-                    }
                     if done.code != 0 {
                         return Err(io::Error::other(format!(
                             "netlink dump failed: code={}",
@@ -276,13 +276,14 @@ mod tests {
 
     #[test]
     fn rejects_interrupted_dumps() {
-        let mut done = done_message();
-        done.header.flags = NLM_F_DUMP_INTR;
-        let mut messages = Vec::new();
+        for mut done in [link_message(SEQ), done_message()] {
+            done.header.flags = NLM_F_DUMP_INTR;
+            let mut messages = Vec::new();
 
-        let error = parse_datagram(&serialize(done), SEQ, &mut messages).unwrap_err();
+            let error = parse_datagram(&serialize(done), SEQ, &mut messages).unwrap_err();
 
-        assert_eq!(error.to_string(), "netlink dump was interrupted");
+            assert_eq!(error.to_string(), "netlink dump was interrupted");
+        }
     }
 
     #[test]
