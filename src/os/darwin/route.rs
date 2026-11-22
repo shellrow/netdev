@@ -23,11 +23,15 @@ const NET_RT_DUMP: c_int = 1;
 const NET_RT_FLAGS: c_int = 2;
 
 const RTM_VERSION: c_uchar = 5;
-const RTF_LLINFO: c_int = 1024;
 
-// rtm_flags
+// Darwin net/route.h flags used in routing messages. libc omits these on iOS.
+const RTF_UP: c_int = 0x0001;
+const RTF_GATEWAY: c_int = 0x0002;
+const RTF_REJECT: c_int = 0x0008;
+const RTF_LLINFO: c_int = 0x0400;
 #[allow(dead_code)]
 const RTF_STATIC: c_int = 0x0800;
+const RTF_BLACKHOLE: c_int = 0x1000;
 const RTF_WASCLONED: c_int = 0x20000;
 
 // rtm_addrs
@@ -543,11 +547,11 @@ fn build_gateway_map(
 
     // Collect gateway candidates per outgoing interface
     for r in routes.into_iter() {
-        let required = libc::RTF_UP | libc::RTF_GATEWAY;
+        let required = RTF_UP | RTF_GATEWAY;
         if r.prefix != 0
             || !r.dst.is_unspecified()
             || r.flags & required != required
-            || r.flags & (libc::RTF_REJECT | libc::RTF_BLACKHOLE) != 0
+            || r.flags & (RTF_REJECT | RTF_BLACKHOLE) != 0
         {
             continue;
         }
@@ -637,16 +641,16 @@ mod tests {
             prefix: 0,
             gateway: Some(gateway),
             ifindex,
-            flags: libc::RTF_UP | libc::RTF_GATEWAY,
+            flags: RTF_UP | RTF_GATEWAY,
         }
     }
 
     #[test]
     fn excludes_inactive_and_rejected_default_routes() {
         for flags in [
-            libc::RTF_GATEWAY,
-            libc::RTF_UP | libc::RTF_GATEWAY | libc::RTF_REJECT,
-            libc::RTF_UP | libc::RTF_GATEWAY | libc::RTF_BLACKHOLE,
+            RTF_GATEWAY,
+            RTF_UP | RTF_GATEWAY | RTF_REJECT,
+            RTF_UP | RTF_GATEWAY | RTF_BLACKHOLE,
         ] {
             let mut route = default_route("192.0.2.1".parse().unwrap(), TEST_IFINDEX);
             route.flags = flags;
