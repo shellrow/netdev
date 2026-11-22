@@ -27,11 +27,6 @@ const RTF_LLINFO: c_int = 1024;
 
 // rtm_flags
 #[allow(dead_code)]
-const RTF_UP: c_int = 0x0001;
-const RTF_GATEWAY: c_int = 0x0002;
-#[allow(dead_code)]
-const RTF_REJECT: c_int = 0x0008;
-#[allow(dead_code)]
 const RTF_STATIC: c_int = 0x0800;
 const RTF_WASCLONED: c_int = 0x20000;
 
@@ -310,7 +305,7 @@ fn message_to_neighbor(msg: &[u8], header_ifindex: u32) -> Option<NeighborEntry>
                 }
             }
             AF_LINK => {
-                if sa_len < mem::size_of::<libc::sockaddr_dl>() {
+                if sa_len < 8 {
                     off += roundup(sa_len);
                     continue;
                 }
@@ -321,7 +316,7 @@ fn message_to_neighbor(msg: &[u8], header_ifindex: u32) -> Option<NeighborEntry>
                 link_ifindex = u16::from_ne_bytes([sdl[2], sdl[3]]) as u32;
 
                 let mac_start = 8 + nlen;
-                if alen >= 6 && mac_start + alen <= sdl.len() {
+                if alen == 6 && mac_start + alen <= sdl.len() {
                     let m = MacAddr::from_octets([
                         sdl[mac_start],
                         sdl[mac_start + 1],
@@ -348,12 +343,10 @@ fn message_to_neighbor(msg: &[u8], header_ifindex: u32) -> Option<NeighborEntry>
 
 #[derive(Debug)]
 struct RawRoute {
-    #[allow(dead_code)]
     dst: IpAddr,
     prefix: u8,
     gateway: Option<IpAddr>,
     ifindex: u32,
-    #[allow(dead_code)]
     flags: c_int,
 }
 
@@ -550,8 +543,12 @@ fn build_gateway_map(
 
     // Collect gateway candidates per outgoing interface
     for r in routes.into_iter() {
-        // Only gateway routes (prefix==0) and those flagged as GATEWAY
-        if r.prefix != 0 || (r.flags & RTF_GATEWAY) == 0 {
+        let required = libc::RTF_UP | libc::RTF_GATEWAY;
+        if r.prefix != 0
+            || !r.dst.is_unspecified()
+            || r.flags & required != required
+            || r.flags & (libc::RTF_REJECT | libc::RTF_BLACKHOLE) != 0
+        {
             continue;
         }
         let gw = match r.gateway {
@@ -640,7 +637,20 @@ mod tests {
             prefix: 0,
             gateway: Some(gateway),
             ifindex,
-            flags: RTF_GATEWAY,
+            flags: libc::RTF_UP | libc::RTF_GATEWAY,
+        }
+    }
+
+    #[test]
+    fn excludes_inactive_and_rejected_default_routes() {
+        for flags in [
+            libc::RTF_GATEWAY,
+            libc::RTF_UP | libc::RTF_GATEWAY | libc::RTF_REJECT,
+            libc::RTF_UP | libc::RTF_GATEWAY | libc::RTF_BLACKHOLE,
+        ] {
+            let mut route = default_route("192.0.2.1".parse().unwrap(), TEST_IFINDEX);
+            route.flags = flags;
+            assert!(build_gateway_map(vec![route], &NeighborTables::default()).is_empty());
         }
     }
 
@@ -737,6 +747,18 @@ mod tests {
     }
 
     #[test]
+    fn accepts_compact_link_address() {
+        let ip = Ipv4Addr::new(192, 0, 2, 1);
+        let mut message = Vec::new();
+        push_sockaddr_in(&mut message, ip);
+        message.extend_from_slice(&[14, AF_LINK as u8, 0, 0, 0, 0, 6, 0]);
+        message.extend_from_slice(&TEST_MAC);
+        message.extend_from_slice(&[0, 0]);
+        let neighbor = message_to_neighbor(&message, TEST_IFINDEX).unwrap();
+        assert_eq!(neighbor.mac, MacAddr::from_octets(TEST_MAC));
+    }
+
+    #[test]
     fn rejects_incomplete_and_truncated_neighbor_entries() {
         let ip: Ipv6Addr = "fe80::1".parse().unwrap();
         let mut incomplete = Vec::new();
@@ -750,8 +772,8 @@ mod tests {
 
         let mut truncated_link = Vec::new();
         push_sockaddr_in(&mut truncated_link, Ipv4Addr::new(192, 168, 10, 1));
-        truncated_link.extend_from_slice(&[16, AF_LINK as u8, 0, 0, 0, 0, 6, 0]);
-        truncated_link.resize(32, 0);
+        truncated_link.extend_from_slice(&[12, AF_LINK as u8, 0, 0, 0, 0, 6, 0]);
+        truncated_link.resize(28, 0);
         assert_eq!(message_to_neighbor(&truncated_link, TEST_IFINDEX), None);
     }
 

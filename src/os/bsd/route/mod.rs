@@ -306,7 +306,7 @@ fn message_to_neighbor(msg: &[u8], header_ifindex: u32) -> Option<NeighborEntry>
                 link_ifindex = u16::from_ne_bytes([sdl[2], sdl[3]]) as u32;
 
                 let mac_start = SOCKADDR_DL_HEADER_LEN + nlen;
-                if alen >= 6 && mac_start + alen <= sdl.len() {
+                if alen == 6 && mac_start + alen <= sdl.len() {
                     let m = MacAddr::from_octets([
                         sdl[mac_start],
                         sdl[mac_start + 1],
@@ -332,12 +332,10 @@ fn message_to_neighbor(msg: &[u8], header_ifindex: u32) -> Option<NeighborEntry>
 
 #[derive(Debug)]
 struct RawRoute {
-    #[allow(dead_code)]
     dst: IpAddr,
     prefix: u8,
     gateway: Option<IpAddr>,
     ifindex: u32,
-    #[allow(dead_code)]
     flags: c_int,
 }
 
@@ -567,8 +565,12 @@ fn build_gateway_map(
 
     // Collect gateway candidates per outgoing interface
     for r in routes.into_iter() {
-        // Only gateway routes (prefix==0) and those flagged as GATEWAY
-        if r.prefix != 0 || (r.flags & libc::RTF_GATEWAY) == 0 {
+        let required = libc::RTF_UP | libc::RTF_GATEWAY;
+        if r.prefix != 0
+            || !r.dst.is_unspecified()
+            || r.flags & required != required
+            || r.flags & (libc::RTF_REJECT | libc::RTF_BLACKHOLE) != 0
+        {
             continue;
         }
         let gw = match r.gateway {
@@ -653,7 +655,20 @@ mod tests {
             prefix: 0,
             gateway: Some(gateway),
             ifindex,
-            flags: libc::RTF_GATEWAY,
+            flags: libc::RTF_UP | libc::RTF_GATEWAY,
+        }
+    }
+
+    #[test]
+    fn excludes_inactive_and_rejected_default_routes() {
+        for flags in [
+            libc::RTF_GATEWAY,
+            libc::RTF_UP | libc::RTF_GATEWAY | libc::RTF_REJECT,
+            libc::RTF_UP | libc::RTF_GATEWAY | libc::RTF_BLACKHOLE,
+        ] {
+            let mut route = default_route("192.0.2.1".parse().unwrap(), TEST_IFINDEX);
+            route.flags = flags;
+            assert!(build_gateway_map(vec![route], &NeighborTables::default()).is_empty());
         }
     }
 
