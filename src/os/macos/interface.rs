@@ -47,7 +47,7 @@ pub fn interfaces() -> Vec<Interface> {
 
         #[cfg(feature = "apple-wifi-extra")]
         if iface.if_type == InterfaceType::Wireless80211 && iface.is_up() {
-            iface.transmit_speed = get_wifi_transmit_rate(&iface.name);
+            iface.transmit_speed = get_wifi_transmit_rate(&iface.name).or(iface.transmit_speed);
         }
 
         #[cfg(feature = "gateway")]
