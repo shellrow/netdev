@@ -26,8 +26,6 @@ env:
   # Builds the archive (taiki-e/install-action below) and runs it in the VM
   # (prebuilt illumos binary). Keep both on the same version.
   NEXTEST_VERSION: "0.9.80"
-  # Plain image: the VM only runs prebuilt binaries. Switch to
-  # r151058-build if anything in `prepare` turns out to need a compiler.
   OMNIOS_RELEASE: r151058
 
 # Default to read-only; jobs that need more grant it explicitly.
@@ -113,8 +111,6 @@ jobs:
           curl -LsSf "https://get.nexte.st/$NEXTEST_VERSION/illumos" | gunzip | tar xf - -C /usr/local/bin
         run: |
           set -e
-          uname -a
-          psrinfo | wc -l
           /usr/local/bin/cargo-nextest nextest run \
             --archive-file illumos-tests.tar.zst \
             --workspace-remap "$PWD" \

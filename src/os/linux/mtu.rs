@@ -5,6 +5,7 @@ use std::os::unix::io::RawFd;
 use std::ptr;
 
 pub(crate) fn get_mtu(name: &str) -> Option<u32> {
+    let c_interface = CString::new(name).ok()?;
     // Create a socket for ioctl operations
     let sock: RawFd = unsafe { socket(AF_INET, SOCK_DGRAM, 0) };
     if sock < 0 {
@@ -18,7 +19,6 @@ pub(crate) fn get_mtu(name: &str) -> Option<u32> {
     let mut ifr: ifreq = unsafe { mem::zeroed() };
 
     // Set the interface name (must not exceed `IFNAMSIZ`)
-    let c_interface = CString::new(name).ok()?;
     // Ensure null termination
     let bytes = c_interface.to_bytes_with_nul();
     if bytes.len() > ifr.ifr_name.len() {

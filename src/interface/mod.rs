@@ -14,8 +14,10 @@ use std::net::IpAddr;
 ///
 /// This function is available when the `gateway` feature is enabled.
 ///
-/// Returns an error when no default route can be determined or when the local IP address
-/// cannot be resolved on the current platform.
+/// Selection can use the source address from [`crate::net::ip::get_local_ipaddr`].
+/// Linux consults the route table to avoid destinations covered by more-specific routes.
+/// With a fixed probe destination, a more-specific route can select a different interface.
+/// Returns an error if the platform data and source address do not identify an interface.
 #[cfg(feature = "gateway")]
 pub fn get_default_interface() -> Result<Interface, String> {
     resolve_default_interface(interfaces())
@@ -65,6 +67,11 @@ pub(crate) fn resolve_default_interface(mut ifaces: Vec<Interface>) -> Result<In
         return Ok(ifaces.swap_remove(pos));
     }
 
+    // Linux already performed the source lookup against its route snapshot.
+    if cfg!(target_os = "linux") {
+        return Err(String::from("Local IP address not found"));
+    }
+
     let local_ip: IpAddr = match get_local_ipaddr() {
         Some(local_ip) => local_ip,
         None => return Err(String::from("Local IP address not found")),
@@ -109,9 +116,8 @@ pub(crate) fn interfaces() -> Vec<Interface> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "gateway"))]
 mod tests {
-    #![cfg(feature = "gateway")]
     use crate::interface::types::InterfaceType;
     use crate::interface::{interface::Interface, pick_default_iface_index};
     use ipnet::{Ipv4Net, Ipv6Net};

@@ -3,93 +3,57 @@ name: CI
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
-  
+
+permissions:
+  contents: read
+
 jobs:
-  lint:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust Toolchain
-        run: rustup toolchain install stable --profile minimal --no-self-update
-
-      - name: Run rustfmt
-        run: cargo fmt --all --check
-
-  check:
-    name: Check
+  native:
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
-
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust Toolchain
-        run: rustup toolchain install stable --profile minimal --no-self-update
-
       - uses: swatinem/rust-cache@v2
 
-      - name: "Display network interfaces on machine (for test failure debugging)"
-        run: cargo run --example list_interfaces
+      - name: Check formatting
+        if: runner.os == 'Linux'
+        run: cargo fmt --all --check
 
-      - name: Run cargo build
-        run: cargo build
-
-      - name: Run cargo test
+      - name: Test default Apple features
+        if: runner.os == 'macOS'
         run: cargo test
+      - run: cargo test --all-features
+      - run: cargo test --no-default-features
 
-      - name: Test with all features
-        run: cargo test --all-features
-
-      - name: Test without default features
-        run: cargo test --no-default-features
-
-      - name: Check documentation links with all features
+      - name: Check public documentation
+        if: runner.os == 'Linux'
         env:
-          RUSTDOCFLAGS: "-D warnings"
-        run: cargo doc --no-deps --all-features
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          cargo doc --no-deps --all-features
+          cargo doc --no-deps --no-default-features
 
-      - name: Check documentation links without default features
-        env:
-          RUSTDOCFLAGS: "-D warnings"
-        run: cargo doc --no-deps --no-default-features
-
-      - name: Run cargo check with all features
-        run: cargo check --all-features
+      - name: Check iOS
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add aarch64-apple-ios
+          cargo check --target aarch64-apple-ios --all-features
 
   cross:
-    name: Cross compile
+    name: Cross-target checks
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - x86_64-unknown-linux-musl
-          - i686-unknown-linux-musl
-          - armv7-linux-androideabi
-          - aarch64-linux-android
-          - x86_64-unknown-freebsd
-          - x86_64-unknown-netbsd
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust Toolchain
-        run: rustup toolchain install stable --profile minimal --no-self-update
-
       - uses: swatinem/rust-cache@v2
-
-      - name: Install cross
-        run: cargo install cross
-
-      - name: Cross Compile Check
-        run: |
-          export CARGO_TARGET_DIR=target/build/${{ matrix.target }}
-          cross check --target ${{ matrix.target }}
+      - run: |
+          targets=(x86_64-unknown-linux-musl i686-unknown-linux-musl armv7-linux-androideabi aarch64-linux-android x86_64-unknown-freebsd x86_64-unknown-netbsd)
+          rustup target add "${targets[@]}"
+          for target in "${targets[@]}"; do
+            cargo check --target "$target" --all-features
+          done

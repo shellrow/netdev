@@ -33,7 +33,10 @@ fn get_ifmediareq(iface_name: &str) -> std::io::Result<ifmediareq> {
     let bytes = name.as_bytes_with_nul();
 
     let mut ifmr: ifmediareq = unsafe { std::mem::zeroed() };
-    ifmr.ifm_name[..bytes.len()].copy_from_slice(&bytes);
+    ifmr.ifm_name
+        .get_mut(..bytes.len())
+        .ok_or(std::io::ErrorKind::InvalidInput)?
+        .copy_from_slice(bytes);
 
     let sock = unsafe { socket(AF_INET, SOCK_DGRAM, 0) };
     if sock < 0 {
@@ -68,7 +71,11 @@ impl From<ifmediareq> for LinkSpeed {
         let auto_negotiate = current_subtype == IFM_AUTO;
 
         Self {
-            bps: map_subtype_to_bps(active_subtype).ok(),
+            bps: if value.ifm_active & MEDIA_TYPE_MASK == ETHERNET_MEDIA {
+                map_subtype_to_bps(active_subtype).ok()
+            } else {
+                None
+            },
             auto_negotiate,
         }
     }
@@ -84,7 +91,8 @@ type ifmediareq_int = u64;
 #[cfg(not(target_os = "openbsd"))]
 type ifmediareq_int = i32;
 
-#[repr(C)]
+#[cfg_attr(target_vendor = "apple", repr(C, packed(4)))]
+#[cfg_attr(not(target_vendor = "apple"), repr(C))]
 struct ifmediareq {
     ifm_name: [u8; IFNAMSIZ],
     ifm_current: ifmediareq_int,
@@ -95,49 +103,34 @@ struct ifmediareq {
     ifm_ulist: *mut ifmediareq_int,
 }
 
-// ifmediareq can be obtained via calling ioctl with the address SIOCGIFMEDIA or SIOCGIFXMEDIA.
-// The version without the 'X' seems to be the older one, which maybe doesn't work with the
-// extended types. However, some BSD variants (OpenBSD and NetBSD) don't define SIOCGIFXMEDIA.
-// This code uses SIOCGIFXMEDIA where available, otherwise SIOCGIFMEDIA.
-
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-// #define SIOCGIFXMEDIA   _IOWR('i', 72, struct ifmediareq)
-const SIOCGIFXMEDIA: u64 = 0xc02c6948;
-// #define SIOCGIFMEDIA    _IOWR('i', 56, struct ifmediareq)
-// const SIOCGIFMEDIA: u64 = 0xc02c6938;
-
-#[cfg(all(target_os = "freebsd", target_pointer_width = "64"))]
-// https://github.com/freebsd/freebsd-src/blob/master/sys/sys/sockio.h#L139
-// #define	SIOCGIFXMEDIA	_IOWR('i', 139, struct ifmediareq)
-const SIOCGIFXMEDIA: u64 = 0xc030698b;
-
-#[cfg(all(target_os = "freebsd", target_arch = "x86"))]
-const SIOCGIFXMEDIA: u32 = 0xc030698b;
-
-#[cfg(all(target_os = "freebsd", target_arch = "arm"))]
-// FreeBSD armv7 uses a 64-bit time_t and has a distinct ioctl value from i386.
-const SIOCGIFXMEDIA: u32 = 0xc028698b;
-
-#[cfg(all(
-    target_os = "freebsd",
-    not(target_pointer_width = "64"),
-    not(target_arch = "x86"),
-    not(target_arch = "arm")
-))]
-// Fallback for unknown 32-bit FreeBSD architectures to keep builds working.
-const SIOCGIFXMEDIA: u32 = 0xc028698b;
-
+// _IOWR('i', number, struct ifmediareq) from each platform's <sys/sockio.h>.
+#[cfg(target_vendor = "apple")]
+const MEDIA_IOCTL_NUMBER: u8 = 72;
+#[cfg(target_os = "freebsd")]
+const MEDIA_IOCTL_NUMBER: u8 = 139;
 #[cfg(any(target_os = "openbsd", target_os = "netbsd"))]
-// OpenBSD and netbsd don't define SIOCGIFXMEDIA.
-// Still using SIOCGIFXMEDIA as the variable name here.
-// https://github.com/openbsd/src/blob/master/sys/sys/sockio.h#L70
-// https://github.com/NetBSD/src/blob/trunk/sys/sys/sockio.h#L94
-// #define	SIOCGIFMEDIA	_IOWR('i', 56, struct ifmediareq)
-const SIOCGIFXMEDIA: libc::c_ulong =
-    0xc0006938 | ((std::mem::size_of::<ifmediareq>() as libc::c_ulong) << 16);
+const MEDIA_IOCTL_NUMBER: u8 = 56;
+const SIOCGIFXMEDIA: libc::c_ulong = 0xc0006900
+    | ((std::mem::size_of::<ifmediareq>() as libc::c_ulong) << 16)
+    | MEDIA_IOCTL_NUMBER as libc::c_ulong;
 
 #[cfg(all(test, target_pointer_width = "64"))]
 mod abi_tests {
+    #[cfg(target_vendor = "apple")]
+    #[test]
+    fn apple_media_request_matches_native_headers() {
+        assert_eq!(std::mem::size_of::<super::ifmediareq>(), 44);
+        assert_eq!(std::mem::offset_of!(super::ifmediareq, ifm_ulist), 36);
+        assert_eq!(super::SIOCGIFXMEDIA, 0xc02c6948);
+    }
+
+    #[test]
+    fn only_decodes_ethernet_media_as_ethernet_speeds() {
+        let mut request: super::ifmediareq = unsafe { std::mem::zeroed() };
+        request.ifm_active = super::IFM_10_T as _;
+        assert!(super::LinkSpeed::from(request).bps.is_none());
+    }
+
     #[cfg(target_os = "openbsd")]
     #[test]
     fn openbsd_media_request_matches_native_headers() {
@@ -152,6 +145,15 @@ mod abi_tests {
         assert_eq!(super::SIOCGIFXMEDIA, 0xc0306938);
     }
 }
+
+#[cfg(target_os = "openbsd")]
+const MEDIA_TYPE_MASK: ifmediareq_int = 0xff00;
+#[cfg(target_os = "openbsd")]
+const ETHERNET_MEDIA: ifmediareq_int = 0x100;
+#[cfg(not(target_os = "openbsd"))]
+const MEDIA_TYPE_MASK: ifmediareq_int = 0xe0;
+#[cfg(not(target_os = "openbsd"))]
+const ETHERNET_MEDIA: ifmediareq_int = 0x20;
 
 // The following constants are the same across all BSD variants and Apple targets.
 

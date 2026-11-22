@@ -27,40 +27,19 @@ pub struct InterfaceStats {
     pub timestamp: Option<SystemTime>,
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
 pub(crate) fn get_stats(ifa: Option<&libc::ifaddrs>, _name: &str) -> Option<InterfaceStats> {
-    let ifa = ifa?;
-    if ifa.ifa_addr.is_null() || ifa.ifa_data.is_null() {
-        return None;
-    }
-    // getifaddrs supplies if_data only for link-layer entries on Apple platforms.
-    if unsafe { (*ifa.ifa_addr).sa_family as libc::c_int } != libc::AF_LINK {
-        return None;
-    }
-    let data = unsafe { &*ifa.ifa_data.cast::<libc::if_data>() };
+    let data = crate::os::unix::link_data(ifa?)?;
     Some(InterfaceStats {
         rx_bytes: u64::from(data.ifi_ibytes),
         tx_bytes: u64::from(data.ifi_obytes),
         timestamp: Some(SystemTime::now()),
     })
-}
-
-#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
-pub(crate) fn get_stats(ifa: Option<&libc::ifaddrs>, _name: &str) -> Option<InterfaceStats> {
-    if let Some(ifa) = ifa {
-        if !ifa.ifa_data.is_null() {
-            let data = unsafe { &*(ifa.ifa_data as *const libc::if_data) };
-            Some(InterfaceStats {
-                rx_bytes: data.ifi_ibytes as u64,
-                tx_bytes: data.ifi_obytes as u64,
-                timestamp: Some(SystemTime::now()),
-            })
-        } else {
-            None
-        }
-    } else {
-        None
-    }
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -113,7 +92,12 @@ pub(crate) fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
     })
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
 fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
     let mut addrs = std::ptr::null_mut();
     if unsafe { libc::getifaddrs(&mut addrs) } != 0 {
@@ -127,7 +111,12 @@ fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
     result
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
 // Safety: addrs must be null or a valid getifaddrs-style list whose storage remains
 // alive for this call, including the NUL-terminated names, addresses, and if_data.
 unsafe fn get_stats_from_ifaddrs(
@@ -149,76 +138,8 @@ unsafe fn get_stats_from_ifaddrs(
     None
 }
 
-#[cfg(any(target_os = "openbsd", target_os = "freebsd", target_os = "netbsd"))]
-fn get_stats_from_name(name: &str) -> Option<InterfaceStats> {
-    use std::ffi::CStr;
-    let mut ifap: *mut libc::ifaddrs = std::ptr::null_mut();
-
-    // 1. getifaddrs()
-    if unsafe { libc::getifaddrs(&mut ifap) } != 0 {
-        return None;
-    }
-
-    let mut current = ifap;
-    let mut result = None;
-
-    // 2. Iterate through the list of ifaddrs
-    while !current.is_null() {
-        unsafe {
-            let ifa = &*current;
-
-            if ifa.ifa_name.is_null() {
-                current = ifa.ifa_next;
-                continue;
-            }
-
-            let ifa_name = CStr::from_ptr(ifa.ifa_name).to_string_lossy();
-
-            if ifa_name == name {
-                if !ifa.ifa_data.is_null() {
-                    let data = &*(ifa.ifa_data as *const libc::if_data);
-                    result = Some(InterfaceStats {
-                        rx_bytes: data.ifi_ibytes as u64,
-                        tx_bytes: data.ifi_obytes as u64,
-                        timestamp: Some(SystemTime::now()),
-                    });
-                    break;
-                }
-            }
-
-            current = ifa.ifa_next;
-        }
-    }
-
-    // 3. freeifaddrs()
-    unsafe {
-        libc::freeifaddrs(ifap);
-    }
-
-    result
-}
-
 #[cfg(target_os = "windows")]
-pub(crate) fn get_stats_from_index(index: u32) -> Option<InterfaceStats> {
-    use std::mem::zeroed;
-    use std::time::SystemTime;
-    use windows_sys::Win32::NetworkManagement::IpHelper::{GetIfEntry2, MIB_IF_ROW2};
-
-    let mut row: MIB_IF_ROW2 = unsafe { zeroed() };
-    row.InterfaceIndex = index;
-
-    unsafe {
-        if GetIfEntry2(&mut row) == 0 {
-            Some(InterfaceStats {
-                rx_bytes: row.InOctets as u64,
-                tx_bytes: row.OutOctets as u64,
-                timestamp: Some(SystemTime::now()),
-            })
-        } else {
-            None
-        }
-    }
-}
+use crate::os::windows::stats::get_stats_from_index;
 
 pub(crate) fn update_interface_stats(iface: &mut Interface) -> std::io::Result<()> {
     #[cfg(any(target_os = "linux", target_os = "android"))]

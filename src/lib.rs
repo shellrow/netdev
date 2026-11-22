@@ -1,20 +1,25 @@
-//! Cross-platform library for enumerating network interfaces with metadata.
+//! Cross-platform library for enumerating network interfaces and their addresses, link properties, and traffic counters.
 //!
-//! `netdev` provides a unified API for discovering local network interfaces
-//! and retrieving commonly used metadata across platforms.
+//! [`get_interfaces`] returns a snapshot. Metadata availability depends on the OS and driver.
 //!
-//! Main entry points:
-//! - [`get_interfaces`] returns a snapshot of all visible interfaces.
-//! - [`Interface`] represents one interface and its collected metadata.
+//! ```
+//! for interface in netdev::get_interfaces() {
+//!     println!("{}: {:?}", interface.name, interface.ip_addrs_with_prefix());
+//! }
+//! ```
+//!
 #![cfg_attr(
     feature = "gateway",
-    doc = "- [`get_default_interface`] and [`get_default_gateway`] are available with the `gateway` feature (default)."
+    doc = "[`get_default_interface`] and [`get_default_gateway`] are available with the `gateway` feature (default)."
 )]
 #![cfg_attr(
     not(feature = "gateway"),
-    doc = "- `get_default_interface` and `get_default_gateway` are available with the `gateway` feature (default)."
+    doc = "`get_default_interface` and `get_default_gateway` are available with the `gateway` feature (default)."
 )]
 //!
+//! On Android, the default `android-extra` feature requires an initialized `ndk-context`.
+//! Standalone binaries can disable default features and enable `gateway` separately.
+
 pub mod interface;
 pub mod net;
 mod os;

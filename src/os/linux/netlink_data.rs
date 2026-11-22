@@ -20,7 +20,6 @@ pub(crate) fn ip_from_addr(addr: &AddressMessage) -> Option<(IpAddr, u8, u32)> {
         .map(|ip| (ip, addr.header.prefix_len, flags))
 }
 
-#[cfg(any(target_os = "android", test))]
 pub(crate) fn stats_from_link(
     link: &netlink_packet_route::link::LinkMessage,
 ) -> Option<crate::stats::counters::InterfaceStats> {
@@ -31,7 +30,8 @@ pub(crate) fn stats_from_link(
         .iter()
         .find_map(|attribute| match attribute {
             LinkAttribute::Stats64(stats) => Some((stats.rx_bytes, stats.tx_bytes)),
-            LinkAttribute::Stats(stats) => {
+            // Linux can still read full-width sysfs counters when Stats64 is absent.
+            LinkAttribute::Stats(stats) if cfg!(target_os = "android") => {
                 fallback = Some((u64::from(stats.rx_bytes), u64::from(stats.tx_bytes)));
                 None
             }
@@ -101,8 +101,12 @@ mod tests {
             link.attributes.reverse();
         }
         link.attributes.pop();
-        let stats = stats_from_link(&link).unwrap();
-        assert_eq!((stats.rx_bytes, stats.tx_bytes), (1, 2));
+        let counters = stats_from_link(&link).map(|stats| (stats.rx_bytes, stats.tx_bytes));
+        if cfg!(target_os = "android") {
+            assert_eq!(counters, Some((1, 2)));
+        } else {
+            assert_eq!(counters, None);
+        }
         link.attributes.clear();
         assert_eq!(stats_from_link(&link), None);
     }

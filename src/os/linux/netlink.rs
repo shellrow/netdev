@@ -10,7 +10,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::{collections::HashMap, io};
 
 #[cfg(feature = "gateway")]
-use netlink_packet_route::AddressFamily;
+use ipnet::{IpAdd, IpNet};
 #[cfg(feature = "gateway")]
 use netlink_packet_route::neighbour::{NeighbourAddress, NeighbourAttribute, NeighbourMessage};
 #[cfg(feature = "gateway")]
@@ -131,32 +131,106 @@ fn route_addr_to_ip(a: &RouteAddress) -> Option<IpAddr> {
 }
 
 #[cfg(feature = "gateway")]
-fn route_extract(rt: &RouteMessage) -> (Option<IpAddr>, Option<u8>, Option<IpAddr>, Option<u32>) {
-    // (dst, prefix, gateway, oif)
-    let mut dst: Option<IpAddr> = None;
-    let pfx: Option<u8> = Some(rt.header.destination_prefix_length);
-    let mut gw: Option<IpAddr> = None;
-    let mut oif: Option<u32> = None;
+fn specific_prefix(route: &RouteMessage) -> Option<IpNet> {
+    let length = route.header.destination_prefix_length;
+    if length == 0 {
+        return None;
+    }
+    route.attributes.iter().find_map(|attr| match attr {
+        RouteAttribute::Destination(addr) => IpNet::new(route_addr_to_ip(addr)?, length).ok(),
+        _ => None,
+    })
+}
 
-    for nla in &rt.attributes {
-        match nla {
-            RouteAttribute::Destination(a) => dst = route_addr_to_ip(a),
-            RouteAttribute::Gateway(a) => gw = route_addr_to_ip(a),
-            RouteAttribute::Oif(i) => oif = Some(*i),
-            _ => {}
+#[cfg(feature = "gateway")]
+fn rule_destinations() -> io::Result<Vec<IpNet>> {
+    use netlink_packet_route::rule::{RuleAttribute, RuleMessage};
+    let mut sock = open_route_socket()?;
+    let seq = SEQ_BASE ^ 0x05;
+    super::netlink_io::send_dump(
+        &mut sock,
+        RouteNetlinkMessage::GetRule(RuleMessage::default()),
+        seq,
+    )?;
+    let mut prefixes = Vec::new();
+    for message in super::netlink_io::recv_multi(&mut sock, seq)? {
+        if let NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRule(rule)) = message.payload
+            && rule.header.dst_len > 0
+        {
+            for attr in rule.attributes {
+                if let RuleAttribute::Destination(addr) = attr
+                    && let Ok(prefix) = IpNet::new(addr, rule.header.dst_len)
+                {
+                    prefixes.push(prefix);
+                }
+            }
         }
     }
+    Ok(prefixes)
+}
 
-    // if dst is None and pfx is 0, it means default route
-    if dst.is_none() && pfx == Some(0) {
-        dst = match rt.header.address_family {
-            AddressFamily::Inet => Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
-            AddressFamily::Inet6 => Some(IpAddr::V6(Ipv6Addr::UNSPECIFIED)),
-            _ => None,
-        };
+#[cfg(feature = "gateway")]
+fn default_probe(prefixes: impl Iterator<Item = IpNet> + Clone, preferred: IpAddr) -> IpAddr {
+    let specificity = prefixes
+        .clone()
+        .filter(|net| net.contains(&preferred))
+        .map(|net| net.prefix_len())
+        .max()
+        .unwrap_or(0);
+    if specificity == 0 {
+        return preferred;
     }
 
-    (dst, pfx, gw, oif)
+    let mut prefixes: Vec<_> = prefixes
+        .filter(|net| net.addr().is_ipv4() == preferred.is_ipv4())
+        .collect();
+    prefixes.sort_unstable_by_key(IpNet::network);
+    // If a VPN covers the address space with two /1 routes, look outside its
+    // narrower exceptions. Keep the original probe when it is equally general.
+    for length in 0..specificity {
+        if let Some(destination) = uncovered_destination(&prefixes, preferred, length) {
+            return destination;
+        }
+    }
+    preferred
+}
+
+#[cfg(feature = "gateway")]
+fn uncovered_destination(prefixes: &[IpNet], preferred: IpAddr, min_length: u8) -> Option<IpAddr> {
+    let ranges: &[(IpAddr, IpAddr)] = match preferred {
+        IpAddr::V4(_) => &[
+            (
+                Ipv4Addr::new(1, 0, 0, 1).into(),
+                Ipv4Addr::new(126, 255, 255, 255).into(),
+            ),
+            (
+                Ipv4Addr::new(128, 0, 0, 0).into(),
+                Ipv4Addr::new(223, 255, 255, 255).into(),
+            ),
+        ][..],
+        IpAddr::V6(_) => &[(
+            Ipv6Addr::from_bits(0x2000_u128 << 112).into(),
+            Ipv6Addr::from_bits((0x4000_u128 << 112) - 1).into(),
+        )][..],
+    };
+
+    for &(mut candidate, end) in ranges {
+        for net in prefixes {
+            if net.network() > candidate {
+                break;
+            }
+            if net.prefix_len() > min_length && net.contains(&candidate) {
+                candidate = match net.broadcast() {
+                    IpAddr::V4(ip) => ip.saturating_add(1).into(),
+                    IpAddr::V6(ip) => ip.saturating_add(1).into(),
+                };
+            }
+        }
+        if candidate <= end {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 #[cfg(feature = "gateway")]
@@ -212,6 +286,7 @@ pub struct IfRow {
     pub ipv6_addr_flags: Vec<u32>,
     pub flags: u32,
     pub mtu: Option<u32>,
+    pub stats: Option<crate::stats::counters::InterfaceStats>,
 }
 
 pub fn collect_interfaces() -> io::Result<Vec<IfRow>> {
@@ -236,6 +311,7 @@ pub fn collect_interfaces() -> io::Result<Vec<IfRow>> {
                 ipv6_addr_flags: vec![],
                 flags,
                 mtu: mtu_nl,
+                stats: super::netlink_data::stats_from_link(&l),
             },
         );
     }
@@ -269,21 +345,40 @@ pub struct GwRow {
 }
 
 #[cfg(feature = "gateway")]
-pub fn collect_routes() -> io::Result<HashMap<u32, GwRow>> {
+pub struct RouteSnapshot {
+    pub gateways: HashMap<u32, GwRow>,
+    pub default_source: Option<IpAddr>,
+}
+
+#[cfg(feature = "gateway")]
+pub fn collect_routes() -> io::Result<RouteSnapshot> {
+    use crate::net::ip::{IPV4_PROBE, IPV6_PROBE, source_address_for};
     let routes = dump_routes()?;
+    // A destination-specific rule can select a VPN table containing only a default route.
+    let rules = rule_destinations().unwrap_or_default();
+    let prefixes = routes
+        .iter()
+        .filter_map(specific_prefix)
+        .chain(rules.iter().copied());
+    let default_source = source_address_for(default_probe(prefixes.clone(), IPV4_PROBE))
+        .or_else(|| source_address_for(default_probe(prefixes, IPV6_PROBE)));
     let neighs = dump_neigh().unwrap_or_default();
 
     let mut m: HashMap<u32, GwRow> = HashMap::new();
     for rt in routes {
-        let (_dst, pfx, gw, oif) = route_extract(&rt);
-        // default route only
-        if pfx != Some(0) {
+        if rt.header.destination_prefix_length != 0 {
             continue;
         }
-        let oif = match oif {
-            Some(i) => i,
-            None => continue,
-        };
+        let mut gw = None;
+        let mut oif = None;
+        for attr in &rt.attributes {
+            match attr {
+                RouteAttribute::Gateway(addr) => gw = route_addr_to_ip(addr),
+                RouteAttribute::Oif(index) => oif = Some(*index),
+                _ => {}
+            }
+        }
+        let Some(oif) = oif else { continue };
         if let Some(gwip) = gw {
             let e = m.entry(oif).or_insert(GwRow {
                 ifindex: oif,
@@ -332,5 +427,66 @@ pub fn collect_routes() -> io::Result<HashMap<u32, GwRow>> {
         row.mac = mac_candidates.get(*ifindex);
     }
 
-    Ok(m)
+    Ok(RouteSnapshot {
+        gateways: m,
+        default_source,
+    })
+}
+
+#[cfg(all(test, feature = "gateway"))]
+mod tests {
+    use super::*;
+    use crate::net::ip::{IPV4_PROBE, IPV6_PROBE};
+
+    fn route(cidr: &str) -> RouteMessage {
+        let prefix: IpNet = cidr.parse().unwrap();
+        let mut route = RouteMessage::default();
+        route.header.destination_prefix_length = prefix.prefix_len();
+        route
+            .attributes
+            .push(RouteAttribute::Destination(match prefix.addr() {
+                IpAddr::V4(addr) => RouteAddress::Inet(addr),
+                IpAddr::V6(addr) => RouteAddress::Inet6(addr),
+            }));
+        route
+    }
+
+    #[test]
+    fn split_routes_do_not_select_the_default_interface() {
+        for (probe, defaults, split) in [
+            (
+                IPV4_PROBE,
+                "0.0.0.0/0",
+                ["10.0.0.0/8", "1.0.0.0/8", "2.0.0.0/7"],
+            ),
+            (IPV6_PROBE, "::/0", ["fc00::/7", "2000::/16", "2001::/16"]),
+        ] {
+            let mut routes = vec![route(defaults)];
+            assert_eq!(
+                default_probe(routes.iter().filter_map(specific_prefix), probe),
+                probe
+            );
+            routes.extend(split.map(route));
+            let selected = default_probe(routes.iter().filter_map(specific_prefix), probe);
+            assert_eq!(probe.is_ipv4(), selected.is_ipv4());
+            assert!(
+                routes
+                    .iter()
+                    .filter_map(specific_prefix)
+                    .all(|net| !net.contains(&selected))
+            );
+        }
+    }
+
+    #[test]
+    fn covering_routes_preserve_the_kernel_lookup() {
+        let mut routes = vec![route("0.0.0.0/1"), route("128.0.0.0/1")];
+        assert_eq!(
+            default_probe(routes.iter().filter_map(specific_prefix), IPV4_PROBE),
+            IPV4_PROBE
+        );
+        routes.push(route("10.0.0.0/8"));
+        let selected = default_probe(routes.iter().filter_map(specific_prefix), IPV4_PROBE);
+        assert!(!specific_prefix(&routes[2]).unwrap().contains(&selected));
+    }
 }

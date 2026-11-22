@@ -1,10 +1,13 @@
 use crate::stats::counters::InterfaceStats;
 use jni::JavaVM;
-use jni::objects::{JByteArray, JObject, JObjectArray, JString, JValue};
+#[cfg(feature = "gateway")]
+use jni::objects::JByteArray;
+use jni::objects::{JObject, JObjectArray, JString, JValue};
 use std::collections::{HashMap, HashSet};
+#[cfg(feature = "gateway")]
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::panic::{self, PanicHookInfo};
-use std::sync::{Mutex, OnceLock};
+use std::panic;
+use std::sync::OnceLock;
 use std::time::SystemTime;
 
 #[derive(Clone, Debug, Default)]
@@ -20,33 +23,7 @@ pub(crate) struct InterfaceExtras {
 }
 
 pub(crate) fn get_interface_stats(name: &str) -> Option<InterfaceStats> {
-    with_android_env(|env, _| {
-        let name = env.new_string(name).ok()?;
-        let rx_bytes = call_static_long(
-            env,
-            "android/net/TrafficStats",
-            "getRxBytes",
-            "(Ljava/lang/String;)J",
-            &[JValue::Object(name.as_ref())],
-        )?;
-        let tx_bytes = call_static_long(
-            env,
-            "android/net/TrafficStats",
-            "getTxBytes",
-            "(Ljava/lang/String;)J",
-            &[JValue::Object(name.as_ref())],
-        )?;
-
-        if rx_bytes < 0 || tx_bytes < 0 {
-            return None;
-        }
-
-        Some(InterfaceStats {
-            rx_bytes: rx_bytes as u64,
-            tx_bytes: tx_bytes as u64,
-            timestamp: Some(SystemTime::now()),
-        })
-    })
+    with_android_env(|env, _| get_traffic_stats(env, name))
 }
 
 pub(crate) fn collect_interface_extras(if_names: &[String]) -> HashMap<String, InterfaceExtras> {
@@ -67,45 +44,46 @@ pub(crate) fn collect_interface_extras(if_names: &[String]) -> HashMap<String, I
 
 fn with_android_env<T, F>(f: F) -> Option<T>
 where
-    F: FnOnce(&mut jni::AttachGuard<'_>, &JObject<'static>) -> Option<T>,
+    F: FnOnce(&mut jni::JNIEnv<'_>, &JObject<'_>) -> Option<T>,
 {
     let ctx = try_android_context()?;
     let vm = unsafe { JavaVM::from_raw(ctx.vm().cast()) }.ok()?;
     let mut env = vm.attach_current_thread().ok()?;
-    let context = unsafe { JObject::from_raw(ctx.context().cast()) };
-    if is_null(&env, &context) {
+    if env.exception_check().ok()? {
         return None;
     }
-    f(&mut env, &context)
+    let raw_context: jni::sys::jobject = ctx.context().cast();
+    if raw_context.is_null() {
+        return None;
+    }
+    // ndk-context owns the global JNI reference. JObject is transparent over jobject.
+    let context = unsafe { &*std::ptr::from_ref(&raw_context).cast::<JObject<'_>>() };
+    let result = env.with_local_frame(32, |env| {
+        let value = f(env, context);
+        clear_pending_exception(env);
+        Ok::<_, jni::errors::Error>(value)
+    });
+    if result.is_err() {
+        clear_pending_exception(&env);
+    }
+    result.ok().flatten()
 }
 
 fn try_android_context() -> Option<ndk_context::AndroidContext> {
-    static ANDROID_CONTEXT_AVAILABLE: OnceLock<bool> = OnceLock::new();
-
-    if *ANDROID_CONTEXT_AVAILABLE.get_or_init(try_init_android_context) {
-        Some(ndk_context::android_context())
-    } else {
-        None
+    // ndk-context requires initialization before main and provides only a panicking getter.
+    static MISSING: OnceLock<()> = OnceLock::new();
+    if MISSING.get().is_some() {
+        return None;
     }
+    panic::catch_unwind(ndk_context::android_context)
+        .map_err(|_| {
+            let _ = MISSING.set(());
+        })
+        .ok()
 }
-
-fn try_init_android_context() -> bool {
-    static PANIC_HOOK_GUARD: Mutex<()> = Mutex::new(());
-
-    let Ok(_guard) = PANIC_HOOK_GUARD.lock() else {
-        return false;
-    };
-    let previous_hook = panic::take_hook();
-    panic::set_hook(Box::new(silent_panic_hook));
-    let result = panic::catch_unwind(ndk_context::android_context).is_ok();
-    panic::set_hook(previous_hook);
-    result
-}
-
-fn silent_panic_hook(_info: &PanicHookInfo<'_>) {}
 
 fn populate_traffic_stats(
-    env: &mut jni::AttachGuard<'_>,
+    env: &mut jni::JNIEnv<'_>,
     if_names: &[String],
     extras: &mut HashMap<String, InterfaceExtras>,
 ) {
@@ -117,8 +95,8 @@ fn populate_traffic_stats(
 }
 
 fn populate_connectivity_extras(
-    env: &mut jni::AttachGuard<'_>,
-    context: &JObject<'static>,
+    env: &mut jni::JNIEnv<'_>,
+    context: &JObject<'_>,
     extras: &mut HashMap<String, InterfaceExtras>,
     wifi_ifaces: &mut HashSet<String>,
 ) {
@@ -205,8 +183,8 @@ fn populate_connectivity_extras(
 }
 
 fn populate_wifi_speed(
-    env: &mut jni::AttachGuard<'_>,
-    context: &JObject<'static>,
+    env: &mut jni::JNIEnv<'_>,
+    context: &JObject<'_>,
     extras: &mut HashMap<String, InterfaceExtras>,
     wifi_ifaces: &HashSet<String>,
 ) {
@@ -255,7 +233,7 @@ fn populate_wifi_speed(
     }
 }
 
-fn get_traffic_stats(env: &mut jni::AttachGuard<'_>, if_name: &str) -> Option<InterfaceStats> {
+fn get_traffic_stats(env: &mut jni::JNIEnv<'_>, if_name: &str) -> Option<InterfaceStats> {
     let if_name = env.new_string(if_name).ok()?;
     let rx_bytes = call_static_long(
         env,
@@ -283,29 +261,28 @@ fn get_traffic_stats(env: &mut jni::AttachGuard<'_>, if_name: &str) -> Option<In
     })
 }
 
-fn get_system_service(
-    env: &mut jni::AttachGuard<'_>,
-    context: &JObject<'static>,
+fn get_system_service<'local>(
+    env: &mut jni::JNIEnv<'local>,
+    context: &JObject<'_>,
     field_name: &str,
-) -> Option<JObject<'static>> {
+) -> Option<JObject<'local>> {
     let service = env
         .get_static_field("android/content/Context", field_name, "Ljava/lang/String;")
         .ok()?
         .l()
         .ok()?;
-    let service_obj = call_object_method(
+    call_object_method(
         env,
         context,
         "getSystemService",
         "(Ljava/lang/String;)Ljava/lang/Object;",
         &[JValue::Object(service.as_ref())],
-    )?;
-    Some(unsafe { JObject::from_raw(service_obj.into_raw()) })
+    )
 }
 
 #[cfg(feature = "gateway")]
 fn get_dns_servers(
-    env: &mut jni::AttachGuard<'_>,
+    env: &mut jni::JNIEnv<'_>,
     link_properties: &JObject<'_>,
 ) -> Option<Vec<IpAddr>> {
     let dns_list = call_object_method(
@@ -342,7 +319,7 @@ fn get_dns_servers(
     Some(dns_servers)
 }
 
-fn has_dhcp_v4(env: &mut jni::AttachGuard<'_>, link_properties: &JObject<'_>) -> bool {
+fn has_dhcp_v4(env: &mut jni::JNIEnv<'_>, link_properties: &JObject<'_>) -> bool {
     let Some(server) = call_object_method(
         env,
         link_properties,
@@ -356,7 +333,7 @@ fn has_dhcp_v4(env: &mut jni::AttachGuard<'_>, link_properties: &JObject<'_>) ->
 }
 
 fn network_has_transport(
-    env: &mut jni::AttachGuard<'_>,
+    env: &mut jni::JNIEnv<'_>,
     connectivity_manager: &JObject<'_>,
     network: &JObject<'_>,
     transport: i32,
@@ -384,10 +361,8 @@ fn network_has_transport(
     .unwrap_or(false)
 }
 
-fn inet_address_to_ip(
-    env: &mut jni::AttachGuard<'_>,
-    inet_address: &JObject<'_>,
-) -> Option<IpAddr> {
+#[cfg(feature = "gateway")]
+fn inet_address_to_ip(env: &mut jni::JNIEnv<'_>, inet_address: &JObject<'_>) -> Option<IpAddr> {
     let addr = call_object_method(env, inet_address, "getAddress", "()[B", &[])?;
     if is_null(env, &addr) {
         return None;
@@ -405,19 +380,16 @@ fn inet_address_to_ip(
     }
 }
 
-fn call_object_method(
-    env: &mut jni::AttachGuard<'_>,
+fn call_object_method<'local>(
+    env: &mut jni::JNIEnv<'local>,
     obj: &JObject<'_>,
     name: &str,
     sig: &str,
     args: &[JValue],
-) -> Option<JObject<'static>> {
+) -> Option<JObject<'local>> {
     let value = env.call_method(obj, name, sig, args);
     match value {
-        Ok(value) => value
-            .l()
-            .ok()
-            .map(|obj| unsafe { JObject::from_raw(obj.into_raw()) }),
+        Ok(value) => value.l().ok(),
         Err(_) => {
             clear_pending_exception(env);
             None
@@ -426,7 +398,7 @@ fn call_object_method(
 }
 
 fn call_string_method(
-    env: &mut jni::AttachGuard<'_>,
+    env: &mut jni::JNIEnv<'_>,
     obj: &JObject<'_>,
     name: &str,
     sig: &str,
@@ -442,7 +414,7 @@ fn call_string_method(
 }
 
 fn call_int_method(
-    env: &mut jni::AttachGuard<'_>,
+    env: &mut jni::JNIEnv<'_>,
     obj: &JObject<'_>,
     name: &str,
     sig: &str,
@@ -459,7 +431,7 @@ fn call_int_method(
 }
 
 fn call_bool_method(
-    env: &mut jni::AttachGuard<'_>,
+    env: &mut jni::JNIEnv<'_>,
     obj: &JObject<'_>,
     name: &str,
     sig: &str,
@@ -476,7 +448,7 @@ fn call_bool_method(
 }
 
 fn call_static_long(
-    env: &mut jni::AttachGuard<'_>,
+    env: &mut jni::JNIEnv<'_>,
     class: &str,
     name: &str,
     sig: &str,
@@ -492,12 +464,7 @@ fn call_static_long(
     }
 }
 
-fn get_static_int(
-    env: &mut jni::AttachGuard<'_>,
-    class: &str,
-    name: &str,
-    sig: &str,
-) -> Option<i32> {
+fn get_static_int(env: &mut jni::JNIEnv<'_>, class: &str, name: &str, sig: &str) -> Option<i32> {
     let value = env.get_static_field(class, name, sig);
     match value {
         Ok(value) => value.i().ok(),
@@ -508,12 +475,12 @@ fn get_static_int(
     }
 }
 
-fn is_null(env: &jni::AttachGuard<'_>, obj: &JObject<'_>) -> bool {
+fn is_null(env: &jni::JNIEnv<'_>, obj: &JObject<'_>) -> bool {
     let null = JObject::null();
     env.is_same_object(obj, &null).unwrap_or(true)
 }
 
-fn clear_pending_exception(env: &jni::AttachGuard<'_>) {
+fn clear_pending_exception(env: &jni::JNIEnv<'_>) {
     if env.exception_check().unwrap_or(false) {
         let _ = env.exception_clear();
     }
