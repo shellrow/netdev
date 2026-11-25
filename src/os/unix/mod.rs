@@ -1,6 +1,6 @@
 #[cfg(all(
     feature = "gateway",
-    not(any(target_os = "ios", target_os = "illumos"))
+    not(any(target_os = "ios", target_os = "tvos", target_os = "illumos"))
 ))]
 pub mod dns;
 pub mod flags;

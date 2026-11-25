@@ -32,7 +32,7 @@ See the [Interface][doc-interface-url] struct documentation for more details.
 - macOS
 - Windows
 - Android
-- iOS
+- iOS and tvOS
 - BSDs
 
 ## Usage
@@ -68,7 +68,7 @@ For more details, see [examples][examples-url] or [doc][doc-url].
   `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE`. For standalone binaries without
   an Android context, use `default-features = false` and enable `gateway` as needed.
 - On macOS, Xcode targets that perform the final link may need to link
-  `SystemConfiguration.framework`. On macOS and iOS, the native byte counters
+  `SystemConfiguration.framework`. On macOS, iOS and tvOS, the native byte counters
   wrap at 4 GiB.
 - On illumos, traffic counters, gateway addresses, and DNS servers are unavailable.
   The default-interface helper can still identify the interface by its source address.

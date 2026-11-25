@@ -58,9 +58,14 @@ pub(crate) use crate::os::bsd::ipv6_addr_flags::*;
 pub(crate) use crate::os::illumos::ipv6_addr_flags::*;
 
 // On Linux/Android flags come from netlink; this is only reached via the
-// `unix_interfaces()` fallback when netlink is unavailable. The iOS SDK has no
-// `SIOCGIFAFLAG_IN6` (`netinet6/in6_var.h` ships for macOS only).
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "ios"))]
+// `unix_interfaces()` fallback when netlink is unavailable. The iOS and tvOS
+// SDKs have no `SIOCGIFAFLAG_IN6` (`netinet6/in6_var.h` ships for macOS only).
+#[cfg(any(
+    target_os = "linux",
+    target_os = "android",
+    target_os = "ios",
+    target_os = "tvos"
+))]
 pub(crate) fn get_ipv6_addr_flags(_ifname: &str, _addr: &std::net::Ipv6Addr) -> Ipv6AddrFlags {
     Ipv6AddrFlags::default()
 }

@@ -47,7 +47,7 @@ objc2 = { version = "0.6", optional = true }
 objc2-core-wlan = { version = "0.3", optional = true }
 objc2-foundation = { version = "0.3", optional = true }
 
-[target.'cfg(target_os = "ios")'.dependencies]
+[target.'cfg(any(target_os = "ios", target_os = "tvos"))'.dependencies]
 dispatch2 = "0.3"
 block2 = "0.6"
 
