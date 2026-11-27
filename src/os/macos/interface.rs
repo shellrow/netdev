@@ -13,11 +13,15 @@ use std::collections::HashMap;
 pub fn interfaces() -> Vec<Interface> {
     let mut ifaces: Vec<Interface> = unix_interfaces();
 
-    let if_extra_map: HashMap<String, SCInterface> =
-        read_sc_plist_interface_map().unwrap_or_else(|_| {
-            // Fallback to SCNetworkInterfaceCopyAll ...
-            get_sc_interface_map()
-        });
+    let if_extra_map: HashMap<String, SCInterface> = match read_sc_plist_interface_map() {
+        Ok(map) => map,
+        // With no free file descriptors, SystemConfiguration cannot map its
+        // preferences and SCNetworkInterfaceGetLocalizedDisplayName crashes
+        // inside CoreFoundation. Return the interfaces without SC metadata.
+        Err(err) if is_fd_exhausted(&err) => HashMap::new(),
+        // Fallback to SCNetworkInterfaceCopyAll ...
+        Err(_) => get_sc_interface_map(),
+    };
 
     #[cfg(feature = "gateway")]
     let gateway_map = crate::os::darwin::route::get_gateway_map();
@@ -71,4 +75,24 @@ pub fn interfaces() -> Vec<Interface> {
     }
 
     ifaces
+}
+
+/// True when an I/O error means the process (EMFILE) or the system (ENFILE)
+/// has no free file descriptors.
+fn is_fd_exhausted(err: &std::io::Error) -> bool {
+    matches!(err.raw_os_error(), Some(libc::EMFILE) | Some(libc::ENFILE))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_fd_exhausted;
+    use std::io::{Error, ErrorKind};
+
+    #[test]
+    fn detects_fd_exhaustion() {
+        assert!(is_fd_exhausted(&Error::from_raw_os_error(libc::EMFILE)));
+        assert!(is_fd_exhausted(&Error::from_raw_os_error(libc::ENFILE)));
+        assert!(!is_fd_exhausted(&Error::from_raw_os_error(libc::ENOENT)));
+        assert!(!is_fd_exhausted(&Error::new(ErrorKind::Other, "other")));
+    }
 }
