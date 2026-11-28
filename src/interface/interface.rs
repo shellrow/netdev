@@ -30,7 +30,7 @@ pub struct Interface {
     /// Human-readable interface name, when the platform provides one.
     ///
     /// Examples include `Wi-Fi` or `Ethernet` on Windows and display names on macOS.
-    /// This field is commonly `None` on Linux, Android, iOS, and BSD systems.
+    /// This field is commonly `None` on Linux, Android, iOS, tvOS, and BSD systems.
     pub friendly_name: Option<String>,
     /// Adapter description, when the platform provides one.
     ///

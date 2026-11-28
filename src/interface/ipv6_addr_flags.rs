@@ -8,7 +8,8 @@
 /// Flags are collected from platform-specific sources:
 ///
 /// - **Linux/Android**: netlink `IFA_FLAGS` attribute (`IFA_F_*` from [`<linux/if_addr.h>`])
-/// - **macOS/iOS**: `SIOCGIFAFLAG_IN6` ioctl (`IN6_IFF_*` from [`<netinet6/in6_var.h>`][xnu])
+/// - **macOS** uses the `SIOCGIFAFLAG_IN6` ioctl (`IN6_IFF_*` from [`<netinet6/in6_var.h>`][xnu]).
+/// - **iOS and tvOS** return `false` for all flags.
 /// - **FreeBSD/OpenBSD/NetBSD**: `SIOCGIFAFLAG_IN6` ioctl (`IN6_IFF_*` from [`<netinet6/in6_var.h>`][freebsd])
 /// - **Windows**: [`NL_DAD_STATE`] and [`NL_SUFFIX_ORIGIN`] from `IP_ADAPTER_UNICAST_ADDRESS`
 ///
