@@ -5,7 +5,7 @@ use mac_addr::MacAddr;
 use objc2_core_foundation::{CFArray, CFRetained};
 use objc2_system_configuration::SCNetworkInterface;
 use std::collections::HashMap;
-use std::io::Cursor;
+use std::io::{self, Cursor};
 
 const SC_NWIF_PATH: &str = "/Library/Preferences/SystemConfiguration/NetworkInterfaces.plist";
 const SC_PREFS_PATH: &str = "/Library/Preferences/SystemConfiguration/preferences.plist";
@@ -327,23 +327,80 @@ pub(crate) fn read_sc_interfaces_plist_map() -> std::io::Result<HashMap<String, 
 
 /// Read macOS SystemConfiguration plist files into a map of `BSD name -> SCInterface`.
 pub(crate) fn read_sc_plist_interface_map() -> std::io::Result<HashMap<String, SCInterface>> {
-    let preferences = std::fs::read(SC_PREFS_PATH)
-        .map(|bytes| load_sc_preferences_plist_map(&bytes))
-        .unwrap_or_default();
+    let preferences =
+        std::fs::read(SC_PREFS_PATH).map(|bytes| load_sc_preferences_plist_map(&bytes));
+    resolve_plist_reads(preferences, read_sc_interfaces_plist_map())
+}
 
-    match read_sc_interfaces_plist_map() {
-        Ok(interfaces) => Ok(merge_sc_interface_maps(interfaces, preferences)),
-        Err(_err) if !preferences.is_empty() => Ok(preferences),
-        Err(err) => Err(err),
+fn resolve_plist_reads(
+    preferences: io::Result<HashMap<String, SCInterface>>,
+    interfaces: io::Result<HashMap<String, SCInterface>>,
+) -> io::Result<HashMap<String, SCInterface>> {
+    match (preferences, interfaces) {
+        (Ok(prefs), Ok(ifaces)) => Ok(merge_sc_interface_maps(ifaces, prefs)),
+        (Err(_), Ok(ifaces)) => Ok(ifaces),
+        (Ok(prefs), Err(_)) if !prefs.is_empty() => Ok(prefs),
+        // Preserve FD exhaustion so the caller skips the SystemConfiguration fallback.
+        (Err(err), Err(_)) if is_fd_exhausted(&err) => Err(err),
+        (_, Err(err)) => Err(err),
     }
+}
+
+pub(super) fn is_fd_exhausted(err: &io::Error) -> bool {
+    matches!(err.raw_os_error(), Some(libc::EMFILE) | Some(libc::ENFILE))
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        load_sc_preferences_plist_map, map_ipv4_config_method_to_dhcp_v4,
-        map_ipv6_config_method_to_dhcp_v6,
+        SCInterface, is_fd_exhausted, load_sc_preferences_plist_map,
+        map_ipv4_config_method_to_dhcp_v4, map_ipv6_config_method_to_dhcp_v6, resolve_plist_reads,
     };
+    use std::{collections::HashMap, io::Error};
+
+    #[test]
+    fn detects_fd_exhaustion() {
+        assert!(is_fd_exhausted(&Error::from_raw_os_error(libc::EMFILE)));
+        assert!(is_fd_exhausted(&Error::from_raw_os_error(libc::ENFILE)));
+        assert!(!is_fd_exhausted(&Error::from_raw_os_error(libc::ENOENT)));
+        assert!(!is_fd_exhausted(&Error::other("other")));
+    }
+
+    #[test]
+    fn preserves_fd_exhaustion_from_either_plist() {
+        for exhausted in [libc::EMFILE, libc::ENFILE] {
+            for (first, second) in [(exhausted, libc::ENOENT), (libc::ENOENT, exhausted)] {
+                let err = resolve_plist_reads(
+                    Err(Error::from_raw_os_error(first)),
+                    Err(Error::from_raw_os_error(second)),
+                )
+                .unwrap_err();
+                assert_eq!(err.raw_os_error(), Some(exhausted));
+            }
+        }
+    }
+
+    #[test]
+    fn keeps_metadata_when_the_other_plist_hits_fd_exhaustion() {
+        let metadata = HashMap::from([("en0".to_owned(), SCInterface::default())]);
+        let exhausted = || Err(Error::from_raw_os_error(libc::EMFILE));
+        let prefs = resolve_plist_reads(Ok(metadata.clone()), exhausted()).unwrap();
+        let ifaces = resolve_plist_reads(exhausted(), Ok(metadata)).unwrap();
+        assert!(prefs.contains_key("en0"));
+        assert!(ifaces.contains_key("en0"));
+    }
+
+    #[test]
+    fn preserves_interfaces_error_for_ordinary_fallback() {
+        for preferences in [
+            Ok(HashMap::new()),
+            Err(Error::from_raw_os_error(libc::EACCES)),
+        ] {
+            let err = resolve_plist_reads(preferences, Err(Error::from_raw_os_error(libc::ENOENT)))
+                .unwrap_err();
+            assert_eq!(err.raw_os_error(), Some(libc::ENOENT));
+        }
+    }
 
     #[test]
     fn maps_ipv4_config_methods_to_dhcp_v4_state() {
