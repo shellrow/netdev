@@ -10,7 +10,7 @@ use crate::interface::interface::Interface;
 /// The counters are cumulative values reported by the operating system, typically since boot.
 /// Availability depends on the target platform and the specific interface driver.
 ///
-/// On macOS and iOS, these are 32-bit `if_data` counters from `getifaddrs`.
+/// On macOS, iOS, and tvOS, these are 32-bit `if_data` counters from `getifaddrs`.
 /// Byte counters wrap at 4 GiB, so they are not guaranteed to be full totals since boot.
 /// Casting them to `u64` does not recover wrapped traffic. No wrap detection or
 /// synthesized 64-bit totals are provided.
