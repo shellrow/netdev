@@ -1,5 +1,5 @@
 use crate::os::darwin::types::{get_functional_type, interface_type_by_name};
-use crate::os::macos::sc::{get_sc_interface_map, read_sc_plist_interface_map};
+use crate::os::macos::sc::{get_sc_interface_map, is_fd_exhausted, read_sc_plist_interface_map};
 #[cfg(feature = "apple-wifi-extra")]
 use crate::os::macos::wifi::get_wifi_transmit_rate;
 use crate::{
@@ -75,24 +75,4 @@ pub fn interfaces() -> Vec<Interface> {
     }
 
     ifaces
-}
-
-/// True when an I/O error means the process (EMFILE) or the system (ENFILE)
-/// has no free file descriptors.
-fn is_fd_exhausted(err: &std::io::Error) -> bool {
-    matches!(err.raw_os_error(), Some(libc::EMFILE) | Some(libc::ENFILE))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::is_fd_exhausted;
-    use std::io::{Error, ErrorKind};
-
-    #[test]
-    fn detects_fd_exhaustion() {
-        assert!(is_fd_exhausted(&Error::from_raw_os_error(libc::EMFILE)));
-        assert!(is_fd_exhausted(&Error::from_raw_os_error(libc::ENFILE)));
-        assert!(!is_fd_exhausted(&Error::from_raw_os_error(libc::ENOENT)));
-        assert!(!is_fd_exhausted(&Error::new(ErrorKind::Other, "other")));
-    }
 }
