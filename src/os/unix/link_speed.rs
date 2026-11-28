@@ -1,6 +1,7 @@
 #![cfg(any(
     target_os = "macos",
     target_os = "ios",
+    target_os = "tvos",
     target_os = "freebsd",
     target_os = "openbsd",
     target_os = "netbsd"
@@ -10,7 +11,7 @@
 use libc::{AF_INET, IFNAMSIZ, SOCK_DGRAM, close, ioctl, socket};
 use std::ffi::CString;
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
 use macos_subtypes::{ifm_subtype, map_subtype_to_bps};
 
 #[cfg(target_os = "freebsd")]
@@ -182,7 +183,7 @@ const IFM_HPNA_1: i32 = 17; // HomePNA 1.0 (1Mb/s)
 
 // The following constants are different on every BSD variant and macOS
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
 mod macos_subtypes {
     // https://github.com/apple/darwin-xnu/blob/main/bsd/net/if_media.h
     // MacOSX.sdk/usr/include/net/if_media.h

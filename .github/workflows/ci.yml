@@ -39,11 +39,12 @@ jobs:
           cargo doc --no-deps --all-features
           cargo doc --no-deps --no-default-features
 
-      - name: Check iOS
+      - name: Check iOS and tvOS
         if: runner.os == 'macOS'
         run: |
-          rustup target add aarch64-apple-ios
+          rustup target add aarch64-apple-ios aarch64-apple-tvos
           cargo check --target aarch64-apple-ios --all-features
+          cargo check --target aarch64-apple-tvos --all-features
 
   cross:
     name: Cross-target checks
